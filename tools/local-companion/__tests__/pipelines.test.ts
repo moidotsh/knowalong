@@ -6,6 +6,12 @@ import { describe, it, expect, beforeEach } from 'bun:test';
 import { jobManager } from '../jobManager';
 import { runSourceAnalysisPipeline } from '../pipelines/sourceAnalysis';
 import { runClccPipeline } from '../pipelines/clccGeneration';
+import {
+  rejectRussianSurfaceFormNoCyrillic,
+  rejectTransliterationMismatch,
+  detectGrammarNoteContradictions,
+  rejectRussianRealizationDefects,
+} from '../pipelines/clccGeneration';
 import type { JobState } from '../jobManager';
 
 interface FakeOllamaOpts {
@@ -695,5 +701,440 @@ describe('clccGeneration pipeline', () => {
     const stage3Call = ollama.calls.find((p) => p.includes('Concepts to illustrate'))!;
     expect(stage3Call).toContain('transliteration');
     expect(stage3Call).toContain('OPTIONAL for French');
+  });
+
+  // ── Anti-hallucination hardening (ru realization integrity) ───────────────
+  //
+  // The next block covers the new deterministic post-generation validators
+  // added to close the gap that let "likedat'", "zhity", and "verb, present
+  // tense, nominative singular" through. Two layers:
+  //   1. Isolated unit tests on each helper (script, transliteration, grammar).
+  //   2. End-to-end Stage 2 tests using the six observed-bad rows from the
+  //      operator's report — each must now be dropped with a specific reason.
+
+  describe('rejectRussianSurfaceFormNoCyrillic', () => {
+    it('rejects Latin-only surfaceForm ("likedat\'")', () => {
+      const reason = rejectRussianSurfaceFormNoCyrillic("likedat'");
+      expect(reason).not.toBeNull();
+      expect(reason).toContain('no Cyrillic');
+    });
+
+    it('rejects ASCII-only transliteration passed as surfaceForm', () => {
+      expect(rejectRussianSurfaceFormNoCyrillic('likedat')).not.toBeNull();
+      expect(rejectRussianSurfaceFormNoCyrillic('zhity')).not.toBeNull();
+    });
+
+    it('accepts genuine Cyrillic surfaceForm', () => {
+      expect(rejectRussianSurfaceFormNoCyrillic('быть')).toBeNull();
+      expect(rejectRussianSurfaceFormNoCyrillic('знать')).toBeNull();
+      expect(rejectRussianSurfaceFormNoCyrillic('внутри')).toBeNull();
+    });
+  });
+
+  describe('rejectTransliterationMismatch', () => {
+    it('rejects "zhity" for "жить" (wrong ISO 9)', () => {
+      const reason = rejectTransliterationMismatch('жить', 'zhity');
+      expect(reason).not.toBeNull();
+      expect(reason).toContain('does not match ISO 9');
+    });
+
+    it('accepts correct ISO 9 transliterations', () => {
+      expect(rejectTransliterationMismatch('быть', "byt'")).toBeNull();
+      expect(rejectTransliterationMismatch('знать', "znat'")).toBeNull();
+      expect(rejectTransliterationMismatch('жить', "zhit'")).toBeNull();
+      expect(rejectTransliterationMismatch('не', 'ne')).toBeNull();
+      expect(rejectTransliterationMismatch('я', 'ya')).toBeNull();
+    });
+
+    it('accepts transliteration with apostrophe/hyphen variants', () => {
+      // Soft sign may appear as ' or be omitted — both should pass.
+      expect(rejectTransliterationMismatch('жить', 'zhit')).toBeNull();
+      expect(rejectTransliterationMismatch('жить', "zhit'")).toBeNull();
+    });
+
+    it('rejects empty transliteration (no Latin letters after normalization)', () => {
+      const reason = rejectTransliterationMismatch('быть', '---');
+      expect(reason).not.toBeNull();
+      expect(reason).toContain('no Latin letters');
+    });
+
+    it('returns null when surfaceForm has no Cyrillic (other check rejects)', () => {
+      // Delegates to the script check; shouldn't double-flag.
+      expect(rejectTransliterationMismatch('likedat', 'likedat')).toBeNull();
+    });
+
+    it('tolerates ё→yo expansion for ё-bearing surfaceForms', () => {
+      // "сёл" → ISO 9 with ё→e gives "sel"; model emitting "syol" (ё→yo) is OK.
+      expect(rejectTransliterationMismatch('сёл', 'syol')).toBeNull();
+      expect(rejectTransliterationMismatch('ёж', 'yozh')).toBeNull();
+    });
+  });
+
+  describe('detectGrammarNoteContradictions', () => {
+    it('flags infinitive + present tense + nominative singular', () => {
+      const contradictions = detectGrammarNoteContradictions(
+        'verb, present tense, nominative singular',
+      );
+      // This note doesn't say "infinitive" — it's the "verb + case+number" check.
+      expect(contradictions.length).toBeGreaterThan(0);
+      expect(contradictions[0]).toContain('case + number');
+    });
+
+    it('flags "verb, infinitive, present tense, first person singular"', () => {
+      const contradictions = detectGrammarNoteContradictions(
+        'verb, infinitive, present tense, first person singular',
+      );
+      expect(contradictions.length).toBeGreaterThan(0);
+      expect(contradictions[0]).toContain('infinitive');
+    });
+
+    it('flags "adverb, prepositional case"', () => {
+      const contradictions = detectGrammarNoteContradictions('adverb, prepositional case');
+      expect(contradictions.length).toBeGreaterThan(0);
+      expect(contradictions[0]).toContain('adverb');
+    });
+
+    it('does NOT flag "verb, infinitive, imperfective aspect" (clean)', () => {
+      // Aspect + infinitive is a valid combination.
+      expect(detectGrammarNoteContradictions('verb, infinitive, imperfective aspect')).toEqual([]);
+    });
+
+    it('does NOT flag "verb, past tense, feminine singular" (clean)', () => {
+      // Past-tense verbs inflect for gender/number; no case mentioned.
+      expect(detectGrammarNoteContradictions('verb, past tense, feminine singular')).toEqual([]);
+    });
+
+    it('does NOT flag "preposition, genitive case" (clean)', () => {
+      expect(detectGrammarNoteContradictions('preposition, genitive case')).toEqual([]);
+    });
+
+    it('does NOT flag "noun, nominative singular" (clean)', () => {
+      expect(detectGrammarNoteContradictions('noun, nominative singular, masculine')).toEqual([]);
+    });
+
+    it('flags "noun, present tense" (nouns are not tensed)', () => {
+      const contradictions = detectGrammarNoteContradictions('noun, present tense, masculine');
+      expect(contradictions.length).toBeGreaterThan(0);
+      expect(contradictions[0]).toContain('noun');
+    });
+  });
+
+  describe('rejectRussianRealizationDefects (combined)', () => {
+    it('rejects "likedat\'" + "likdat\'" (no Cyrillic + bad transliteration)', () => {
+      const reasons = rejectRussianRealizationDefects({
+        surfaceForm: "likedat'",
+        transliteration: "likdat'",
+        grammaticalNote: 'verb, present tense, imperfective aspect, first person singular',
+      });
+      // Multiple defects surface; the script check must fire.
+      expect(reasons.some((r) => r.includes('no Cyrillic'))).toBe(true);
+    });
+
+    it('rejects "знать" with verb+nominative+singular contradiction', () => {
+      const reasons = rejectRussianRealizationDefects({
+        surfaceForm: 'знать',
+        transliteration: "znat'",
+        grammaticalNote: 'verb, present tense, nominative singular',
+      });
+      expect(reasons.some((r) => r.includes('case + number'))).toBe(true);
+    });
+
+    it('rejects "внутри" with adverb+case contradiction', () => {
+      const reasons = rejectRussianRealizationDefects({
+        surfaceForm: 'внутри',
+        transliteration: 'vnutri',
+        grammaticalNote: 'adverb, prepositional case',
+      });
+      expect(reasons.some((r) => r.includes('adverb'))).toBe(true);
+    });
+
+    it('rejects "на" with adverb+case contradiction', () => {
+      const reasons = rejectRussianRealizationDefects({
+        surfaceForm: 'на',
+        transliteration: 'na',
+        grammaticalNote: 'adverb, prepositional case',
+      });
+      expect(reasons.some((r) => r.includes('adverb'))).toBe(true);
+    });
+
+    it('rejects "жить" / "zhity" transliteration mismatch', () => {
+      const reasons = rejectRussianRealizationDefects({
+        surfaceForm: 'жить',
+        transliteration: 'zhity',
+        grammaticalNote: 'verb, infinitive, imperfective aspect',
+      });
+      expect(reasons.some((r) => r.includes('does not match ISO 9'))).toBe(true);
+    });
+
+    it('accepts clean canonical rows', () => {
+      // быть / byt' / verb, infinitive, imperfective aspect
+      expect(
+        rejectRussianRealizationDefects({
+          surfaceForm: 'быть',
+          transliteration: "byt'",
+          grammaticalNote: 'verb, infinitive, imperfective aspect',
+        }),
+      ).toEqual([]);
+
+      // не / ne / negation particle, proclitic, unstressed
+      expect(
+        rejectRussianRealizationDefects({
+          surfaceForm: 'не',
+          transliteration: 'ne',
+          grammaticalNote: 'negation particle, proclitic, unstressed',
+        }),
+      ).toEqual([]);
+
+      // я / ya / personal pronoun, nominative case, singular
+      expect(
+        rejectRussianRealizationDefects({
+          surfaceForm: 'я',
+          transliteration: 'ya',
+          grammaticalNote: 'personal pronoun, nominative case, singular',
+        }),
+      ).toEqual([]);
+
+      // знать / znat' / verb, infinitive, imperfective aspect — clean case from operator report
+      expect(
+        rejectRussianRealizationDefects({
+          surfaceForm: 'знать',
+          transliteration: "znat'",
+          grammaticalNote: 'verb, infinitive, imperfective aspect',
+        }),
+      ).toEqual([]);
+    });
+  });
+
+  // ── End-to-end: bad rows from the operator's report are now dropped ────────
+  //
+  // These mirror the "rejects hybrid-junk surfaceForms like 'likedat'" test
+  // above but cover the new ru-integrity checks. The model emits the bad row
+  // on the first Stage 2 attempt and a clean replacement on the retry; the
+  // pipeline must end with the clean row accepted and the bad row's code
+  // visible in the dropped log.
+
+  /** Helper: builds a well-formed entry for code EXIST with surfaceForm "быть". */
+  const cleanExistRu = {
+    coreConceptCode: 'EXIST',
+    realizationType: 'word',
+    surfaceForm: 'быть',
+    transliteration: "byt'",
+    gloss: 'to be (existential copula)',
+    grammaticalNote: 'verb, infinitive, imperfective aspect',
+    senseKind: 'core',
+  };
+
+  it('Stage 2 drops "likedat\'" (apostrophe-bearing hybrid junk, ru)', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                surfaceForm: "likedat'",
+                transliteration: "likdat'",
+                gloss: 'to like or prefer',
+                grammaticalNote: 'verb, present tense, imperfective aspect, first person singular',
+                senseKind: 'core',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanExistRu] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-h1', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-h1')!;
+    // The clean retry wins — bad row is rejected, not silently accepted.
+    expect(result.result?.proposals.length).toBe(1);
+    const payload = result.result?.proposals[0].payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('быть');
+    // A warning event was emitted and its payload carries the bad row's drop reason.
+    // (The summary.droppedCodes is empty because retry succeeded, but the per-batch
+    // event log preserves the reason for operator forensics.)
+    const warningEvents = result.events.filter((e) => e.severity === 'warning');
+    expect(warningEvents.length).toBeGreaterThan(0);
+    const droppedInEvents = warningEvents.flatMap(
+      (e) => (e.payload?.dropped as Array<{ code: string; reason: string }>) ?? [],
+    );
+    // The hybrid-junk regex (now apostrophe-tolerant) catches "likedat'" before
+    // the ru-integrity check fires. Either reason correctly rejects the row.
+    expect(
+      droppedInEvents.some(
+        (d) => d.reason.includes('hybrid junk') || d.reason.includes('no Cyrillic'),
+      ),
+    ).toBe(true);
+  });
+
+  it('Stage 2 drops transliteration mismatch "zhity" for "жить"', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                surfaceForm: 'жить',
+                transliteration: 'zhity',
+                gloss: 'to live or stay',
+                grammaticalNote: 'verb, infinitive, imperfective aspect',
+                senseKind: 'core',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanExistRu] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-h2', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-h2')!;
+    expect(result.result?.proposals.length).toBe(1);
+    expect(
+      (result.result?.proposals[0].payload as Record<string, unknown>).surfaceForm,
+    ).toBe('быть');
+    const warningEvents = result.events.filter((e) => e.severity === 'warning');
+    const droppedInEvents = warningEvents.flatMap(
+      (e) => (e.payload?.dropped as Array<{ code: string; reason: string }>) ?? [],
+    );
+    expect(droppedInEvents.some((d) => d.reason.includes('does not match ISO 9'))).toBe(true);
+  });
+
+  it('Stage 2 drops grammar contradiction "verb, present tense, nominative singular"', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                surfaceForm: 'знать',
+                transliteration: "znat'",
+                gloss: 'cognition of a fact or person',
+                grammaticalNote: 'verb, present tense, nominative singular',
+                senseKind: 'core',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanExistRu] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-h3', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-h3')!;
+    expect(result.result?.proposals.length).toBe(1);
+    expect(
+      (result.result?.proposals[0].payload as Record<string, unknown>).surfaceForm,
+    ).toBe('быть');
+    const warningEvents = result.events.filter((e) => e.severity === 'warning');
+    const droppedInEvents = warningEvents.flatMap(
+      (e) => (e.payload?.dropped as Array<{ code: string; reason: string }>) ?? [],
+    );
+    expect(droppedInEvents.some((d) => d.reason.includes('case + number'))).toBe(true);
+  });
+
+  it('Stage 2 drops adverb+case contradiction (внутри / "adverb, prepositional case")', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                surfaceForm: 'внутри',
+                transliteration: 'vnutri',
+                gloss: 'in a container or area',
+                grammaticalNote: 'adverb, prepositional case',
+                senseKind: 'core',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanExistRu] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-h4', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-h4')!;
+    expect(result.result?.proposals.length).toBe(1);
+    expect(
+      (result.result?.proposals[0].payload as Record<string, unknown>).surfaceForm,
+    ).toBe('быть');
+    const warningEvents = result.events.filter((e) => e.severity === 'warning');
+    const droppedInEvents = warningEvents.flatMap(
+      (e) => (e.payload?.dropped as Array<{ code: string; reason: string }>) ?? [],
+    );
+    expect(droppedInEvents.some((d) => d.reason.includes('adverb'))).toBe(true);
+  });
+
+  it('Stage 2 still accepts a clean canonical ru row without dropping it', async () => {
+    // Regression guard: the new checks must not false-positive on clean rows
+    // that the operator reported as good (быть, не, я).
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({ realizations: [cleanExistRu] }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-h5', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-h5')!;
+    expect(result.result?.proposals.length).toBe(1);
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.dropped).toBe(0);
   });
 });

@@ -97,15 +97,240 @@ function validateEntry(
   return { ok: true, value: parsed.data };
 }
 
-/** Heuristic surface-form sanity check. Catches the "likedat"/"needat" failure mode. */
+/** ASCII-only surface form (letters/digits/apostrophes/hyphens, no diacritics,
+ *  no Cyrillic/Arabic). Catches "likedat", "likedat'", "need-at" — the hybrid
+ *  English-stem + Latin-suffix failure mode small local models emit for ru/fa.
+ *  The apostrophe/hyphen allowance closes the gap where "likedat'" slipped past
+ *  the prior `/^[A-Za-z][A-Za-z0-9]{3,}$/` regex (apostrophe broke the match). */
+const ASCII_ONLY_PATTERN = /^[A-Za-z][A-Za-z0-9''\-]{3,}$/;
+
+/** Heuristic surface-form sanity check. Catches the "likedat"/"needat" failure
+ *  mode — including the apostrophe-bearing variant "likedat'" that previously
+ *  slipped through. Real Russian/Persian surface forms contain Cyrillic /
+ *  Arabic script; if a surfaceForm is entirely ASCII letters/digits/apostrophes
+ *  and length >= 4, it is almost certainly hybrid junk for a ru/fa concept. */
 function looksLikeHybridJunk(surfaceForm: string): boolean {
-  // Pure ASCII letters + digits with length >= 4 AND not in the small allowlist
-  // of ascii-only forms (e.g. "il y a" contains spaces; "ne... pas" too).
-  // Real Russian/Persian surface forms contain Cyrillic / Arabic script.
-  if (/^[A-Za-z][A-Za-z0-9]{3,}$/.test(surfaceForm)) {
-    return true;
+  return ASCII_ONLY_PATTERN.test(surfaceForm);
+}
+
+// ── Russian realization integrity checks ──────────────────────────────
+//
+// Post-generation hardening layer for ru realization entries. Runs AFTER
+// RealizationEntrySchema (shape) and looksLikeHybridJunk (ASCII junk), and
+// catches three classes of small-model hallucination that previously passed:
+//
+//   1. Latin-script surfaceForm (the model emitted a transliteration or an
+//      invented English-stem form instead of the actual Cyrillic word).
+//   2. Transliteration that does not match ISO 9 of the surfaceForm (the
+//      model emitted "zhity" for "жить" where ISO 9 is "zhit'").
+//   3. grammaticalNote self-contradictions ("verb, infinitive, present
+//      tense, first person singular" or "adverb, prepositional case").
+//
+// Each helper returns `null` on success or a string rejection reason on
+// failure. The Stage 2 finalize loop collects these and drops the entry
+// with the reason visible in the operator log ("X accepted, Y dropped"
+// carries the reason through to the awaiting_review summary).
+
+const CYRILLIC_PATTERN = /[\u0400-\u04FF\u0500-\u052F]/;
+
+/** ISO 9:1995 romanization (lowercase). Uses the ASCII-friendly variant the
+ *  Stage 2 prompt instructs the model to follow (я→ya, ж→zh, ш→sh, щ→shch,
+ *  ц→ts, ч→ch, ы→y, й→y, ю→yu, я→ya, ъ→'', ь→''). ё maps to "e" here; the
+ *  plausibility check below treats ё cases with extra tolerance so the model
+ *  emitting "yo" is still accepted. */
+const ISO9_LOWER: Record<string, string> = {
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e',
+  ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k',
+  л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r',
+  с: 's', т: 't', у: 'u', ф: 'f', х: 'kh', ц: 'ts',
+  ч: 'ch', ш: 'sh', щ: 'shch', ъ: '', ы: 'y', ь: '',
+  э: 'e', ю: 'yu', я: 'ya',
+};
+
+/** Build a per-character count of Latin letters expected from ISO 9 of the
+ *  Cyrillic surfaceForm. Lowercase only; non-letters (apostrophes, hyphens,
+ *  spaces) are dropped. */
+function iso9Multiset(surfaceForm: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const ch of surfaceForm.toLowerCase()) {
+    const mapped = ISO9_LOWER[ch];
+    if (mapped === undefined) continue; // non-Cyrillic char (apostrophe/space/etc.)
+    for (const latin of mapped) {
+      m.set(latin, (m.get(latin) ?? 0) + 1);
+    }
   }
-  return false;
+  return m;
+}
+
+/** Build a per-character count of Latin letters in the model's transliteration.
+ *  Apostrophes, hyphens, spaces, and any non-[a-z] char are dropped (these are
+ *  soft-sign markers or separators that the ISO 9 spec allows to vary). */
+function latinMultiteral(s: string): Map<string, number> {
+  const m = new Map<string, number>();
+  for (const ch of s.toLowerCase()) {
+    if (ch >= 'a' && ch <= 'z') {
+      m.set(ch, (m.get(ch) ?? 0) + 1);
+    }
+  }
+  return m;
+}
+
+/** Multiset symmetric-difference count. 0 means the multisets are equal. */
+function multisetDiff(a: Map<string, number>, b: Map<string, number>): number {
+  const keys = new Set<string>([...a.keys(), ...b.keys()]);
+  let diff = 0;
+  for (const k of keys) {
+    diff += Math.abs((a.get(k) ?? 0) - (b.get(k) ?? 0));
+  }
+  return diff;
+}
+
+/** Reject Russian realization entries whose surfaceForm contains no Cyrillic.
+ *  Catches the model emitting a transliteration/invention where a Cyrillic
+ *  word was required. Returns the rejection reason or null if acceptable. */
+export function rejectRussianSurfaceFormNoCyrillic(surfaceForm: string): string | null {
+  if (!CYRILLIC_PATTERN.test(surfaceForm)) {
+    return `surfaceForm "${surfaceForm}" contains no Cyrillic characters (real Russian realizations are Cyrillic).`;
+  }
+  return null;
+}
+
+/** Reject transliteration values that don't plausibly match ISO 9 of the
+ *  surfaceForm. Tolerance is 0 by default; words containing ё get +3 per ё
+ *  (covers the ё→"yo" expansion vs the canonical ё→"e" mapping). Returns
+ *  the rejection reason or null if acceptable. */
+export function rejectTransliterationMismatch(
+  surfaceForm: string,
+  transliteration: string,
+): string | null {
+  const expected = iso9Multiset(surfaceForm);
+  if (expected.size === 0) return null; // surfaceForm has no Cyrillic; other check rejects
+  const actual = latinMultiteral(transliteration);
+  if (actual.size === 0) {
+    return `transliteration "${transliteration}" contains no Latin letters.`;
+  }
+  const yoCount = (surfaceForm.toLowerCase().match(/ё/g) ?? []).length;
+  const tolerance = yoCount * 3;
+  const diff = multisetDiff(expected, actual);
+  if (diff > tolerance) {
+    return `transliteration "${transliteration}" does not match ISO 9 of surfaceForm "${surfaceForm}" (char-diff=${diff}, tolerance=${tolerance}).`;
+  }
+  return null;
+}
+
+// ── Grammar-note contradiction detection ──────────────────────────────
+//
+// These rules catch small-model nonsense like "verb, present tense, nominative
+// singular" (verbs don't take case+number agreement unless participles) or
+// "adverb, prepositional case" (adverbs don't inflect for case). Each rule is
+// conservative — it only fires when the contradiction is internal to the
+// grammaticalNote text itself, NOT on whether the note is the "right" note
+// for the surfaceForm (that would require a Russian grammar dictionary).
+
+const VERB_PERSON_NUMBER_TERMS = [
+  'present tense', 'past tense', 'future tense',
+  'first person', 'second person', 'third person',
+  'singular', 'plural',
+];
+const CASE_TERMS = [
+  'nominative', 'accusative', 'genitive', 'dative',
+  'instrumental', 'prepositional', 'locative',
+];
+const VERB_TENSE_ASPECT_TERMS = [
+  'present tense', 'past tense', 'future tense',
+  'first person', 'second person', 'third person',
+];
+
+/** Detect internal grammaticalNote contradictions. Returns one reason string
+ *  per contradiction found (typically 0 or 1). Empty array = no contradiction. */
+export function detectGrammarNoteContradictions(grammaticalNote: string): string[] {
+  const lower = grammaticalNote.toLowerCase();
+  const has = (term: string) => lower.includes(term);
+  const out: string[] = [];
+
+  // Infinitives are not tensed, person-marked, number-marked, or case-marked.
+  // Aspect ("imperfective aspect" / "perfective aspect") is FINE for infinitives.
+  if (has('infinitive')) {
+    for (const term of [...VERB_PERSON_NUMBER_TERMS, ...CASE_TERMS]) {
+      if (has(term)) {
+        out.push(
+          `grammar-note contradiction: "infinitive" cannot co-occur with "${term}" (infinitives are not tensed/person/number/case-marked).`,
+        );
+        break;
+      }
+    }
+  }
+
+  // Adverbs do not inflect for case. (Exception: "adverbial" participles —
+  // screened out by the adverbial check below.)
+  if (has('adverb') && !has('adverbial')) {
+    for (const c of CASE_TERMS) {
+      if (has(c)) {
+        out.push(
+          `grammar-note contradiction: "adverb" cannot carry case "${c}" (adverbs are not inflected for case).`,
+        );
+        break;
+      }
+    }
+  }
+
+  // Verbs (other than participles / gerunds / adverbial forms) cannot carry
+  // case + number agreement. Catches "verb, present tense, nominative singular".
+  if (
+    has('verb') &&
+    !has('participle') &&
+    !has('gerund') &&
+    !has('adverbial')
+  ) {
+    const hasCase = CASE_TERMS.some(has);
+    const hasNumber = has('singular') || has('plural');
+    if (hasCase && hasNumber) {
+      out.push(
+        'grammar-note contradiction: a finite/infinitive verb cannot carry case + number agreement (only participles and gerunds can).',
+      );
+    }
+  }
+
+  // Nouns cannot carry verb tense / person. Catches "noun, present tense, first person singular".
+  if (has('noun') && !has('pronoun') && !has('noun phrase')) {
+    for (const t of VERB_TENSE_ASPECT_TERMS) {
+      if (has(t)) {
+        out.push(
+          `grammar-note contradiction: "noun" cannot carry verbal property "${t}".`,
+        );
+        break;
+      }
+    }
+  }
+
+  // Russian prepositions do not govern nominative case (the only marginal
+  // exception is poetic/inverted word order; flag for review in normal prose).
+  if (has('preposition') && has('nominative')) {
+    out.push(
+      'grammar-note contradiction: Russian prepositions do not govern nominative case.',
+    );
+  }
+
+  return out;
+}
+
+/** Full Russian realization integrity check. Returns an array of rejection
+ *  reasons (empty = entry acceptable). Runs script + transliteration + grammar
+ *  checks; each can produce one or more reasons. */
+export function rejectRussianRealizationDefects(entry: {
+  surfaceForm: string;
+  transliteration?: string;
+  grammaticalNote: string;
+}): string[] {
+  const reasons: string[] = [];
+  const scriptReason = rejectRussianSurfaceFormNoCyrillic(entry.surfaceForm);
+  if (scriptReason) reasons.push(scriptReason);
+  if (entry.transliteration && entry.transliteration.trim().length > 0) {
+    const trReason = rejectTransliterationMismatch(entry.surfaceForm, entry.transliteration);
+    if (trReason) reasons.push(trReason);
+  }
+  reasons.push(...detectGrammarNoteContradictions(entry.grammaticalNote));
+  return reasons;
 }
 
 // ── STRICT per-entry schema for stage 3 (example sentences) ────────────
@@ -288,7 +513,9 @@ export async function runClccPipeline(
             coreConcepts: batchMeta.length === batch.length ? batchMeta : promptInput.coreConcepts,
           };
 
-          const result = await generateAndValidateBatch(deps, model, batchPromptInput, batch, allowedCodes);
+          const result = await generateAndValidateBatch(deps, model, batchPromptInput, batch, allowedCodes, {
+            targetLanguageCode: request.targetLanguageCode,
+          });
           for (const v of result.validated) {
             if (!acceptedCodes.has(v.coreConceptCode)) {
               acceptedCodes.add(v.coreConceptCode);
@@ -541,12 +768,22 @@ interface BatchResult {
   model: string;
 }
 
+/** Target language code is threaded through finalizeBatch so the Russian
+ *  realization integrity check (script + transliteration + grammar) only fires
+ *  for ru. Other languages (fr/fa) skip it for now — the prompt instructs the
+ *  model on the appropriate script for each, and the existing Stage 3 example
+ *  junk filter handles fa/fr script checks at the example level. */
+interface BatchLanguageContext {
+  targetLanguageCode: 'fr' | 'ru' | 'fa';
+}
+
 async function generateAndValidateBatch(
   deps: ClccPipelineDeps,
   model: string,
   batchPromptInput: ClccPromptInput,
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
+  ctx: BatchLanguageContext,
 ): Promise<BatchResult> {
   // First attempt.
   const r1 = await deps.ollama.generate({
@@ -573,9 +810,9 @@ async function generateAndValidateBatch(
         model: r2.model,
       };
     }
-    return finalizeBatch(parsed2.entries, batchCodes, allowedCodes, r2);
+    return finalizeBatch(parsed2.entries, batchCodes, allowedCodes, r2, ctx);
   }
-  const firstPass = finalizeBatch(parsed1.entries, batchCodes, allowedCodes, r1);
+  const firstPass = finalizeBatch(parsed1.entries, batchCodes, allowedCodes, r1, ctx);
   // If the first pass accepted everything, we're done. Otherwise retry once
   // for the missing codes.
   const missingFromFirst = batchCodes.filter((c) => !firstPass.validated.some((v) => v.coreConceptCode === c));
@@ -600,7 +837,7 @@ async function generateAndValidateBatch(
   if (parsed2.kind === 'parse-fail') {
     return firstPass; // keep first-pass results; don't retry again.
   }
-  const secondPass = finalizeBatch(parsed2.entries, missingFromFirst, allowedCodes, r2);
+  const secondPass = finalizeBatch(parsed2.entries, missingFromFirst, allowedCodes, r2, ctx);
   return {
     validated: [...firstPass.validated, ...secondPass.validated],
     dropped: [...firstPass.dropped, ...secondPass.dropped],
@@ -615,6 +852,7 @@ function finalizeBatch(
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
   response: { text: string; model: string },
+  ctx: BatchLanguageContext,
 ): BatchResult {
   const validated: ValidatedRealizationEntry[] = [];
   const dropped: Array<{ code: string; reason: string }> = [];
@@ -638,6 +876,22 @@ function finalizeBatch(
         reason: `surfaceForm "${v.value.surfaceForm}" looks like hybrid junk (ASCII-only)`,
       });
       continue;
+    }
+    // Russian-specific integrity check: script + transliteration + grammar.
+    // Failures here drop the row with a specific reason visible to the operator.
+    if (ctx.targetLanguageCode === 'ru') {
+      const defects = rejectRussianRealizationDefects({
+        surfaceForm: v.value.surfaceForm,
+        transliteration: v.value.transliteration,
+        grammaticalNote: v.value.grammaticalNote,
+      });
+      if (defects.length > 0) {
+        dropped.push({
+          code: v.value.coreConceptCode,
+          reason: defects.join(' '),
+        });
+        continue;
+      }
     }
     seen.add(v.value.coreConceptCode);
     validated.push(v.value);
