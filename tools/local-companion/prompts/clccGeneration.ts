@@ -18,6 +18,13 @@ export interface ClccPromptInput {
   /** Optional catalog metadata; when supplied, the stage-2 prompt embeds it. */
   coreConcepts?: CompanionClccConceptInput[];
   existingRealizationSurfaceForms?: string[];
+  /**
+   * Stage-2 validated realizations, passed to Stage 3 so the example-sentence
+   * prompt can anchor each sentence on the actual surface form produced for
+   * that concept. Entries only need code + surfaceForm; the rest of the
+   * realization shape is irrelevant at the prompt layer.
+   */
+  realizations?: Array<{ coreConceptCode: string; surfaceForm: string }>;
 }
 
 /**
@@ -197,29 +204,138 @@ Return ONLY the JSON object. No prose, no markdown fences.`;
 }
 
 // Stage 3: example sentences
+//
+// Rewritten for small-local-model reliability (mirrors Stage 2 discipline):
+//  - Language code is resolved to a human-readable language name in the prompt.
+//  - Per-language 3-shot anchors (FIRST_PERSON / EXIST / NEGATION — the same
+//    shape anchors Stage 2 uses) show the expected JSON shape.
+//  - Concept codes are listed WITH labels + descriptions when supplied.
+//  - Stage-2 realizations (when supplied) are surfaced as the word/phrase the
+//    sentence should illustrate, so the model is anchored on a real surface
+//    form rather than left to invent one.
+//  - Explicit anti-hallucination callouts forbid invented words, mixed-script
+//    sentences, fake cognates, and transliteration when the language has its
+//    own script.
+//  - "Short, simple, idiomatic, high-frequency" is the production rule.
 export function stage3ExamplesPrompt(input: ClccPromptInput): { prompt: string; format: Record<string, unknown> } {
+  const langName =
+    input.targetLanguageCode === 'ru' ? 'Russian' :
+    input.targetLanguageCode === 'fr' ? 'French' :
+    'Persian/Farsi';
+  const langCode = input.targetLanguageCode;
+  const scriptLabel =
+    langCode === 'ru' ? 'Cyrillic' :
+    langCode === 'fr' ? 'Latin (with diacritics)' :
+    'Persian-Arabic';
+  const conceptList = renderConceptListForExamples(input);
+  const examples = fewShotExampleSentences(langCode);
+
+  const prompt = `You are a linguist writing example sentences for a Core-Concept language pack for ${langName} (${langCode}).
+For EACH Core Concept below, write ONE short ${langName} sentence that illustrates the concept, using its realization when one is provided.
+
+Concepts to illustrate:
+${conceptList}
+
+Return STRICT JSON with this shape:
+{ "examples": [
+  { "coreConceptCode": string,
+    "sourceText": string,
+    "translation": string }
+] }
+
+Field rules (NON-NEGOTIABLE):
+- "coreConceptCode": MUST be one of the codes listed above. One entry per code, no duplicates, no extras.
+- "sourceText": ONE ${langName} sentence that a native speaker would actually say.
+    * Short and simple: one clause, 3-10 words, everyday vocabulary.
+    * MUST be written in ${langName} script (${scriptLabel}). Do NOT transliterate.
+    * Avoid proper nouns (people, brands, place names) unless extremely common.
+    * Avoid literary, archaic, or rare vocabulary. Prefer words a beginner would recognize.
+    * When a realization is provided for the concept, the sentence should ideally contain that surface form.
+- "translation": a natural English translation of sourceText. REQUIRED — never null, never empty. MUST match the meaning of sourceText.
+
+${examples}
+
+Anti-patterns (NEVER produce these):
+- Invented or fabricated ${langName} words (e.g. "валяя", "деляю" are NOT real Russian). If you are unsure of a word, write a SIMPLER real sentence using vocabulary you do know.
+- Mixed-script sentences (English words glued into ${langName} grammar, e.g. "I am не going").
+- Transliterated ${langName} written in Latin script when ${langName} has its own script.
+- Fake cognates or "sounds-plausible" phonotactic nonsense that is not a real word.
+- Long multi-clause sentences; complex or literary vocabulary.
+- Translation that does not match sourceText.
+
+Return ONLY the JSON object. No prose, no markdown fences.`;
+
+  const exampleItemSchema = {
+    type: 'object',
+    properties: {
+      coreConceptCode: { type: 'string' },
+      sourceText: { type: 'string', minLength: 2 },
+      translation: { type: 'string', minLength: 2 },
+    },
+    required: ['coreConceptCode', 'sourceText', 'translation'],
+  };
+
   return {
-    prompt: `Generate one short example ${input.targetLanguageCode} sentence illustrating each Core Concept: ${input.coreConceptCodes.join(', ')}.
-Return JSON: { "examples": [{ "coreConceptCode": string, "sourceText": string, "translation": string }] }`,
+    prompt,
     format: {
       type: 'object',
       properties: {
         examples: {
           type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              coreConceptCode: { type: 'string' },
-              sourceText: { type: 'string' },
-              translation: { type: 'string' },
-            },
-            required: ['coreConceptCode', 'sourceText', 'translation'],
-          },
+          items: exampleItemSchema,
         },
       },
       required: ['examples'],
     },
   };
+}
+
+/**
+ * Render the concept list for the stage-3 prompt. Each line shows the code,
+ * its label + description (when supplied), AND the realization surface form
+ * (when supplied) so the model knows what word to use in the sentence.
+ */
+function renderConceptListForExamples(input: ClccPromptInput): string {
+  const meta = new Map((input.coreConcepts ?? []).map((c) => [c.code, c]));
+  const realByCode = new Map((input.realizations ?? []).map((r) => [r.coreConceptCode, r.surfaceForm]));
+  return input.coreConceptCodes
+    .map((code) => {
+      const m = meta.get(code);
+      const bits = [code];
+      if (m) {
+        bits.push(m.canonicalLabel);
+        if (m.description) bits.push(`(${m.description})`);
+      }
+      const surfaceForm = realByCode.get(code);
+      if (surfaceForm) bits.push(`[realization: ${surfaceForm}]`);
+      return bits.join(' — ');
+    })
+    .join('\n');
+}
+
+/**
+ * Per-language 3-shot anchors for stage-3 example sentences. Same anchor
+ * concepts Stage 2 uses (FIRST_PERSON / EXIST / NEGATION); only the shape
+ * differs (sourceText + translation instead of surfaceForm + gloss).
+ */
+function fewShotExampleSentences(targetLanguageCode: ClccPromptInput['targetLanguageCode']): string {
+  if (targetLanguageCode === 'ru') {
+    return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
+{ "coreConceptCode": "FIRST_PERSON", "sourceText": "Я иду домой.", "translation": "I am going home." }
+{ "coreConceptCode": "EXIST", "sourceText": "В Москве есть метро.", "translation": "There is a metro in Moscow." }
+{ "coreConceptCode": "NEGATION", "sourceText": "Я не знаю.", "translation": "I don't know." }`;
+  }
+  if (targetLanguageCode === 'fr') {
+    return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
+{ "coreConceptCode": "FIRST_PERSON", "sourceText": "Je vais à la maison.", "translation": "I am going home." }
+{ "coreConceptCode": "EXIST", "sourceText": "Il y a un livre sur la table.", "translation": "There is a book on the table." }
+{ "coreConceptCode": "NEGATION", "sourceText": "Je ne sais pas.", "translation": "I don't know." }`;
+  }
+  // fa
+  return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
+{ "coreConceptCode": "FIRST_PERSON", "sourceText": "من می‌روم خانه.", "translation": "I am going home." }
+{ "coreConceptCode": "EXIST", "sourceText": "در تهران مترو هست.", "translation": "There is a metro in Tehran." }
+{ "coreConceptCode": "NEGATION", "sourceText": "من نمی‌دانم.", "translation": "I don't know." }`;
 }
 
 // Stage 4: validation + cross-check
