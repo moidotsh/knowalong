@@ -339,7 +339,7 @@ async function streamSse(req: Request, job: JobState, _jobManager: JobManager): 
 }
 
 function formatSseFrame(event: CompanionJobEvent): string {
-  const data = JSON.stringify({
+  const data = jsonStringifyUtf8({
     kind: event.kind,
     ordinal: event.ordinal,
     severity: event.severity,
@@ -348,6 +348,36 @@ function formatSseFrame(event: CompanionJobEvent): string {
     payload: event.payload,
   });
   return `id: ${event.ordinal}\nevent: ${event.kind}\ndata: ${data}\n\n`;
+}
+
+/**
+ * JSON.stringify that preserves printable non-ASCII characters as literal
+ * UTF-8 instead of `\uXXXX` escapes. The default serializer escapes every
+ * code point above U+007F, which made human-readable languages (Russian
+ * Cyrillic, Persian Arabic script, French accented chars) render as
+ * `\u0432\u0430\u043b` in the Studio UI.
+ *
+ * Both forms are valid JSON and parse to identical strings; the difference
+ * is purely human-readability of the wire form.
+ *
+ * Limitation: a literal backslash + `u` + 4 hex chars in a source string
+ * (e.g. `\u0041` as 6 literal characters) would be incorrectly unescaped.
+ * Model-generated natural language never contains this pattern; the
+ * limitation is acceptable for our use case (event payloads, JSON error
+ * bodies, status responses). Control characters (< U+0020) and lone
+ * surrogates (U+D800–U+DFFF) are kept escaped so the output remains valid
+ * UTF-8.
+ */
+function jsonStringifyUtf8(obj: unknown): string {
+  return JSON.stringify(obj).replace(
+    /\\u([0-9a-fA-F]{4})/g,
+    (m, hex: string) => {
+      const cp = parseInt(hex, 16);
+      if (cp < 0x20) return m;
+      if (cp >= 0xd800 && cp <= 0xdfff) return m;
+      return String.fromCodePoint(cp);
+    },
+  );
 }
 
 // ── CORS ─────────────────────────────────────────────────────────────
@@ -411,7 +441,7 @@ async function readJsonBody(req: Request): Promise<unknown> {
 }
 
 function jsonResponse(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), {
+  return new Response(jsonStringifyUtf8(body), {
     status,
     headers: { 'Content-Type': 'application/json' },
   });
@@ -422,4 +452,4 @@ function jsonError(status: number, kind: CompanionErrorResponse['error']['kind']
 }
 
 // Exported for tests
-export { applyCors, checkBearer, constantTimeEqual, formatSseFrame, jsonError, readJsonBody };
+export { applyCors, checkBearer, constantTimeEqual, formatSseFrame, jsonError, jsonStringifyUtf8, readJsonBody };
