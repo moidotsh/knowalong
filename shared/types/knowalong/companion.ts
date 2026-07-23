@@ -50,9 +50,26 @@ export interface CompanionClccGenerationRequest {
   targetLanguageCode: 'fr' | 'ru' | 'fa';
   /** Core Concepts to realize. Codes from the seeded catalog (migration 00003). */
   coreConceptCodes: string[];
+  /**
+   * Optional catalog metadata for each requested code. When supplied, the
+   * companion's realization prompt embeds the canonical label + description
+   * so the local model has human-readable context for opaque codes like
+   * `LIKE_PREFER` or `LOCATE_ON`. Studio should always send this; the
+   * field is optional only so older callers still work.
+   */
+  coreConcepts?: CompanionClccConceptInput[];
   /** Existing user-owned realizations to avoid regenerating. */
   existingRealizationSurfaceForms?: string[];
   modelLabel?: string;
+}
+
+/** Catalog metadata for a single Core Concept, sent for prompt context. */
+export interface CompanionClccConceptInput {
+  code: string;
+  canonicalLabel: string;
+  description: string;
+  functionalCluster?: string;
+  tier?: number;
 }
 
 /** Companion job status (single-flight; never `succeeded` terminal). */

@@ -122,10 +122,20 @@ export const CompanionSourceAnalysisRequestSchema = z.object({
   modelLabel: z.string().max(100).optional(),
 });
 
+/** Catalog metadata for a Core Concept, sent for prompt context. Optional. */
+export const CompanionClccConceptInputSchema = z.object({
+  code: z.string().min(1).max(64),
+  canonicalLabel: z.string().min(1).max(200),
+  description: z.string().min(1).max(1000),
+  functionalCluster: z.string().max(64).optional(),
+  tier: z.number().int().min(0).max(5).optional(),
+});
+
 /** Body of POST /jobs/clcc-generation. */
 export const CompanionClccGenerationRequestSchema = z.object({
   targetLanguageCode: ClccLanguageSchema,
   coreConceptCodes: z.array(z.string().min(1).max(64)).min(1).max(200),
+  coreConcepts: z.array(CompanionClccConceptInputSchema).optional(),
   existingRealizationSurfaceForms: z.array(z.string().max(500)).optional(),
   modelLabel: z.string().max(100).optional(),
 });
