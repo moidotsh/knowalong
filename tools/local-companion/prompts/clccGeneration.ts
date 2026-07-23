@@ -95,13 +95,17 @@ function renderConceptList(input: ClccPromptInput): string {
  * Per-language few-shot examples for stage 2. Anchoring the model on two
  * or three correct examples dramatically reduces hallucinated surface forms
  * on small local models. Examples use the DB enum directly.
+ *
+ * Transliteration is included for ru (ISO 9 — the load-bearing Phase-1 case)
+ * and fa (BGN/PCGN-style romanization — Persian is non-Latin too). Omitted
+ * for fr (Latin script — romanization is trivially the surface form itself).
  */
 function fewShotExamples(targetLanguageCode: ClccPromptInput['targetLanguageCode']): string {
   if (targetLanguageCode === 'ru') {
     return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
-{ "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "я", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, nominative case, singular", "senseKind": "core" }
-{ "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "быть", "gloss": "to be (existential copula)", "grammaticalNote": "verb, infinitive, imperfective aspect", "senseKind": "core" }
-{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "не", "gloss": "not (general negation)", "grammaticalNote": "negation particle, proclitic, unstressed", "senseKind": "core" }`;
+{ "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "я", "transliteration": "ya", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, nominative case, singular", "senseKind": "core" }
+{ "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "быть", "transliteration": "byt'", "gloss": "to be (existential copula)", "grammaticalNote": "verb, infinitive, imperfective aspect", "senseKind": "core" }
+{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "не", "transliteration": "ne", "gloss": "not (general negation)", "grammaticalNote": "negation particle, proclitic, unstressed", "senseKind": "core" }`;
   }
   if (targetLanguageCode === 'fr') {
     return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
@@ -111,9 +115,9 @@ function fewShotExamples(targetLanguageCode: ClccPromptInput['targetLanguageCode
   }
   // fa
   return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
-{ "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "من", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, Persian-Arabic script", "senseKind": "core" }
-{ "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "بودن", "gloss": "to be / to exist (copula)", "grammaticalNote": "verb, infinitive; present-tense copula is often omitted", "senseKind": "core" }
-{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "ن", "gloss": "not (verbal negation prefix)", "grammaticalNote": "proclitic/prefix on verbs: می‌روم → نمی‌روم", "senseKind": "core" }`;
+{ "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "من", "transliteration": "man", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, Persian-Arabic script", "senseKind": "core" }
+{ "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "بودن", "transliteration": "budan", "gloss": "to be / to exist (copula)", "grammaticalNote": "verb, infinitive; present-tense copula is often omitted", "senseKind": "core" }
+{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "ن", "transliteration": "na", "gloss": "not (verbal negation prefix)", "grammaticalNote": "proclitic/prefix on verbs: می‌روم → نمی‌روم", "senseKind": "core" }`;
 }
 
 // Stage 2: per-concept realization proposals (load-bearing prompt).
@@ -147,6 +151,7 @@ Return STRICT JSON with this shape:
   { "coreConceptCode": string,
     "realizationType": "word" | "phrase" | "construction" | "feature" | "morpheme",
     "surfaceForm": string,
+    "transliteration": string,
     "gloss": string,
     "grammaticalNote": string,
     "senseKind": "core" | "contextual" | "idiomatic" }
@@ -161,6 +166,11 @@ Field rules (NON-NEGOTIABLE):
     * feature = an inflectional or morphological feature realized on another word.
     * morpheme = a bound morpheme or particle that cannot stand alone (e.g. Russian "не").
 - "surfaceForm": the actual ${langName} text. MUST be a real ${langName} word/phrase that a native speaker would recognize.
+- "transliteration": the surface form romanized into the Latin script using the canonical scheme for ${langName}.
+    * REQUIRED for Russian (use ISO 9: я→ya, быть→byt', не→ne, ё→ё→e/yo, ж→zh, ш→sh, щ→shch, ц→ts, ч→ch, ы→y, й→y, ю→yu, я→ya, ъ→', ь→').
+    * REQUIRED for Persian (use BGN/PCGN: من→man, بودن→budan, ن→na/na-).
+    * OPTIONAL for French (Latin script — romanization is trivially the surface form itself; you may omit this field for fr).
+    * This is transliteration ONLY — NOT IPA, NOT stress marks, NOT pronunciation guidance. Just the romanized form of "surfaceForm".
 - "gloss": a SHORT English translation of surfaceForm. REQUIRED — never null, never empty. Examples: "I (1sg pronoun)", "to be", "not (negation particle)".
 - "grammaticalNote": one short note on part of speech + notable grammar. REQUIRED — never null, never empty. Call out: part of speech, aspect/case/gender where relevant, register if unusual.
 - "senseKind": "core" for the canonical mapping (almost always "core" for this task).
@@ -171,6 +181,8 @@ Anti-patterns (NEVER produce these):
 - Made-up words formed by gluing an English stem to a ${langName} suffix (e.g. "likedat", "needat"). If you are not sure of the real ${langName} word for a concept, output your best-guess REAL ${langName} word and put a clear note in grammaticalNote; never invent a hybrid.
 - Surrogate code in surfaceForm (e.g. "TODO", "—", "?", the concept code itself).
 - Leaving gloss or grammaticalNote null/empty.
+- For ru/fa, leaving transliteration null/empty. For fr, omitting transliteration is fine.
+- Putting IPA, stress marks, syllable boundaries, or audio hints in transliteration. Transliteration is the romanized form only.
 - Setting realizationType to anything outside the five allowed values (no "lexical", "periphrastic", "morphological", "syntactic").
 
 Return ONLY the JSON object. No prose, no markdown fences.`;
@@ -181,11 +193,20 @@ Return ONLY the JSON object. No prose, no markdown fences.`;
       coreConceptCode: { type: 'string' },
       realizationType: { type: 'string', enum: [...REALIZATION_TYPE_DB_VALUES] },
       surfaceForm: { type: 'string', minLength: 1 },
+      transliteration: { type: 'string', minLength: 1 },
       gloss: { type: 'string', minLength: 1 },
       grammaticalNote: { type: 'string', minLength: 1 },
       senseKind: { type: 'string', enum: ['core', 'contextual', 'idiomatic'] },
     },
-    required: ['coreConceptCode', 'realizationType', 'surfaceForm', 'gloss', 'grammaticalNote', 'senseKind'],
+    required: [
+      'coreConceptCode',
+      'realizationType',
+      'surfaceForm',
+      'gloss',
+      'grammaticalNote',
+      'senseKind',
+      ...(input.targetLanguageCode === 'ru' || input.targetLanguageCode === 'fa' ? ['transliteration'] : []),
+    ],
   };
 
   return {
@@ -240,6 +261,7 @@ Return STRICT JSON with this shape:
 { "examples": [
   { "coreConceptCode": string,
     "sourceText": string,
+    "transliteration": string,
     "translation": string }
 ] }
 
@@ -251,6 +273,11 @@ Field rules (NON-NEGOTIABLE):
     * Avoid proper nouns (people, brands, place names) unless extremely common.
     * Avoid literary, archaic, or rare vocabulary. Prefer words a beginner would recognize.
     * When a realization is provided for the concept, the sentence should ideally contain that surface form.
+- "transliteration": the sourceText romanized into the Latin script using the canonical scheme for ${langName}.
+    * REQUIRED for Russian (use ISO 9: я→ya, быть→byt', не→ne, Москва→Moskva).
+    * REQUIRED for Persian (use BGN/PCGN).
+    * OPTIONAL for French (Latin script — romanization is trivially sourceText itself; you may omit this field for fr).
+    * This is transliteration ONLY — NOT IPA, NOT stress marks, NOT pronunciation guidance. Just the romanized form of "sourceText".
 - "translation": a natural English translation of sourceText. REQUIRED — never null, never empty. MUST match the meaning of sourceText.
 
 ${examples}
@@ -258,8 +285,10 @@ ${examples}
 Anti-patterns (NEVER produce these):
 - Invented or fabricated ${langName} words (e.g. "валяя", "деляю" are NOT real Russian). If you are unsure of a word, write a SIMPLER real sentence using vocabulary you do know.
 - Mixed-script sentences (English words glued into ${langName} grammar, e.g. "I am не going").
-- Transliterated ${langName} written in Latin script when ${langName} has its own script.
+- Transliterated ${langName} written in Latin script when ${langName} has its own script — keep sourceText in the native script; the Latin form goes in "transliteration", never in "sourceText".
 - Fake cognates or "sounds-plausible" phonotactic nonsense that is not a real word.
+- For ru/fa, leaving transliteration null/empty. For fr, omitting transliteration is fine.
+- Putting IPA, stress marks, syllable boundaries, or audio hints in transliteration.
 - Long multi-clause sentences; complex or literary vocabulary.
 - Translation that does not match sourceText.
 
@@ -270,9 +299,15 @@ Return ONLY the JSON object. No prose, no markdown fences.`;
     properties: {
       coreConceptCode: { type: 'string' },
       sourceText: { type: 'string', minLength: 2 },
+      transliteration: { type: 'string', minLength: 2 },
       translation: { type: 'string', minLength: 2 },
     },
-    required: ['coreConceptCode', 'sourceText', 'translation'],
+    required: [
+      'coreConceptCode',
+      'sourceText',
+      'translation',
+      ...(input.targetLanguageCode === 'ru' || input.targetLanguageCode === 'fa' ? ['transliteration'] : []),
+    ],
   };
 
   return {
@@ -317,13 +352,16 @@ function renderConceptListForExamples(input: ClccPromptInput): string {
  * Per-language 3-shot anchors for stage-3 example sentences. Same anchor
  * concepts Stage 2 uses (FIRST_PERSON / EXIST / NEGATION); only the shape
  * differs (sourceText + translation instead of surfaceForm + gloss).
+ *
+ * Transliteration rides along for ru (ISO 9) and fa (BGN/PCGN); omitted
+ * for fr (Latin script — romanization is trivially sourceText itself).
  */
 function fewShotExampleSentences(targetLanguageCode: ClccPromptInput['targetLanguageCode']): string {
   if (targetLanguageCode === 'ru') {
     return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
-{ "coreConceptCode": "FIRST_PERSON", "sourceText": "Я иду домой.", "translation": "I am going home." }
-{ "coreConceptCode": "EXIST", "sourceText": "В Москве есть метро.", "translation": "There is a metro in Moscow." }
-{ "coreConceptCode": "NEGATION", "sourceText": "Я не знаю.", "translation": "I don't know." }`;
+{ "coreConceptCode": "FIRST_PERSON", "sourceText": "Я иду домой.", "transliteration": "Ya idu domoy.", "translation": "I am going home." }
+{ "coreConceptCode": "EXIST", "sourceText": "В Москве есть метро.", "transliteration": "V Moskve yest' metro.", "translation": "There is a metro in Moscow." }
+{ "coreConceptCode": "NEGATION", "sourceText": "Я не знаю.", "transliteration": "Ya ne znayu.", "translation": "I don't know." }`;
   }
   if (targetLanguageCode === 'fr') {
     return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
@@ -333,9 +371,9 @@ function fewShotExampleSentences(targetLanguageCode: ClccPromptInput['targetLang
   }
   // fa
   return `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
-{ "coreConceptCode": "FIRST_PERSON", "sourceText": "من می‌روم خانه.", "translation": "I am going home." }
-{ "coreConceptCode": "EXIST", "sourceText": "در تهران مترو هست.", "translation": "There is a metro in Tehran." }
-{ "coreConceptCode": "NEGATION", "sourceText": "من نمی‌دانم.", "translation": "I don't know." }`;
+{ "coreConceptCode": "FIRST_PERSON", "sourceText": "من می‌روم خانه.", "transliteration": "Man miram khaneh.", "translation": "I am going home." }
+{ "coreConceptCode": "EXIST", "sourceText": "در تهران مترو هست.", "transliteration": "Dar Tehran metro hast.", "translation": "There is a metro in Tehran." }
+{ "coreConceptCode": "NEGATION", "sourceText": "من نمی‌دانم.", "transliteration": "Man nemidanam.", "translation": "I don't know." }`;
 }
 
 // Stage 4: validation + cross-check

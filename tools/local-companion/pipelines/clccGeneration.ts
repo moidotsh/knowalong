@@ -47,6 +47,16 @@ const SummarySchema = z.object({ summary: z.object({}).passthrough() });
 // anything. Small local models frequently emit malformed entries (null
 // fields, surrogate codes, out-of-enum realizationType); the strict schema
 // is the rejection gate.
+//
+// `transliteration` carries the romanized surface form (ISO 9 for Russian,
+// ALA-LC/BGN/PCGN for Persian, BGN/PCGN/ISO 9985 for Armenian). It is
+// OPTIONAL in the schema so models can omit it for Latin-script languages
+// (French, Swedish — romanization is trivially the surface form itself)
+// and so older callers stay backwards-compatible. For Russian it is the
+// load-bearing Phase-1 addition: the editorial review-vote panel treats
+// it as a first-class reviewable field, surfaced alongside surfaceForm
+// wherever the Cyrillic form appears. Transliteration is DISTINCT from
+// pronunciation guidance (IPA, stress marks, audio) — that is NOT in scope.
 const RealizationEntrySchema = z
   .object({
     coreConceptCode: z.string().min(1).max(64),
@@ -55,6 +65,7 @@ const RealizationEntrySchema = z
     gloss: z.string().min(1).max(500),
     grammaticalNote: z.string().min(1).max(2000),
     senseKind: z.enum(['core', 'contextual', 'idiomatic']),
+    transliteration: z.string().min(1).max(500).optional(),
   })
   .strict();
 
@@ -102,11 +113,16 @@ function looksLikeHybridJunk(surfaceForm: string): boolean {
 // ("валяя", "деляю"), mixed-script sentences, transliterated Latin when the
 // language has its own script, and translations that don't match the source.
 // The strict schema + script-aware junk filter is the rejection gate.
+//
+// `transliteration` carries the romanized sourceText (same scheme as the
+// realization: ISO 9 for Russian). Optional — see RealizationEntrySchema
+// header for the rationale.
 const ExampleEntrySchema = z
   .object({
     coreConceptCode: z.string().min(1).max(64),
     sourceText: z.string().min(2).max(500),
     translation: z.string().min(2).max(500),
+    transliteration: z.string().min(2).max(500).optional(),
   })
   .strict();
 

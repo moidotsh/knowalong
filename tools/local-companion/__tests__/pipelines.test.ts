@@ -126,6 +126,16 @@ const wellFormedExist = {
   senseKind: 'core',
 };
 
+/**
+ * Same fixture with transliteration populated (ISO 9 romanization for ru).
+ * The transliteration field is optional in the schema so models can omit it
+ * for Latin-script languages; for ru the prompt asks for it explicitly.
+ */
+const wellFormedExistWithTransliteration = {
+  ...wellFormedExist,
+  transliteration: "byt'",
+};
+
 describe('clccGeneration pipeline', () => {
   beforeEach(() => {
     (jobManager as unknown as { _resetForTests: () => void })._resetForTests();
@@ -554,5 +564,136 @@ describe('clccGeneration pipeline', () => {
     expect(stage3Calls.length).toBe(0);
     // A skip warning was emitted.
     expect(result.events.some((e) => e.stage === 'Example sentences' && e.payload?.reason === 'no_realizations')).toBe(true);
+  });
+
+  // ── Transliteration tests ──────────────────────────────────────────────
+  //
+  // The transliteration field is the Phase-1 addition for ru (ISO 9) and fa
+  // (BGN/PCGN). It is optional in the schema so older callers and Latin-script
+  // languages (fr) continue to validate cleanly. When the model emits it, it
+  // must ride through to the proposal payload unchanged.
+
+  it('stage 2 realization proposal carries transliteration when the model emits it', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExistWithTransliteration] }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c11', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c11')!;
+    const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('быть');
+    expect(payload.transliteration).toBe("byt'");
+  });
+
+  it('stage 2 accepts entries without transliteration (backwards compat / Latin-script languages)', async () => {
+    // fr — transliteration is optional; the prompt allows omission for
+    // Latin-script languages. The schema must not reject entries that omit it.
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Romance', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExist] }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c12', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fr', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c12')!;
+    const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('быть');
+    expect(payload.transliteration).toBeUndefined();
+  });
+
+  it('stage 3 example proposal carries transliteration when the model emits it', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExistWithTransliteration] }),
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            sourceText: 'В Москве есть метро.',
+            transliteration: "V Moskve yest' metro.",
+            translation: 'There is a metro in Moscow.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c13', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c13')!;
+    const exampleProposal = result.result?.proposals.find((p) => p.proposalKind === 'example');
+    const examplePayload = exampleProposal?.payload as Record<string, unknown>;
+    expect(examplePayload.sourceText).toBe('В Москве есть метро.');
+    expect(examplePayload.transliteration).toBe("V Moskve yest' metro.");
+  });
+
+  it('stage 2 prompt for ru includes the ISO 9 transliteration instruction', async () => {
+    // The prompt body is a load-bearing contract: it must tell the model
+    // which scheme to use, and must distinguish transliteration from
+    // pronunciation guidance (no IPA, no stress marks).
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExistWithTransliteration] }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c14', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Call = ollama.calls.find((p) => p.includes('Concepts to realize'))!;
+    expect(stage2Call).toContain('ISO 9');
+    expect(stage2Call).toContain('transliteration');
+    // Pronunciation guidance is explicitly excluded.
+    expect(stage2Call).toContain('NOT IPA');
+    expect(stage2Call).toContain('NOT stress marks');
+  });
+
+  it('stage 3 prompt for fr marks transliteration optional', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Romance', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExist] }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c15', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fr', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage3Call = ollama.calls.find((p) => p.includes('Concepts to illustrate'))!;
+    expect(stage3Call).toContain('transliteration');
+    expect(stage3Call).toContain('OPTIONAL for French');
   });
 });
