@@ -1,0 +1,12 @@
+{
+  "name": "knowalong-local-companion",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Local loopback-only LLM companion for KnowAlong. Binds 127.0.0.1 only, owns its API token, never writes to Supabase. Strategy A: root toolchain typechecks + tests this directory.",
+  "scripts": {
+    "dev": "bun run index.ts",
+    "start": "bun run index.ts",
+    "test": "bun test",
+    "rotate-token": "bun run scripts/rotateToken.ts"
+  }
+}

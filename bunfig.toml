@@ -1,0 +1,4 @@
+[install]
+# Arqavellum uses bun for everything. Never commit package-lock.json or yarn.lock —
+# audit-pattern-compliance enforces this at pre-commit.
+saveLockfile = true

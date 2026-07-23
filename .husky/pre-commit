@@ -1,0 +1,145 @@
+# ─────────────────────────────────────────────────────────────────────
+# arqavellum local quality gate. 12 structural audits + tsc + structural eslint.
+# Fast checks only — test suite is deferred to CI. Runs in a few seconds.
+# ─────────────────────────────────────────────────────────────────────
+
+# Barrel audit (S5): hard fail.
+echo "→ Running barrel audit…" >&2
+bun run scripts/audit-barrels.ts || {
+  echo "" >&2
+  echo "  ERROR: Barrel import violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Data layer audit (S9/S13/D5): hard fail.
+echo "→ Running data layer audit…" >&2
+bun run scripts/audit-data-layer.ts || {
+  echo "" >&2
+  echo "  ERROR: Data layer violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# State audit (D3/D10): hard fail.
+echo "→ Running state audit…" >&2
+bun run scripts/audit-state.ts || {
+  echo "" >&2
+  echo "  ERROR: State management violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Security audit (S12/SE2/S10): hard fail.
+echo "→ Running security audit…" >&2
+bun run scripts/audit-security.ts || {
+  echo "" >&2
+  echo "  ERROR: Security violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Logging & error-handling audit (S11/S10): hard fail.
+echo "→ Running logging/error-handling audit…" >&2
+bun run scripts/audit-logging-errors.ts || {
+  echo "" >&2
+  echo "  ERROR: Logging or error-handling violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# UI & theming audit (S7/LIGHT/C3): hard fail.
+echo "→ Running UI/theme audit…" >&2
+bun run scripts/audit-ui-theme.ts || {
+  echo "" >&2
+  echo "  ERROR: UI/theme violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Component-quality audit (C1/C2/C4): hard fail.
+echo "→ Running component-quality audit…" >&2
+bun run scripts/audit-component-quality.ts || {
+  echo "" >&2
+  echo "  ERROR: Component-quality violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Testing & types audit (D6/T1/T2): hard fail.
+echo "→ Running testing/types audit…" >&2
+bun run scripts/audit-testing-types.ts || {
+  echo "" >&2
+  echo "  ERROR: Testing/type violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Pattern compliance audit (S19/C10): hard fail.
+echo "→ Running pattern-compliance audit…" >&2
+bun run scripts/audit-pattern-compliance.ts || {
+  echo "" >&2
+  echo "  ERROR: Pattern-compliance violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Runtime resilience audit (R4a/R4b/R1): hard fail.
+echo "→ Running runtime-resilience audit…" >&2
+bun run scripts/audit-runtime-resilience.ts || {
+  echo "" >&2
+  echo "  ERROR: Runtime-resilience violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Screen-body audit (SB1): hard fail.
+echo "→ Running screen-body audit…" >&2
+bun run scripts/audit-screen-body.ts || {
+  echo "" >&2
+  echo "  ERROR: Screen-body violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Portal content-width audit (SB2): hard fail.
+echo "→ Running portal-content-width audit…" >&2
+bun run scripts/audit-mobile-content-width.ts || {
+  echo "" >&2
+  echo "  ERROR: Portal content-width violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Structural ESLint (S6/S8): hard fail.
+echo "→ Running structural ESLint (S6/S8)…" >&2
+eslint . --config eslint.structure.config.js --quiet || {
+  echo "" >&2
+  echo "  ERROR: Structural ESLint violations found. See above." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}
+
+# Typecheck: hard fail. tsc is fast (~5s) and a red typecheck means the
+# commit is genuinely broken.
+echo "→ Running tsc --noEmit…" >&2
+bunx tsc --noEmit || {
+  echo "" >&2
+  echo "  ERROR: tsc failed. Fix type errors before committing." >&2
+  echo "  (skip with --no-verify if you genuinely need to.)" >&2
+  echo "" >&2
+  exit 1
+}

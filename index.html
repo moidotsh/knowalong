@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!--
+      PWA / Add to Home Screen configuration.
+
+      This file is the source-of-truth DECLARATION of which PWA tags the
+      app expects to ship with. The runtime DELIVERY mechanism is the
+      web-bootstrap useEffect in app/_layout.tsx (ensureMeta / ensureLink)
+      — Expo Web's static export (`expo export --platform web`) strips
+      every tag below from <head> except <link rel="icon"> when generating
+      dist/index.html, and the runtime injection block restores them.
+
+      The two are a deliberate mirror pair — keep them in sync in the
+      same change. The theme-color values here are arqavellum's defaults
+      (light surface for desktop, brand indigo for mobile); consumers
+      who override the `brand` slot should update both this file and
+      the matching lines in app/_layout.tsx so the deployed HTML and
+      the runtime injection agree.
+      Full design + debugging checklist: docs/architecture/pwa-installability.md.
+    -->
+    <meta name="theme-color" content="#F1F5F9" media="(min-width: 701px)" />
+    <meta name="theme-color" content="#4F46E5" media="(max-width: 700px)" />
+
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/192.png" />
+    <link rel="icon" type="image/png" href="/icons/192.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="KnowAlong" />
+
+    <title>KnowAlong</title>
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        background: #f1f5f9;
+      }
+      #root {
+        display: flex;
+        flex-direction: column;
+      }
+      /* Hide scrollbars across the entire app. The mobile-native
+         indicators are gated per-ScrollView via
+         showsVerticalScrollIndicator={false}; on web the only
+         systematic way to suppress the always-visible desktop
+         scrollbar is global CSS. A visible scrollbar on the
+         centered 420pt mobile-first column reads as desktop chrome
+         and breaks the immersive feel. */
+      *::-webkit-scrollbar {
+        display: none;
+      }
+      * {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

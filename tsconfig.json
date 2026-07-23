@@ -1,0 +1,20 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "baseUrl": ".",
+    "paths": {
+      "@app/*": ["./*"],
+      "@/*": ["./*"],
+      "@shared/*": ["./shared/*"],
+      "@components/*": ["./components/*"],
+      "@hooks/*": ["./hooks/*"],
+      "@stores/*": ["./stores/*"],
+      "@utils/*": ["./utils/*"]
+    },
+    "jsx": "react-jsx",
+    "types": ["bun-types", "vitest/globals"]
+  },
+  "include": ["**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", ".next", "pages", "api", "supabase/functions"]
+}

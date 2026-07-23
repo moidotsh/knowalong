@@ -1,0 +1,54 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native artifacts
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Metro / build caches
+.metro-health-check*
+*.tsbuildinfo
+
+# Tamagui
+.tamagui/
+
+# Env
+.env
+.env.local
+.env.*.local
+.env.local.dev
+.env.local.prod
+
+# IDE / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Vercel
+.vercel/
+
+# Tests
+coverage/
+__screenshots__/
+
+# Local-only configuration (kept out of public history)
+.arqavellum-private-terms
+
+# Local companion runtime config (contains the bearer token; generated on first start)
+tools/local-companion/config/
+
+# NOTE: bun.lock IS committed. Only package-lock.json and yarn.lock are
+# forbidden (audit-pattern-compliance enforces "only bun.lock at root").
