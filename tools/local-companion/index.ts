@@ -18,6 +18,12 @@ async function main() {
     hostname: HOST,
     port: config.port,
     fetch: router,
+    // Bun's default idleTimeout is 10s, which is shorter than our SSE heartbeat
+    // interval (15s) — without this override, every SSE connection is closed
+    // before the first heartbeat can keep it alive. 60s is 4× the heartbeat
+    // interval (comfortable margin) and still cleans up abandoned connections
+    // within a minute.
+    idleTimeout: 60,
   });
 
   // Subscribe a periodic SSE pump: nothing here for now — jobManager streams
