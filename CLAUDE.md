@@ -199,4 +199,5 @@ This is the contract that prevents doc drift. For every change you land in code,
 | Durable lyrics-domain ADR (private-content boundary, source-vs-generated safety rule, readiness versioning) | `_reports/knowalong-lyrics-domain-architecture.md` |
 | Durable local-analysis/CLCC ADR (companion trust/auth/CORS, SSE-over-fetch, acceptance matrix, span model, HTTPS-to-loopback limitation, deferred promotion items) | `_reports/local-analysis-clcc.md` |
 | Durable Learner-Studio-CLCC product-boundary ADR (Learner PWA ownership, Studio boundary, data boundary, language-pack lifecycle, future bridge-card contract, rollout order, explicit non-goals) | `_reports/learner-studio-clcc-boundary.md` |
+| Durable Bridge Deck Generation Contract (bridge-deck definition, inputs, output categories, per-card metadata, binding sequencing rules, exclusions, future-generator acceptance criteria, illustrative scaffold, non-implementation mapping) | `_reports/bridge-deck-generation-contract.md` |
 | Local companion operating manual (setup, onboarding, token rotation, model list, troubleshooting) | `tools/local-companion/README.md` |

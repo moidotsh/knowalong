@@ -102,3 +102,4 @@ This ADR records seven binding decisions and an explicit non-goals list.
 | # | Date | Change |
 |---|---|---|
 | 1 | Initial | Seven binding decisions recorded: product ownership, Studio boundary, data boundary, language-pack lifecycle, future bridge-card contract, rollout order, non-goals. |
+| 2 | 2026-07-22 | Decision 5 ("Future bridge-card contract") landed as `_reports/bridge-deck-generation-contract.md`. The named separate decision record now defines the bridge deck, its inputs/outputs/per-card metadata, binding sequencing rules, exclusions, and future-generator acceptance criteria. No schema changes; no generator implementation. Decision body unchanged. |
