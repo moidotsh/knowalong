@@ -55,12 +55,37 @@ export async function runClccPipeline(
   const model = request.modelLabel ?? deps.ollama.defaultModel;
   let nextOrdinal = 1;
 
+  // After each Ollama call, surface the raw model response as a progress
+  // event so the operator can see actual AI output (not just stage labels)
+  // during long-running stages. The payload carries the full text; the
+  // message field stays short to respect the 500-char cap.
+  const emitModelOutput = (
+    stageId: string,
+    stageLabel: string,
+    r: { text: string; model: string },
+  ): void => {
+    emitEvent(job, {
+      kind: 'event',
+      ordinal: nextOrdinal++,
+      severity: 'progress',
+      stage: stageLabel,
+      message: `Model responded (${r.text.length} chars).`,
+      payload: {
+        modelOutput: r.text,
+        model: r.model,
+        stageId,
+        chars: r.text.length,
+      },
+    });
+  };
+
   const stages: Array<{ id: string; label: string; run: () => Promise<void> }> = [
     {
       id: 'profile',
       label: CLCC_STAGES[0].label,
       run: async () => {
         const r = await deps.ollama.generate({ model, temperature: 0.2, ...stage1LanguageProfilePrompt(promptInput) });
+        emitModelOutput('profile', CLCC_STAGES[0].label, r);
         ProfileSchema.parse(JSON.parse(r.text));
       },
     },
@@ -69,6 +94,7 @@ export async function runClccPipeline(
       label: CLCC_STAGES[1].label,
       run: async () => {
         const r = await deps.ollama.generate({ model, temperature: 0.3, ...stage2RealizationsPrompt(promptInput) });
+        emitModelOutput('realizations', CLCC_STAGES[1].label, r);
         RealizationsSchema.parse(JSON.parse(r.text));
         // Persist realization proposals for review. Acceptance is deferred.
         const parsed = JSON.parse(r.text) as { realizations: Array<Record<string, unknown>> };
@@ -91,6 +117,7 @@ export async function runClccPipeline(
       label: CLCC_STAGES[2].label,
       run: async () => {
         const r = await deps.ollama.generate({ model, temperature: 0.4, ...stage3ExamplesPrompt(promptInput) });
+        emitModelOutput('examples', CLCC_STAGES[2].label, r);
         ExamplesSchema.parse(JSON.parse(r.text));
       },
     },
@@ -99,6 +126,7 @@ export async function runClccPipeline(
       label: CLCC_STAGES[3].label,
       run: async () => {
         const r = await deps.ollama.generate({ model, temperature: 0.1, ...stage4ValidationPrompt(promptInput) });
+        emitModelOutput('validation', CLCC_STAGES[3].label, r);
         ValidationSchema.parse(JSON.parse(r.text));
       },
     },
@@ -107,6 +135,7 @@ export async function runClccPipeline(
       label: CLCC_STAGES[4].label,
       run: async () => {
         const r = await deps.ollama.generate({ model, temperature: 0.1, ...stage5SummaryPrompt(promptInput) });
+        emitModelOutput('summary', CLCC_STAGES[4].label, r);
         SummarySchema.parse(JSON.parse(r.text));
       },
     },
