@@ -8,7 +8,11 @@ import { dirname, join } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { z } from 'zod';
 
-const CONFIG_PATH = process.env.KNOWALONG_COMPANION_CONFIG ?? join(process.cwd(), 'tools/local-companion/config/companion.local.json');
+// Resolve relative to THIS MODULE so the path is cwd-independent. Running
+// `bun run dev` from repo root or from inside tools/local-companion/ both
+// land at the same file. The previous `process.cwd()`-based path doubled
+// the `tools/local-companion/` segment when invoked from inside that dir.
+const CONFIG_PATH = process.env.KNOWALONG_COMPANION_CONFIG ?? join(import.meta.dir, 'config/companion.local.json');
 
 export const DEFAULT_LOOPBACK_HOST = '127.0.0.1';
 export const DEFAULT_LOOPBACK_PORT = 8765;
