@@ -64,7 +64,13 @@ export type AnalysisRunStatus =
   | 'failed'
   | 'cancelled';
 
-/** Severity of an analysis event. The stage_* values drive the progress card UI. */
+/** Severity of an analysis event. The stage_* values drive the progress card UI.
+ *
+ *  The `'token'` value (Phase 4) carries per-chunk model output as it streams
+ *  off Ollama. Token events are ephemeral: they flow through the SSE stream
+ *  so the UI can render live model output, but they MUST NOT be persisted to
+ *  `analysis_events` (M11 forbids raw model chain-of-thought in storage). The
+ *  PWA-side ingest filters them out at the service layer. */
 export type AnalysisEventSeverity =
   | 'info'
   | 'progress'
@@ -72,7 +78,8 @@ export type AnalysisEventSeverity =
   | 'error'
   | 'stage_start'
   | 'stage_complete'
-  | 'stage_failed';
+  | 'stage_failed'
+  | 'token';
 
 /**
  * Kind of analysis proposal. Mirrors migration 007's CHECK exactly. The

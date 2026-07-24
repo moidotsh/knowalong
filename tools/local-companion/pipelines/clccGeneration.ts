@@ -256,6 +256,29 @@ export async function runClccPipeline(
     });
   };
 
+  // Phase 4 token-stream emitter. Returns a callback suitable for passing
+  // as `onToken` to OllamaAdapter.generate(). Each chunk off the wire
+  // becomes one `severity: 'token'` event in the SSE stream, so the UI
+  // can render live model output as it arrives. Token events share the
+  // run's monotonic ordinal space with stage_lifecycle events; the
+  // PWA-side ingest filter drops them before persistence so they never
+  // land in analysis_events (M11 forbids raw model output there).
+  const tokenEmitter = (
+    stageLabel: string,
+    stageId: string,
+  ): ((chunk: string) => void) => {
+    return (chunk) => {
+      emitEvent(job, {
+        kind: 'event',
+        ordinal: nextOrdinal++,
+        severity: 'token',
+        stage: stageLabel,
+        message: `Token stream chunk (${chunk.length} chars)`,
+        payload: { stageId, chunk },
+      });
+    };
+  };
+
   // Accumulator for validated realization entries. Stage 2 fills this.
   const validatedEntries: ValidatedRealizationEntry[] = [];
   const droppedCodes: DroppedEntry[] = [];
@@ -273,7 +296,7 @@ export async function runClccPipeline(
       id: 'profile',
       label: CLCC_STAGES[0].label,
       run: async () => {
-        const r = await deps.ollama.generate({ model, temperature: 0.2, ...stage1LanguageProfilePrompt(promptInput) });
+        const r = await deps.ollama.generate({ model, temperature: 0.2, ...stage1LanguageProfilePrompt(promptInput), onToken: tokenEmitter(CLCC_STAGES[0].label, 'profile') });
         emitModelOutput('profile', CLCC_STAGES[0].label, r);
         ProfileSchema.parse(JSON.parse(r.text));
       },
@@ -299,7 +322,7 @@ export async function runClccPipeline(
 
           const result = await generateAndValidateBatch(deps, model, batchPromptInput, batch, allowedCodes, {
             targetLanguageCode: request.targetLanguageCode,
-          });
+          }, tokenEmitter(CLCC_STAGES[1].label, 'realizations'));
           for (const v of result.validated) {
             if (!acceptedCodes.has(v.coreConceptCode)) {
               acceptedCodes.add(v.coreConceptCode);
@@ -379,6 +402,7 @@ export async function runClccPipeline(
             batch,
             allowedExampleCodes,
             request.targetLanguageCode,
+            tokenEmitter(CLCC_STAGES[2].label, 'examples'),
           );
           for (const v of result.validated) {
             if (!acceptedExampleCodes.has(v.coreConceptCode)) {
@@ -416,7 +440,7 @@ export async function runClccPipeline(
       id: 'validation',
       label: CLCC_STAGES[3].label,
       run: async () => {
-        const r = await deps.ollama.generate({ model, temperature: 0.1, ...stage4ValidationPrompt(promptInput) });
+        const r = await deps.ollama.generate({ model, temperature: 0.1, ...stage4ValidationPrompt(promptInput), onToken: tokenEmitter(CLCC_STAGES[3].label, 'validation') });
         emitModelOutput('validation', CLCC_STAGES[3].label, r);
         ValidationSchema.parse(JSON.parse(r.text));
       },
@@ -425,7 +449,7 @@ export async function runClccPipeline(
       id: 'summary',
       label: CLCC_STAGES[4].label,
       run: async () => {
-        const r = await deps.ollama.generate({ model, temperature: 0.1, ...stage5SummaryPrompt(promptInput) });
+        const r = await deps.ollama.generate({ model, temperature: 0.1, ...stage5SummaryPrompt(promptInput), onToken: tokenEmitter(CLCC_STAGES[4].label, 'summary') });
         emitModelOutput('summary', CLCC_STAGES[4].label, r);
         SummarySchema.parse(JSON.parse(r.text));
       },
@@ -566,12 +590,14 @@ async function generateAndValidateBatch(
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
   ctx: BatchLanguageContext,
+  onToken?: (chunk: string) => void,
 ): Promise<BatchResult> {
   // First attempt.
   const r1 = await deps.ollama.generate({
     model,
     temperature: 0.3,
     ...stage2RealizationsPrompt(batchPromptInput),
+    onToken,
   });
   const parsed1 = tryParseRealizations(r1.text);
   if (parsed1.kind === 'parse-fail') {
@@ -580,6 +606,7 @@ async function generateAndValidateBatch(
       model,
       temperature: 0.2,
       ...stage2RealizationsPrompt(batchPromptInput),
+      onToken,
     });
     const parsed2 = tryParseRealizations(r2.text);
     if (parsed2.kind === 'parse-fail') {
@@ -623,6 +650,7 @@ async function generateAndValidateBatch(
     model,
     temperature: 0.2,
     ...stage2RealizationsPrompt(retryPromptInput),
+    onToken,
   });
   const parsed2 = tryParseRealizations(r2.text);
   if (parsed2.kind === 'parse-fail') {
@@ -752,11 +780,13 @@ async function generateAndValidateExampleBatch(
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
   targetLanguageCode: 'fr' | 'ru' | 'fa',
+  onToken?: (chunk: string) => void,
 ): Promise<ExampleBatchResult> {
   const r1 = await deps.ollama.generate({
     model,
     temperature: 0.4,
     ...stage3ExamplesPrompt(batchPromptInput),
+    onToken,
   });
   const parsed1 = tryParseExamples(r1.text);
   if (parsed1.kind === 'parse-fail') {
@@ -764,6 +794,7 @@ async function generateAndValidateExampleBatch(
       model,
       temperature: 0.3,
       ...stage3ExamplesPrompt(batchPromptInput),
+      onToken,
     });
     const parsed2 = tryParseExamples(r2.text);
     if (parsed2.kind === 'parse-fail') {
@@ -799,6 +830,7 @@ async function generateAndValidateExampleBatch(
     model,
     temperature: 0.3,
     ...stage3ExamplesPrompt(retryPromptInput),
+    onToken,
   });
   const parsed2 = tryParseExamples(r2.text);
   if (parsed2.kind === 'parse-fail') {

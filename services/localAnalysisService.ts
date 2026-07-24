@@ -155,7 +155,11 @@ async function ingestEvents(
     return;
   }
   const seen = new Set(existingRes.data.map((e) => e.ordinal));
-  const fresh = events.filter((e) => !seen.has(e.ordinal));
+  // Phase 4: token events carry raw model chain-of-thought and MUST NOT
+  // land in analysis_events (invariant M11). They flow only through the
+  // live SSE stream; drop them at ingest as defense-in-depth alongside
+  // the DB CHECK constraint that doesn't include 'token'.
+  const fresh = events.filter((e) => !seen.has(e.ordinal) && e.severity !== 'token');
   if (fresh.length === 0) return;
   const appendRes = await analysisEventRepository.appendBatch({
     userId,

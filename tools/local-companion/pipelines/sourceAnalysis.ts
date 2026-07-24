@@ -69,6 +69,30 @@ export async function runSourceAnalysisPipeline(
     sourceLines: request.sourceLines,
   };
   const model = request.modelLabel ?? deps.ollama.defaultModel;
+  // Declared early so the token emitter (Phase 4) can close over the
+  // ordinal allocator. Stage lifecycle events and token stream events
+  // share this single monotonic ordinal space.
+  let nextOrdinal = 1;
+
+  // Phase 4 token-stream emitter. Each chunk off the wire becomes one
+  // `severity: 'token'` event so the UI can render live model output.
+  // The PWA-side ingest filter drops these before persistence so they
+  // never land in analysis_events (M11 forbids raw model output there).
+  const tokenEmitter = (
+    stageLabel: string,
+    stageId: string,
+  ): ((chunk: string) => void) => {
+    return (chunk) => {
+      emitEvent(job, {
+        kind: 'event',
+        ordinal: nextOrdinal++,
+        severity: 'token',
+        stage: stageLabel,
+        message: `Token stream chunk (${chunk.length} chars)`,
+        payload: { stageId, chunk },
+      });
+    };
+  };
 
   const stages: Array<{ id: string; label: string; run: () => Promise<CompanionResultProposal[]> }> = [
     {
@@ -79,6 +103,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.2,
           ...stage1SectionsPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[0].label, 'sections'),
         });
         SectionsSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { sections: Array<Record<string, unknown>> };
@@ -97,6 +122,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.2,
           ...stage2SegmentsPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[1].label, 'segments'),
         });
         SegmentsSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { segments: Array<Record<string, unknown>> };
@@ -115,6 +141,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.3,
           ...stage3LineTranslationPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[2].label, 'translations'),
         });
         TranslationsSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { translations: Array<Record<string, unknown>> };
@@ -137,6 +164,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.2,
           ...stage4LemmasPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[3].label, 'lemmas'),
         });
         LemmasSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { lemmas: Array<Record<string, unknown>> };
@@ -155,6 +183,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.2,
           ...stage5FormsPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[4].label, 'forms'),
         });
         FormsSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { forms: Array<Record<string, unknown>> };
@@ -173,6 +202,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.1,
           ...stage6TokensPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[5].label, 'tokens'),
         });
         TokensSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { tokens: Array<Record<string, unknown>> };
@@ -191,6 +221,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.1,
           ...stage7MorphologyPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[6].label, 'morphology'),
         });
         MorphologySchema.parse(JSON.parse(result.text));
         // Morphology is an UPDATE path; emit as morphology proposals keyed
@@ -206,6 +237,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.3,
           ...stage8GrammarAndConceptsPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[7].label, 'grammar_and_concepts'),
         });
         GrammarSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as {
@@ -239,6 +271,7 @@ export async function runSourceAnalysisPipeline(
           model,
           temperature: 0.4,
           ...stage9CardsPrompt(promptInput),
+          onToken: tokenEmitter(SOURCE_ANALYSIS_STAGES[8].label, 'cards'),
         });
         CardsSchema.parse(JSON.parse(result.text));
         const parsed = JSON.parse(result.text) as { cards: Array<Record<string, unknown>> };
@@ -259,7 +292,6 @@ export async function runSourceAnalysisPipeline(
   ];
 
   const allProposals: CompanionResultProposal[] = [];
-  let nextOrdinal = 1;
   jobManager.setStage(job.id, stages[0].label, 0, stages.length);
   jobManager.transition(job.id, 'connecting');
   jobManager.transition(job.id, 'running');

@@ -27,6 +27,15 @@ const GenerateResponseSchema = z.object({
   done: z.boolean(),
 });
 
+/** Per-chunk schema for `stream: true` responses. Ollama emits one JSON
+ *  object per line; every line has `response` (possibly empty) and the
+ *  final line has `done: true`. */
+const GenerateChunkSchema = z.object({
+  model: z.string().optional(),
+  response: z.string().optional(),
+  done: z.boolean().optional(),
+});
+
 export interface GenerateOptions {
   model: string;
   prompt: string;
@@ -35,6 +44,14 @@ export interface GenerateOptions {
   /** Lower temperature for structured output. */
   temperature?: number;
   maxRetries?: number;
+  /**
+   * Phase 4 token streaming. When provided, the adapter switches to
+   * `stream: true` and invokes the callback for each incremental chunk
+   * off the wire. The accumulated text is still returned as `result.text`
+   * so existing callers work unchanged. Callbacks MUST be cheap — they
+   * fire on the fetch loop, not on the caller's promise chain.
+   */
+  onToken?: (chunk: string) => void;
 }
 
 export interface GenerateResult {
@@ -74,6 +91,11 @@ export function createOllamaAdapter(opts: OllamaAdapterOptions) {
     let lastError: unknown = null;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
+        // Phase 4: switch to stream:true when caller passes onToken. The
+        // stream is parsed line-by-line (Ollama emits NDJSON — one JSON
+        // object per chunk). The accumulated text is returned exactly as
+        // the non-streaming path would return it, so callers don't care.
+        const useStream = typeof opts.onToken === 'function';
         const res = await fetch(`${baseUrl}/api/generate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -81,7 +103,7 @@ export function createOllamaAdapter(opts: OllamaAdapterOptions) {
             model: opts.model,
             prompt: opts.prompt,
             format: opts.format,
-            stream: false,
+            stream: useStream,
             options: opts.temperature !== undefined ? { temperature: opts.temperature } : undefined,
           }),
         });
@@ -89,8 +111,50 @@ export function createOllamaAdapter(opts: OllamaAdapterOptions) {
           // s10-exempt: caught by the generate retry loop and surfaced as a pipeline warning.
           throw new Error(`Ollama /api/generate returned ${res.status}: ${await safeText(res)}`);
         }
-        const parsed = GenerateResponseSchema.parse(await res.json());
-        return { text: parsed.response, model: parsed.model };
+        if (!useStream || !res.body) {
+          const parsed = GenerateResponseSchema.parse(await res.json());
+          return { text: parsed.response, model: parsed.model };
+        }
+        // Streaming path: read NDJSON chunks, accumulate, invoke callback.
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let text = '';
+        let model = opts.model;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            let nl = buffer.indexOf('\n');
+            while (nl !== -1) {
+              const line = buffer.slice(0, nl).trim();
+              buffer = buffer.slice(nl + 1);
+              if (line.length > 0) {
+                const chunk = GenerateChunkSchema.parse(JSON.parse(line));
+                if (chunk.response) {
+                  text += chunk.response;
+                  opts.onToken!(chunk.response);
+                }
+                if (chunk.model) model = chunk.model;
+              }
+              nl = buffer.indexOf('\n');
+            }
+          }
+          // Drain any trailing buffered line.
+          const tail = buffer.trim();
+          if (tail.length > 0) {
+            const chunk = GenerateChunkSchema.parse(JSON.parse(tail));
+            if (chunk.response) {
+              text += chunk.response;
+              opts.onToken!(chunk.response);
+            }
+            if (chunk.model) model = chunk.model;
+          }
+        } finally {
+          reader.releaseLock();
+        }
+        return { text, model };
       } catch (e) {
         lastError = e;
         // Brief backoff before retry.
