@@ -7,12 +7,62 @@ import { jobManager } from '../jobManager';
 import { runSourceAnalysisPipeline } from '../pipelines/sourceAnalysis';
 import { runClccPipeline } from '../pipelines/clccGeneration';
 import {
-  rejectRussianSurfaceFormNoCyrillic,
-  rejectTransliterationMismatch,
-  detectGrammarNoteContradictions,
-  rejectRussianRealizationDefects,
-} from '../pipelines/clccGeneration';
+  validateRealizationEntry,
+  RU_PROFILE,
+  FA_PROFILE,
+  FR_PROFILE,
+} from '../validation';
+import type { ValidatedEntry, LanguageProfile } from '../validation';
 import type { JobState } from '../jobManager';
+
+// Back-compat wrappers: the round-1 helpers now live in the validation engine.
+// These delegate to the engine + RU_PROFILE so the existing helper-level tests
+// keep exercising the same logic through the new centralized framework.
+const KNOWN_CODES = new Set<string>(['X']);
+function checkRuEntry(
+  surfaceForm: string,
+  transliteration: string | undefined,
+  grammaticalNote: string,
+): ReturnType<typeof validateRealizationEntry> {
+  const entry: ValidatedEntry = {
+    coreConceptCode: 'X',
+    realizationType: 'word',
+    surfaceForm,
+    transliteration,
+    gloss: 'gloss',
+    grammaticalNote,
+  };
+  return validateRealizationEntry(entry, RU_PROFILE, KNOWN_CODES);
+}
+function rejectRussianSurfaceFormNoCyrillic(surfaceForm: string): string | null {
+  const r = checkRuEntry(surfaceForm, undefined, 'lexeme').rejections.find(
+    (x) => x.code === 'SCRIPT_NONE_NATIVE',
+  );
+  return r ? r.reason : null;
+}
+function rejectTransliterationMismatch(
+  surfaceForm: string,
+  transliteration: string,
+): string | null {
+  const r = checkRuEntry(surfaceForm, transliteration, 'lexeme').rejections.find(
+    (x) => x.code === 'TRANSLIT_MISMATCH' || x.code === 'TRANSLIT_NON_LATIN',
+  );
+  return r ? r.reason : null;
+}
+function detectGrammarNoteContradictions(grammaticalNote: string): string[] {
+  return checkRuEntry('быть', "byt'", grammaticalNote).rejections
+    .filter((x) => x.code.startsWith('GRAMMAR_'))
+    .map((x) => x.reason);
+}
+function rejectRussianRealizationDefects(entry: {
+  surfaceForm: string;
+  transliteration?: string;
+  grammaticalNote: string;
+}): string[] {
+  return checkRuEntry(entry.surfaceForm, entry.transliteration, entry.grammaticalNote).rejections.map(
+    (x) => x.reason,
+  );
+}
 
 interface FakeOllamaOpts {
   /** Map of substring → response. First matching substring wins per call. */
@@ -1136,5 +1186,228 @@ describe('clccGeneration pipeline', () => {
     expect(result.result?.proposals.length).toBe(1);
     const summary = result.result?.summary as Record<string, unknown>;
     expect(summary.dropped).toBe(0);
+  });
+
+  // ── Round-2 validators (profile-driven engine) ──────────────────────────
+  //
+  // New rules added by the centralized validation framework. Each exercises a
+  // rule mechanism with a synthetic case constructed to fire it — they do NOT
+  // bind to specific concept codes or surfaceForm values, proving the rules
+  // are general. See validation/profiles/ru.ts for the rule data.
+
+  /** Clean Russian row: passes every configured rule. Base for mutating below. */
+  const cleanRuEntry: ValidatedEntry = {
+    coreConceptCode: 'X',
+    realizationType: 'word',
+    surfaceForm: 'быть',
+    transliteration: "byt'",
+    gloss: 'to be',
+    grammaticalNote: 'verb, infinitive, imperfective aspect',
+  };
+
+  describe('SCRIPT_MIXED (mixed Cyrillic+Latin in one token)', () => {
+    it('rejects the reported "могlichkeit" case', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, surfaceForm: 'могlichkeit', transliteration: 'moglichkeit' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.verdict).toBe('malformed');
+      expect(r.skipReview).toBe(true);
+      expect(r.rejections.some((x) => x.code === 'SCRIPT_MIXED')).toBe(true);
+    });
+
+    it('rejects synthetic mixed-script tokens (generality guard)', () => {
+      for (const sf of ['xnaxelihood', 'ruslatination', 'amixb']) {
+        // Construct a token with both Cyrillic and Latin chunks.
+        const mixed = 'на' + sf;
+        const r = validateRealizationEntry(
+          { ...cleanRuEntry, surfaceForm: mixed, transliteration: 'na' + sf },
+          RU_PROFILE,
+          KNOWN_CODES,
+        );
+        expect(r.rejections.some((x) => x.code === 'SCRIPT_MIXED')).toBe(true);
+      }
+    });
+  });
+
+  describe('POS-extension grammar rules (preposition/adverb/conjunction/numeral/cardinal/ordinal/particle)', () => {
+    it('rejects "preposition, present tense" (synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'preposition, present tense' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(true);
+    });
+
+    it('rejects "conjunction, present tense" (synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'conjunction, present tense' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(true);
+    });
+
+    it('rejects "numeral, present tense" (synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'numeral, present tense' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(true);
+    });
+
+    it('rejects "cardinal, first person" (synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'cardinal, first person' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(true);
+    });
+
+    it('rejects "particle, present tense" (synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'particle, present tense' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(true);
+    });
+  });
+
+  describe('exclusive-category (multi-tense / multi-person)', () => {
+    it('rejects "verb, present tense, past tense" (multi-tense, synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'verb, present tense, past tense' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_TENSE')).toBe(true);
+    });
+
+    it('rejects "verb, first person, second person" (multi-person, synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'verb, first person, second person' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_PERSON')).toBe(true);
+    });
+  });
+
+  describe('REALIZATION_TYPE_SHAPE (word with whitespace)', () => {
+    it('rejects realizationType "word" with a space (synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, surfaceForm: 'быть здесь', transliteration: 'byt zdes' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'REALIZATION_TYPE_SHAPE')).toBe(true);
+    });
+
+    it('accepts realizationType "phrase" with a space', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, realizationType: 'phrase', surfaceForm: 'быть здесь', transliteration: 'byt zdes' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.verdict).toBe('valid');
+    });
+  });
+
+  describe('TRANSLIT_NON_LATIN (transliteration contains no Latin letters)', () => {
+    it('rejects a Cyrillic transliteration (script leak)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, transliteration: 'быть' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'TRANSLIT_NON_LATIN')).toBe(true);
+    });
+  });
+
+  // ── Retry-feedback (Stage 2 prompt carries prior rejection reasons) ──────
+  //
+  // When a code is dropped on first pass with a structured rejectionCode, the
+  // retry prompt for that code includes the rejection reason text. This gives
+  // the model an actionable, language-general signal to repair the defect.
+
+  it('Stage 2 retry prompt includes the prior rejection reason', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                surfaceForm: 'могlichkeit',
+                transliteration: 'moglichkeit',
+                gloss: 'possibility',
+                grammaticalNote: 'noun, nominative singular, neuter',
+                senseKind: 'core',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanExistRu] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Slavic', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-rf', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'ru', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    // The retry (second 'Concepts to realize' call) must carry the prior
+    // rejection code + reason so the model can avoid the exact error class.
+    const stage2Calls = ollama.calls.filter((p) => p.includes('Concepts to realize'));
+    expect(stage2Calls.length).toBe(2);
+    const retryPrompt = stage2Calls[1];
+    expect(retryPrompt).toContain('Prior attempt feedback');
+    expect(retryPrompt).toContain('SCRIPT_MIXED');
+    expect(retryPrompt).toContain('могlichkeit');
+    // The clean retry wins.
+    const result = jobManager.get('c-rf')!;
+    expect(result.result?.proposals.length).toBe(1);
+  });
+
+  // ── Profile-coverage guard (language scalability) ─────────────────────────
+  //
+  // The engine must run without crashing for every registered profile. This is
+  // the language-scalability guard: if a future profile is missing a required
+  // field, this test catches it. RU is fully populated; FA/FR ship as minimal
+  // stubs (script identity + word-shape rule, empty contradiction rules).
+
+  describe.each([
+    ['ru', RU_PROFILE, { surfaceForm: 'быть', transliteration: "byt'", note: 'verb, infinitive, imperfective aspect' }],
+    ['fa', FA_PROFILE, { surfaceForm: 'بودن', transliteration: 'budan', note: 'verb, infinitive' }],
+    ['fr', FR_PROFILE, { surfaceForm: 'être', transliteration: undefined, note: 'verb, infinitive' }],
+  ] as const)('profile coverage for %s', (_code, profile, fixture) => {
+    it('engine runs without crashing and accepts a clean row', () => {
+      const r = validateRealizationEntry(
+        {
+          coreConceptCode: 'X',
+          realizationType: 'word',
+          surfaceForm: fixture.surfaceForm,
+          transliteration: fixture.transliteration,
+          gloss: 'gloss',
+          grammaticalNote: fixture.note,
+        },
+        profile as LanguageProfile,
+        KNOWN_CODES,
+      );
+      expect(r.verdict).toBe('valid');
+      expect(r.rejections).toEqual([]);
+    });
   });
 });

@@ -11,6 +11,7 @@
 // pattern callout forbidding English-word-plus-Russian-suffix jams.
 
 import type { CompanionClccConceptInput } from '../../../shared/types/knowalong/companion';
+import type { RejectionCode } from '../validation';
 
 export interface ClccPromptInput {
   targetLanguageCode: 'fr' | 'ru' | 'fa';
@@ -25,6 +26,15 @@ export interface ClccPromptInput {
    * realization shape is irrelevant at the prompt layer.
    */
   realizations?: Array<{ coreConceptCode: string; surfaceForm: string }>;
+  /** Prior-attempt rejections for codes being retried in Stage 2. Each entry
+   *  pairs the code with the structured Rejection (code + reason). Rendered in
+   *  the Stage 2 retry prompt so the model gets an actionable, language-general
+   *  signal. Undefined on a first attempt; populated only on the retry pass. */
+  priorRejections?: Array<{
+    coreConceptCode: string;
+    rejectionCode: RejectionCode;
+    reason: string;
+  }>;
 }
 
 /**
@@ -120,6 +130,23 @@ function fewShotExamples(targetLanguageCode: ClccPromptInput['targetLanguageCode
 { "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "ن", "transliteration": "na", "gloss": "not (verbal negation prefix)", "grammaticalNote": "proclitic/prefix on verbs: می‌روم → نمی‌روم", "senseKind": "core" }`;
 }
 
+/**
+ * Render the prior-attempt feedback block for a Stage 2 retry. Returns '' on a
+ * first attempt (no priorRejections); returns a structured block listing each
+ * rejected code with its rejection code + reason on a retry. The rejection-code
+ * bracket is the language-general handle — any future profile's rejections
+ * render identically, so no per-language retry text lives here.
+ */
+function renderPriorRejectionsBlock(input: ClccPromptInput): string {
+  if (!input.priorRejections || input.priorRejections.length === 0) return '';
+  const lines = input.priorRejections.map(
+    (r) => `- ${r.coreConceptCode} [${r.rejectionCode}]: ${r.reason}`,
+  );
+  return `Prior attempt feedback (for retries only):
+Your previous response for the following codes was rejected by deterministic validation. Each entry shows the rejection code and reason. Regenerate a valid realization for each code that avoids this exact error class.
+${lines.join('\n')}`;
+}
+
 // Stage 2: per-concept realization proposals (load-bearing prompt).
 //
 // Design notes for small-local-model friendliness:
@@ -139,6 +166,7 @@ export function stage2RealizationsPrompt(input: ClccPromptInput): { prompt: stri
     'Persian/Farsi';
   const conceptList = renderConceptList(input);
   const examples = fewShotExamples(input.targetLanguageCode);
+  const priorFeedbackBlock = renderPriorRejectionsBlock(input);
 
   const prompt = `You are a linguist seeding a Core-Concept language pack for ${langName} (${input.targetLanguageCode}).
 For EACH Core Concept below, propose exactly one ${langName} realization.
@@ -184,7 +212,7 @@ Anti-patterns (NEVER produce these):
 - For ru/fa, leaving transliteration null/empty. For fr, omitting transliteration is fine.
 - Putting IPA, stress marks, syllable boundaries, or audio hints in transliteration. Transliteration is the romanized form only.
 - Setting realizationType to anything outside the five allowed values (no "lexical", "periphrastic", "morphological", "syntactic").
-
+${priorFeedbackBlock ? priorFeedbackBlock + '\n' : ''}
 Return ONLY the JSON object. No prose, no markdown fences.`;
 
   const realizationItemSchema = {
