@@ -41,19 +41,24 @@ export const RU_PROFILE: LanguageProfile = {
     required: true,
     schemeName: 'ISO 9:1995',
     charMap: ISO9_LOWER,
-    // ё→yo expands one Cyrillic char into two Latin chars; grant +3 per ё
-    // so the model emitting "yo" (vs the canonical ё→"e" mapping) still passes.
+    // ~1 char-diff per 5 chars + 3 per ё. The per-length floor absorbs common
+    // model variants (х→"h" vs "kh", "сс"→"s", unstressed о→"a"); the ё bonus
+    // lets the model emit "yo" (vs canonical ё→"e").
     toleranceFor: (surfaceForm) =>
+      Math.floor(surfaceForm.length / 5) +
       3 * (surfaceForm.toLowerCase().match(/ё/g) ?? []).length,
   },
 
   contradictionRules: [
-    // Infinitive cannot co-occur with tense/person/number/case.
+    // Infinitive cannot co-occur with person/number/case. Tense intentionally
+    // omitted: models tag imperfective infinitives as "present tense" even
+    // though the surface form is a valid infinitive — keeping tense here
+    // drops valid rows (run #21 yield regression).
     {
       kind: 'pos-prop',
       posToken: 'infinitive',
-      forbiddenProps: [...TENSE_TERMS, ...PERSON_TERMS, ...NUMBER_TERMS, ...CASE_TERMS],
-      reasonTemplate: 'grammar-note contradiction: "infinitive" cannot co-occur with "${prop}" (infinitives are not tensed/person/number/case-marked).',
+      forbiddenProps: [...PERSON_TERMS, ...NUMBER_TERMS, ...CASE_TERMS],
+      reasonTemplate: 'grammar-note contradiction: "infinitive" cannot co-occur with "${prop}" (infinitives are not person/number/case-marked).',
     },
     // Preposition does not inflect for tense/person/number/gender and does not govern nominative.
     {

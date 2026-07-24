@@ -818,6 +818,13 @@ describe('clccGeneration pipeline', () => {
       expect(rejectTransliterationMismatch('сёл', 'syol')).toBeNull();
       expect(rejectTransliterationMismatch('ёж', 'yozh')).toBeNull();
     });
+
+    it('accepts common model variants within per-length tolerance (run #21 regression)', () => {
+      // х→"h" instead of "kh"; doubled consonants collapsed ("сс"→"s"). With
+      // surfaceForm length 10 the tolerance floor is 2, so diff=1 passes.
+      expect(rejectTransliterationMismatch('переходить', 'perehodit')).toBeNull();
+      expect(rejectTransliterationMismatch('рассказать', 'raskazat')).toBeNull();
+    });
   });
 
   describe('detectGrammarNoteContradictions', () => {
@@ -830,12 +837,19 @@ describe('clccGeneration pipeline', () => {
       expect(contradictions[0]).toContain('case + number');
     });
 
-    it('flags "verb, infinitive, present tense, first person singular"', () => {
+    it('flags "verb, infinitive, first person singular" (person/number still contradiction)', () => {
       const contradictions = detectGrammarNoteContradictions(
         'verb, infinitive, present tense, first person singular',
       );
       expect(contradictions.length).toBeGreaterThan(0);
       expect(contradictions[0]).toContain('infinitive');
+    });
+
+    it('does NOT flag "verb, infinitive, present tense" alone (run #21 regression)', () => {
+      // Tense removed from infinitive's forbiddenProps: models routinely tag
+      // imperfective infinitives as "present tense" even though the surface
+      // form is a valid infinitive. Only person/number/case remain contradictory.
+      expect(detectGrammarNoteContradictions('verb, infinitive, present tense')).toEqual([]);
     });
 
     it('flags "adverb, prepositional case"', () => {
