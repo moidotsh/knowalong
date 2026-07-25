@@ -49,8 +49,8 @@ export function validateRealizationEntry(
 ): ValidationResult {
   const rejections: Rejection[] = [];
 
-  // 1. Structural (same for all languages).
-  rejections.push(...checkStructural(entry, knownConceptCodes));
+  // 1. Structural (shape/enum/placeholder; ASCII hybrid-junk gated by profile).
+  rejections.push(...checkStructural(entry, knownConceptCodes, profile));
 
   // 2. Script composition (profile-driven).
   rejections.push(...checkScriptComposition(entry.surfaceForm, profile));

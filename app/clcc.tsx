@@ -1,7 +1,8 @@
 // app/clcc.tsx
-// CLCC landing. Language picker (fr/ru/fa), prior runs by language, generate CTA.
-// Realization proposals persist but promotion into concept_realizations is
-// deferred for this checkpoint — the generate CTA surfaces this clearly.
+// CLCC landing. Language picker (fr/ru/fa/hy/sr-cyrl/bs-latn), prior runs by
+// language, generate CTA. Realization proposals persist but promotion into
+// concept_realizations is deferred for this checkpoint — the generate CTA
+// surfaces this clearly.
 
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -26,14 +27,17 @@ import {
   useStartClccGeneration,
 } from '../hooks';
 import { CompanionStatusChip } from '../components/knowalong';
-import type { CompanionJobStatus } from '../shared/types/knowalong';
+import type { CompanionJobStatus, ClccLanguageCode } from '../shared/types/knowalong';
 
-type ClccLang = 'fr' | 'ru' | 'fa';
+type ClccLang = ClccLanguageCode;
 
 const LANG_LABEL: Record<ClccLang, string> = {
   fr: 'French',
   ru: 'Russian',
   fa: 'Persian / Farsi',
+  hy: 'Armenian',
+  'sr-cyrl': 'Serbian (Cyrillic)',
+  'bs-latn': 'Bosnian/Croatian (Latin)',
 };
 
 function statusColor(status: string, colors: { brand: string; status: { warning: string; error: string } }): string {
@@ -66,6 +70,9 @@ export default function ClccScreen() {
     { label: 'Français', value: 'fr' },
     { label: 'Русский', value: 'ru' },
     { label: 'فارسی', value: 'fa' },
+    { label: 'Հայերեն', value: 'hy' },
+    { label: 'Српски', value: 'sr-cyrl' },
+    { label: 'Hrvatski', value: 'bs-latn' },
   ];
 
   const onStart = () => {

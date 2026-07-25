@@ -99,8 +99,12 @@ export const DifficultyBudgetSchema = z.object({
 
 // ── Local-companion request schemas (Zod-validated by the companion) ───
 
-/** Languages supported for CLCC generation. */
-export const ClccLanguageSchema = z.enum(['fr', 'ru', 'fa']);
+/**
+ * Languages supported for CLCC generation. Must stay in lockstep with
+ * `ClccLanguageCode` in companion.ts and the companion's prompt catalogue
+ * (`tools/local-companion/prompts/clccGeneration.ts`).
+ */
+export const ClccLanguageSchema = z.enum(['fr', 'ru', 'fa', 'hy', 'sr-cyrl', 'bs-latn']);
 
 /** Body of POST /jobs/source-analysis. */
 export const CompanionSourceAnalysisRequestSchema = z.object({
@@ -128,7 +132,7 @@ export const CompanionClccConceptInputSchema = z.object({
   canonicalLabel: z.string().min(1).max(200),
   description: z.string().min(1).max(1000),
   functionalCluster: z.string().max(64).optional(),
-  tier: z.number().int().min(0).max(5).optional(),
+  tier: z.number().int().min(0).max(9).optional(),
 });
 
 /** Body of POST /jobs/clcc-generation. */

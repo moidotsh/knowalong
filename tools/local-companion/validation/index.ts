@@ -19,4 +19,4 @@ export type {
   ExclusiveCategoryContradiction,
   RealizationTypeConstraint,
 } from './types';
-export { PROFILE_BY_CODE, RU_PROFILE, FA_PROFILE, FR_PROFILE } from './profiles';
+export { PROFILE_BY_CODE, RU_PROFILE, FA_PROFILE, FR_PROFILE, HY_PROFILE, SR_CYRL_PROFILE, BS_LATN_PROFILE } from './profiles';

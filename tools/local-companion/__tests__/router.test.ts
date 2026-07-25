@@ -49,7 +49,7 @@ describe('router', () => {
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.supportedRunTypes).toContain('source_analysis');
-    expect(body.supportedLanguages).toEqual(['fr', 'ru', 'fa']);
+    expect(body.supportedLanguages).toEqual(['fr', 'ru', 'fa', 'hy', 'sr-cyrl', 'bs-latn']);
   });
 
   it('POST /jobs/source-analysis with empty body returns 400', async () => {

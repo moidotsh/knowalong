@@ -67,6 +67,17 @@ describe('CompanionClccGenerationRequestSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it.each(['fr', 'ru', 'fa', 'hy', 'sr-cyrl', 'bs-latn'] as const)(
+    'accepts targetLanguageCode = %s (in companion scope)',
+    (code) => {
+      const result = CompanionClccGenerationRequestSchema.safeParse({
+        targetLanguageCode: code,
+        coreConceptCodes: ['EXIST'],
+      });
+      expect(result.success).toBe(true);
+    },
+  );
+
   it('rejects Swedish (not in this checkpoint scope)', () => {
     const result = CompanionClccGenerationRequestSchema.safeParse({
       targetLanguageCode: 'sv',

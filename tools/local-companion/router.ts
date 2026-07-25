@@ -143,7 +143,9 @@ function buildRoutes(deps: RouterDeps): RouteEntry[] {
         return jsonResponse(200, {
           version: '0.1.0',
           supportedRunTypes: ['source_analysis', 'clcc_generation'],
-          supportedLanguages: ['fr', 'ru', 'fa'],
+          // Must stay in lockstep with ClccLanguageCode (shared types) and
+          // the prompt catalogue in prompts/clccGeneration.ts.
+          supportedLanguages: ['fr', 'ru', 'fa', 'hy', 'sr-cyrl', 'bs-latn'],
           defaultModel: deps.config.defaultModel,
           availableModels,
         });

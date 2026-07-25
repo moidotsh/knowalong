@@ -24,6 +24,7 @@ import type {
   CompanionResultProposal,
   CompanionJobEvent,
   CompanionClccConceptInput,
+  ClccLanguageCode,
 } from '../../../shared/types/knowalong/companion';
 import {
   CLCC_STAGES,
@@ -156,19 +157,23 @@ function validateExampleEntry(
 /**
  * Script-aware sanity check for example sentences. Catches the most common
  * small-model failure modes per target language:
- *   - Russian (ru): sourceText must contain at least one Cyrillic char.
- *     Invented stems like "валяя"/"деляю" pass this check (they're
- *     well-formed Cyrillic) but get caught by the review-vote stage; purely
- *     Latin or transliterated ru sentences are rejected here.
+ *   - Russian (ru) + Serbian Cyrillic (sr-cyrl): sourceText must contain at
+ *     least one Cyrillic char. Invented stems like "валяя"/"деляю" pass this
+ *     check (they're well-formed Cyrillic) but get caught by the review-vote
+ *     stage; purely Latin or transliterated sentences are rejected here.
+ *     Serbian Cyrillic is a subset of Russian Cyrillic so the same range
+ *     applies.
  *   - Persian (fa): sourceText must contain at least one Arabic-script char.
  *     Latin-only transliteration is rejected.
- *   - French (fr): sourceText must contain at least one Latin letter.
- *     Placeholder tokens ("TODO", "???", the concept code itself) are rejected.
+ *   - Armenian (hy): sourceText must contain at least one Armenian char.
+ *   - French (fr) + BCS Latin (bs-latn): sourceText must contain at least one
+ *     Latin letter. Placeholder tokens ("TODO", "???", the concept code
+ *     itself) are rejected.
  *
  * Single-letter scripts (e.g. "Я иду.") contain spaces and short words; the
  * check only requires AT LEAST ONE char of the expected script, not a ratio.
  */
-function looksLikeExampleJunk(sourceText: string, targetLanguageCode: 'fr' | 'ru' | 'fa'): boolean {
+function looksLikeExampleJunk(sourceText: string, targetLanguageCode: ClccLanguageCode): boolean {
   // Placeholder / surrogate token check applies to all languages.
   const trimmed = sourceText.trim();
   const PLACEHOLDER_TOKENS = new Set([
@@ -177,9 +182,10 @@ function looksLikeExampleJunk(sourceText: string, targetLanguageCode: 'fr' | 'ru
   if (PLACEHOLDER_TOKENS.has(trimmed.toLowerCase())) return true;
   if (trimmed.length < 2) return true;
 
-  if (targetLanguageCode === 'ru') {
+  if (targetLanguageCode === 'ru' || targetLanguageCode === 'sr-cyrl') {
     // U+0400–U+04FF is the Cyrillic block. Also accept Cyrillic Supplement
-    // (U+0500–U+052F) for minority languages just in case.
+    // (U+0500–U+052F) for minority languages just in case. Serbian Cyrillic
+    // is a subset of this range.
     return !/[\u0400-\u04FF\u0500-\u052F]/.test(sourceText);
   }
   if (targetLanguageCode === 'fa') {
@@ -187,7 +193,12 @@ function looksLikeExampleJunk(sourceText: string, targetLanguageCode: 'fr' | 'ru
     // (U+FB50–U FDFF, U+FE70–U+FEFF) cover Persian/Arabic script.
     return !/[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(sourceText);
   }
-  // fr — require at least one Latin letter.
+  if (targetLanguageCode === 'hy') {
+    // Armenian block (U+0530–U+058F) + Alphabetic Presentation Forms
+    // (U+FB13–U+FB17) cover Armenian + its four historic ligatures.
+    return !/[\u0530-\u058F\uFB13-\uFB17]/.test(sourceText);
+  }
+  // fr + bs-latn — require at least one Latin letter (incl. Latin-1 diacritics).
   return !/[A-Za-zÀ-ÿ]/.test(sourceText);
 }
 
@@ -198,7 +209,7 @@ export interface ClccPipelineDeps {
 }
 
 export interface ClccJobRequest {
-  targetLanguageCode: 'fr' | 'ru' | 'fa';
+  targetLanguageCode: ClccLanguageCode;
   coreConceptCodes: string[];
   coreConcepts?: CompanionClccConceptInput[];
   existingRealizationSurfaceForms?: string[];
@@ -580,7 +591,7 @@ interface BatchResult {
  *  resolves the right profile. For unsupported codes the engine is skipped and
  *  only the Zod schema gate applies (structural-only fallback). */
 interface BatchLanguageContext {
-  targetLanguageCode: 'fr' | 'ru' | 'fa';
+  targetLanguageCode: ClccLanguageCode;
 }
 
 async function generateAndValidateBatch(
@@ -779,7 +790,7 @@ async function generateAndValidateExampleBatch(
   batchPromptInput: ClccPromptInput,
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
-  targetLanguageCode: 'fr' | 'ru' | 'fa',
+  targetLanguageCode: ClccLanguageCode,
   onToken?: (chunk: string) => void,
 ): Promise<ExampleBatchResult> {
   const r1 = await deps.ollama.generate({
@@ -850,7 +861,7 @@ function finalizeExampleBatch(
   entries: unknown[],
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
-  targetLanguageCode: 'fr' | 'ru' | 'fa',
+  targetLanguageCode: ClccLanguageCode,
   response: { text: string; model: string },
 ): ExampleBatchResult {
   const validated: ValidatedExampleEntry[] = [];

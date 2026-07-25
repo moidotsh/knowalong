@@ -21,6 +21,7 @@ import type {
   EvidenceProvenance,
 } from './enums';
 import type { DifficultyBudget } from './difficultyBudget';
+import type { ClccLanguageCode } from './companion';
 
 /** Input to a future cloud analysis run. */
 export interface MediaAnalysisRequest {
@@ -290,7 +291,7 @@ export interface CardProposalPayload {
 /** Payload for proposal_kind = 'realization'. Acceptance DEFERRED (CLCC promotion deferred). */
 export interface RealizationProposalPayload {
   coreConceptCode: string;
-  languageCode: 'fr' | 'ru' | 'fa';
+  languageCode: ClccLanguageCode;
   realizationType: RealizationType;
   surfaceForm: string;
   gloss: string | null;

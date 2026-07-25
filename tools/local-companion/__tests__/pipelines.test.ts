@@ -11,6 +11,9 @@ import {
   RU_PROFILE,
   FA_PROFILE,
   FR_PROFILE,
+  HY_PROFILE,
+  SR_CYRL_PROFILE,
+  BS_LATN_PROFILE,
 } from '../validation';
 import type { ValidatedEntry, LanguageProfile } from '../validation';
 import type { JobState } from '../jobManager';
@@ -1399,13 +1402,16 @@ describe('clccGeneration pipeline', () => {
   //
   // The engine must run without crashing for every registered profile. This is
   // the language-scalability guard: if a future profile is missing a required
-  // field, this test catches it. RU is fully populated; FA/FR ship as minimal
-  // stubs (script identity + word-shape rule, empty contradiction rules).
+  // field, this test catches it. RU/HY/SR_CYRL are fully populated; FA/FR/
+  // BS_LATN ship with the word-shape rule and (for fa) script identity.
 
   describe.each([
     ['ru', RU_PROFILE, { surfaceForm: 'быть', transliteration: "byt'", note: 'verb, infinitive, imperfective aspect' }],
     ['fa', FA_PROFILE, { surfaceForm: 'بودن', transliteration: 'budan', note: 'verb, infinitive' }],
     ['fr', FR_PROFILE, { surfaceForm: 'être', transliteration: undefined, note: 'verb, infinitive' }],
+    ['hy', HY_PROFILE, { surfaceForm: 'լինել', transliteration: 'linel', note: 'verb, infinitive' }],
+    ['sr-cyrl', SR_CYRL_PROFILE, { surfaceForm: 'бити', transliteration: 'biti', note: 'verb, infinitive' }],
+    ['bs-latn', BS_LATN_PROFILE, { surfaceForm: 'biti', transliteration: undefined, note: 'verb, infinitive' }],
   ] as const)('profile coverage for %s', (_code, profile, fixture) => {
     it('engine runs without crashing and accepts a clean row', () => {
       const r = validateRealizationEntry(

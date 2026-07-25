@@ -21,11 +21,20 @@ export interface CompanionHealthResponse {
   authenticationRequired: true;
 }
 
+/**
+ * Languages the companion has prompt-catalogue support for. Must stay in
+ * lockstep with the per-language data in
+ * `tools/local-companion/prompts/clccGeneration.ts` and the Zod allowlist in
+ * `schemas.ts` (`ClccLanguageSchema`). Adding a language requires updating
+ * all three sites plus authoring a companion validation profile.
+ */
+export type ClccLanguageCode = 'fr' | 'ru' | 'fa' | 'hy' | 'sr-cyrl' | 'bs-latn';
+
 /** Authenticated capabilities response. Lists supported run types + models. */
 export interface CompanionCapabilitiesResponse {
   version: string;
   supportedRunTypes: Array<'source_analysis' | 'clcc_generation'>;
-  supportedLanguages: Array<'fr' | 'ru' | 'fa'>;
+  supportedLanguages: ClccLanguageCode[];
   defaultModel: string;
   availableModels: Array<{ label: string; recommended?: boolean }>;
 }
@@ -47,7 +56,7 @@ export interface CompanionSourceAnalysisRequest {
 
 /** Body for POST /jobs/clcc-generation. Iterates Core Concepts from the request body. */
 export interface CompanionClccGenerationRequest {
-  targetLanguageCode: 'fr' | 'ru' | 'fa';
+  targetLanguageCode: ClccLanguageCode;
   /** Core Concepts to realize. Codes from the seeded catalog (migration 00003). */
   coreConceptCodes: string[];
   /**

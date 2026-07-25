@@ -16,6 +16,7 @@ import type {
   CompanionJobEvent,
   CompanionJobResult,
   CompanionClccGenerationRequest,
+  ClccLanguageCode,
   StartClccGenerationDTO,
 } from '../shared/types/knowalong';
 import { isCompanionConnectionError } from '../shared/types/knowalong';
@@ -36,7 +37,7 @@ function severityFromEvent(event: CompanionJobEvent): AnalysisEventSeverity {
 
 export interface StartClccGenerationInput {
   userId: string;
-  targetLanguageCode: 'fr' | 'ru' | 'fa';
+  targetLanguageCode: ClccLanguageCode;
   coreConceptCodes: string[];
   modelLabel?: string;
 }

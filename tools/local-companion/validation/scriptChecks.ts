@@ -54,10 +54,14 @@ function isPlaceholder(value: string): boolean {
 }
 
 /** Structural checks shared by every language. Empty/placeholder/enum/code
- *  defects land here; script-specific defects land in checkScriptComposition. */
+ *  defects land here; script-specific defects land in checkScriptComposition.
+ *  The hybrid-junk ASCII check is gated on `profile.requiresNativeScript`
+ *  because pure-ASCII surfaceForms are legitimate for Latin-script languages
+ *  (fr, bs-latn) but suspicious for non-Latin ones (ru, fa, hy, sr-cyrl). */
 export function checkStructural(
   entry: ValidatedEntry,
   knownConceptCodes: ReadonlySet<string>,
+  profile: LanguageProfile,
 ): Rejection[] {
   const rejections: Rejection[] = [];
 
@@ -77,7 +81,7 @@ export function checkStructural(
     });
   }
 
-  // surfaceForm: empty → placeholder → hybrid-junk.
+  // surfaceForm: empty → placeholder → (profile-gated) hybrid-junk.
   const surface = entry.surfaceForm?.trim() ?? '';
   if (surface.length === 0) {
     rejections.push({
@@ -91,7 +95,7 @@ export function checkStructural(
       reason: `surfaceForm "${surface}" is a placeholder token.`,
       severity: 'reject',
     });
-  } else if (HYBRID_JUNK_PATTERN.test(surface)) {
+  } else if (profile.requiresNativeScript && HYBRID_JUNK_PATTERN.test(surface)) {
     rejections.push({
       code: 'STRUCT_HYBRID_JUNK_ASCII',
       reason: `surfaceForm "${surface}" looks like ASCII-only hybrid junk (real non-Latin text contains native script).`,

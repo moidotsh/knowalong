@@ -45,7 +45,7 @@ export interface StartSourceAnalysisDTO {
 
 /** Input for starting a CLCC generation run. */
 export interface StartClccGenerationDTO {
-  targetLanguageCode: 'fr' | 'ru' | 'fa';
+  targetLanguageCode: 'fr' | 'ru' | 'fa' | 'hy' | 'sr-cyrl' | 'bs-latn';
   coreConceptCodes: string[];
   modelLabel?: string;
 }

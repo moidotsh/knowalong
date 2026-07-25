@@ -9,6 +9,7 @@ import type {
   AnalysisRunStatus,
   StartSourceAnalysisDTO,
   StartClccGenerationDTO,
+  ClccLanguageCode,
 } from '../../../shared/types/knowalong';
 import type { RepositoryResult } from './types';
 import { ok, handleRepositoryError, unauthorized } from './types';
@@ -74,7 +75,7 @@ export interface CreateSourceAnalysisRunInput {
 
 export interface CreateClccRunInput {
   userId: string;
-  targetLanguageCode: 'fr' | 'ru' | 'fa';
+  targetLanguageCode: ClccLanguageCode;
   coreConceptCodes: string[];
   modelLabel?: string;
   requestParams?: Record<string, unknown>;
