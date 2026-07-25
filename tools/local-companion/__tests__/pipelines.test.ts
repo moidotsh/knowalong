@@ -759,6 +759,42 @@ describe('clccGeneration pipeline', () => {
     expect(stage3Call).toContain('OPTIONAL for French');
   });
 
+  it('stage 2 prompt for fa includes the Persian grammar guidance block', async () => {
+    // The grammarGuidance field on LANG_PROMPT_DATA.fa is injected into the
+    // stage-2 prompt. This is the load-bearing assertion that the guidance
+    // lands in the prompt body (not just in the data file).
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Iranian', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [{
+            coreConceptCode: 'EXIST',
+            realizationType: 'word',
+            surfaceForm: 'بودن',
+            transliteration: 'budan',
+            gloss: 'to be',
+            grammaticalNote: 'verb, infinitive',
+            senseKind: 'core',
+          }],
+        }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-fa-prompt', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fa', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Call = ollama.calls.find((p) => p.includes('Concepts to realize'))!;
+    expect(stage2Call).toContain('Persian grammar guidance');
+    expect(stage2Call).toContain('NO grammatical gender');
+    expect(stage2Call).toContain('singular');
+    expect(stage2Call).toContain('plural');
+  });
+
   // ── Anti-hallucination hardening (ru realization integrity) ───────────────
   //
   // The next block covers the new deterministic post-generation validators
@@ -1377,6 +1413,72 @@ describe('clccGeneration pipeline', () => {
         KNOWN_CODES,
       );
       expect(r.verdict).toBe('valid');
+    });
+  });
+
+  // ── Persian (fa) grammar contradictions ──────────────────────────────────
+  //
+  // The companion fa profile was un-stubbed in this hardening pass. These
+  // prove the rules actually fire through the engine for fa — they are the
+  // companion-side mirror of the Studio validation-fa.test.ts grammar
+  // block.
+
+  /** Clean Persian row: passes every configured rule. Base for mutating below. */
+  const cleanFaEntry: ValidatedEntry = {
+    coreConceptCode: 'X',
+    realizationType: 'word',
+    surfaceForm: 'بودن',
+    // charMap is empty by design (abjad) — transliteration is a no-op.
+    transliteration: 'budan',
+    gloss: 'to be',
+    grammaticalNote: 'verb, infinitive',
+  };
+
+  describe('FA grammar contradictions (companion profile un-stubbed)', () => {
+    it('rejects "verb, infinitive, first person" (pos-prop)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanFaEntry, grammaticalNote: 'verb, infinitive, first person' },
+        FA_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(true);
+    });
+
+    it('rejects "verb, present tense, past tense" (multi-tense)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanFaEntry, grammaticalNote: 'verb, present tense, past tense' },
+        FA_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_TENSE')).toBe(true);
+    });
+
+    it('rejects "verb, first person, second person" (multi-person)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanFaEntry, grammaticalNote: 'verb, first person, second person' },
+        FA_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_PERSON')).toBe(true);
+    });
+
+    it('rejects "verb, singular, plural" (multi-number)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanFaEntry, grammaticalNote: 'verb, singular, plural' },
+        FA_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_NUMBER')).toBe(true);
+    });
+
+    it('does NOT reject "verb, third person, singular" (clean)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanFaEntry, grammaticalNote: 'verb, third person, singular' },
+        FA_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.verdict).toBe('valid');
+      expect(r.rejections).toEqual([]);
     });
   });
 
