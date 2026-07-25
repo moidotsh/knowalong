@@ -109,6 +109,7 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
     translitAntiPatternNote:
       '- For French, omitting transliteration is fine (Latin script).',
     grammarGuidance: `French grammar guidance (for grammaticalNote):
+- French uses Latin script with diacritics é/è/ê/ë/à/â/ù/û/ô/î/ï/ç and the ligatures œ/æ. Use these diacritics where required — they are not optional (élève, français, être, œuvre). Do NOT use non-French Latin letters (ñ, ß, ð, þ) — French uses "gn" for /ɲ (montagne), not "ñ".
 - French has TWO grammatical genders: masculine and feminine. Gender is intrinsic to the noun lexeme; pick ONE gender per form (never a list). Adjectives and past participles agree with the noun they modify in gender AND number.
 - French has TWO numbers: singular and plural. Plural is marked on nouns, articles, adjectives, and past participles (usually -s, silent). Pick ONE number per form.
 - Verbs: pick ONE person (first/second/third person) and ONE number (singular/plural) on a finite verb — never a list. French verbs do not inflect for gender (exception: past participles agree with the direct object in gender+number when the direct object precedes the verb).

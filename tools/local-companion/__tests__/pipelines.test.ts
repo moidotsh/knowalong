@@ -2689,4 +2689,347 @@ describe('clccGeneration pipeline', () => {
     expect(stage3Prompt!).toContain('bititi');
     expect(stage3Prompt!).toContain('govorititi');
   });
+
+  // ── Fr deep-hardening: orthography + new pos-props + prompt presence ────
+  //
+  // End-to-end coverage of the engine + pipeline + prompt expansions landed
+  // in Commits 1-2 of the deep French pass. fr uses Latin script with
+  // French diacritics; orthography constraints target cross-script bleed
+  // (Cyrillic, Greek, Arabic, Hebrew) and a tight non-French Latin set
+  // (ñ, ß, ð, þ).
+
+  /** Clean French row: passes every configured rule. */
+  const cleanFrExist = {
+    coreConceptCode: 'EXIST',
+    realizationType: 'word',
+    surfaceForm: 'être',
+    gloss: 'to be (copula)',
+    grammaticalNote: 'verb, infinitive',
+    senseKind: 'core',
+  };
+
+  // Stage 2 fr: orthography on surfaceForm. The engine rejects a realization
+  // whose surfaceForm contains a Cyrillic letter (Russian text bleed), and
+  // the retry returns a clean French form.
+  it('Stage 2 drops a fr realization with Cyrillic э (U+044D) via ORTHOGRAPHY_VIOLATION', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                ...cleanFrExist,
+                // Cyrillic э (U+044D) appended — Russian text bleed.
+                surfaceForm: 'être\u044D',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanFrExist] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Romance branch)', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-fr-ortho-sf', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fr', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-fr-ortho-sf')!;
+    expect(result.result?.proposals.length).toBe(1);
+    const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('être');
+    // The Stage 2 retry prompt must carry the prior ORTHOGRAPHY_VIOLATION.
+    const stage2Calls = ollama.calls.filter((p) => p.includes('Concepts to realize'));
+    expect(stage2Calls.length).toBe(2);
+    const retryPrompt = stage2Calls[1];
+    expect(retryPrompt).toContain('ORTHOGRAPHY_VIOLATION');
+    expect(retryPrompt).toContain('U+044D');
+  });
+
+  // Stage 3 fr: orthography on sourceText. The pipeline's checkOrthography
+  // call drops example sentences with the Spanish ñ (U+00F1) — a non-French
+  // Latin confusable. French uses "gn" for /ɲ (montagne, espagnol).
+  it('Stage 3 drops a fr example sentence with Spanish ñ (U+00F1) via the checkOrthography call', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Romance branch)', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [cleanFrExist],
+        }),
+        // Both attempts: Spanish ñ (U+00F1) in a Latin-script sentence.
+        // The script-aware junk filter passes (Latin letters are present);
+        // the orthography check fires on the ñ.
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            // Spanish ñ in a French-ish sentence — should be "montagne".
+            sourceText: 'Il y a une montañ\u00F1e.',
+            translation: 'There is a mountain.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-fr-ortho-st', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fr', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-fr-ortho-st')!;
+    expect(result.result?.proposals.length).toBe(1);
+    expect(result.result?.proposals[0].proposalKind).toBe('realization');
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.acceptedExamples).toBe(0);
+    expect(summary.droppedExampleCount).toBe(2);
+    // The drop reason must be the ORTHOGRAPHY_VIOLATION reason containing
+    // the ñ codepoint, NOT the script-aware junk-filter reason.
+    const droppedExamples = summary.droppedExamples as Array<{ code: string; reason: string }>;
+    expect(droppedExamples.every((d) => d.reason.includes('ñ'))).toBe(true);
+    expect(droppedExamples.every((d) => d.reason.includes('U+00F1'))).toBe(true);
+  });
+
+  // ── Fr grammar rules (4 new: noun pos-prop, adjective pos-prop,
+  //    multi-number, multi-gender) ────────────────────────────────────────
+
+  it('fr noun pos-prop rejects "noun, present tense"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'maison',
+        gloss: 'house',
+        grammaticalNote: 'noun, present tense',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"noun"'))).toBe(true);
+  });
+
+  it('fr noun pos-prop rejects "noun, dative" (French has no case)', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'maison',
+        gloss: 'house',
+        grammaticalNote: 'noun, dative',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"noun"'))).toBe(true);
+  });
+
+  it('fr noun pos-prop accepts "noun, feminine, singular" (gender + number are productive)', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'maison',
+        gloss: 'house',
+        grammaticalNote: 'noun, feminine, singular',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('valid');
+  });
+
+  it('fr adjective pos-prop rejects "adjective, present tense" but accepts "adjective, feminine, plural"', () => {
+    // French adjectives agree in gender + number — they DO NOT carry
+    // tense/person/case. The unlessHas 'participle' guard protects
+    // participial adjectives carrying verbal properties.
+    const bad = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'jolie',
+        gloss: 'pretty',
+        grammaticalNote: 'adjective, present tense',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(bad.verdict).toBe('malformed');
+    expect(bad.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"adjective"'))).toBe(true);
+
+    const good = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'jolies',
+        gloss: 'pretty (fem pl)',
+        grammaticalNote: 'adjective, feminine, plural',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(good.verdict).toBe('valid');
+  });
+
+  it('fr adjective unlessHas guard: "adjective, participle, past tense" passes', () => {
+    // Past participles used adjectivally ("les portes fermées") legitimately
+    // carry tense; the unlessHas 'participle' guard protects them.
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'fermées',
+        gloss: 'closed (fem pl past participle used adjectivally)',
+        grammaticalNote: 'adjective, participle, past tense',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('valid');
+  });
+
+  it('fr multi-number rejects "noun, singular, plural"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'chat',
+        gloss: 'cat',
+        grammaticalNote: 'noun, singular, plural',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_NUMBER')).toBe(true);
+  });
+
+  it('fr multi-gender rejects "noun, masculine, feminine"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'chat',
+        gloss: 'cat',
+        grammaticalNote: 'noun, masculine, feminine',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_GENDER')).toBe(true);
+  });
+
+  it('fr profile-driven junk-filter guard: clean Latin-only French accepted (regression)', () => {
+    // The script-aware junk filter must not false-reject clean French
+    // (Latin-script with French diacritics).
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'élève',
+        gloss: 'student',
+        grammaticalNote: 'noun, feminine, singular',
+      },
+      FR_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('valid');
+  });
+
+  // ── Fr prompt-presence (Commit 2 grammarGuidance + anti-examples) ───────
+
+  it('fr stage-2 prompt contains the expanded grammar guidance keywords', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Romance branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [cleanFrExist] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to illustrate')) {
+          return { text: JSON.stringify({ examples: [{ coreConceptCode: 'EXIST', sourceText: 'Il y a un livre sur la table.', translation: 'There is a book on the table.' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-fr-stage2', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fr', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Prompt = captured.find((p) => p.includes('Concepts to realize'));
+    expect(stage2Prompt).toBeDefined();
+    // French diacritic inventory called out.
+    expect(stage2Prompt!).toContain('é/è/ê/ë/à/â/ù/û/ô/î/ï/ç');
+    // TWO grammatical genders guidance.
+    expect(stage2Prompt!).toContain('TWO grammatical genders');
+    // Bipartite negation.
+    expect(stage2Prompt!).toContain('ne...pas');
+    // Passé composé (French-specific tense name).
+    expect(stage2Prompt!).toContain('passé composé');
+    // Subjunctive mood.
+    expect(stage2Prompt!).toContain('subjunctive');
+  });
+
+  it('fr stage-3 prompt contains the French-specific orthography anti-pattern bullet + anti-examples', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Romance branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [cleanFrExist] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to illustrate')) {
+          return { text: JSON.stringify({ examples: [{ coreConceptCode: 'EXIST', sourceText: 'Il y a un livre sur la table.', translation: 'There is a book on the table.' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-fr-stage3', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fr', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage3Prompt = captured.find((p) => p.includes('Concepts to illustrate'));
+    expect(stage3Prompt).toBeDefined();
+    // The fr-specific sourceText orthography anti-pattern bullet.
+    expect(stage3Prompt!).toContain('Cyrillic');
+    expect(stage3Prompt!).toContain('U+0400-U+04FF');
+    // ñ codepoint callout.
+    expect(stage3Prompt!).toContain('ñ');
+    expect(stage3Prompt!).toContain('U+00F1');
+    // Data-driven anti-examples — populated by Commit 2's fr population.
+    expect(stage3Prompt!).toContain('faisaison');
+    expect(stage3Prompt!).toContain('parlerer');
+  });
 });
