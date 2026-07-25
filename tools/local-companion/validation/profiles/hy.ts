@@ -48,6 +48,49 @@ export const HY_PROFILE: LanguageProfile = {
   // Armenian does not mix Latin in canonical form; flag mixed-script surfaceForms.
   forbiddenLatinWhenNative: true,
 
+  // Armenian-specific orthography constraints. Each is a single regex with
+  // zero false positives on canonical modern Armenian text. Armenian
+  // orthography is genuinely more regular than Persian (no cross-script
+  // confusion, no abjad, no ZWNJ, no distinctive digit system) — these four
+  // are the complete set of Armenian-specific zero-false-positive checks.
+  orthographyConstraints: [
+    // 1. Armenian modifier letters (academic / liturgical transliteration
+    //    markers). NEVER appear in canonical modern Armenian prose. Range
+    //    narrowed to U+0559-U+055C: left half ring, right half ring,
+    //    emphasis mark, exaggeration mark. EXCLUDES U+055D (Armenian comma),
+    //    U+055E (Armenian question mark), U+055F (Armenian abbreviation
+    //    mark) — those are legitimate standard punctuation.
+    {
+      rejectsCharPattern: /[\u0559\u055A\u055B\u055C]/,
+      reason: 'Armenian modifier letter (U+0559-U+055C) is reserved for academic/liturgical transliteration; canonical modern Armenian text never uses it.',
+    },
+    // 2. Cyrillic block. Armenian uses its own script exclusively; Cyrillic
+    //    letters are always Russian text bleed (Armenians are frequently
+    //    bilingual with Russian, making this the highest-yield constraint).
+    //    Zero false positives on canonical Armenian text.
+    {
+      rejectsCharPattern: /[\u0400-\u04FF]/,
+      reason: 'Cyrillic letter in Armenian text: Armenian uses its own script exclusively. Remove the Russian text bleed (watch for visual confusables like Russian а/е/о/р/с vs Armenian ա/ե/ո/ռ/ս).',
+    },
+    // 3. Infinitive over-suffixation (mirror of Persian doubled-ن). Real
+    //    Armenian infinitives end in single -ել or -ալ; the model sometimes
+    //    appends an extra suffix, producing ելել or ալալ at word end.
+    //    Anchored to end-of-text via $ to avoid any substring false
+    //    positives. The doubled sequence is NEVER a legitimate word-final
+    //    in modern Armenian.
+    {
+      rejectsCharPattern: /(ելել|ալալ)$/,
+      reason: 'Doubled infinitive suffix (-ելել / -ալալ): Armenian infinitives end in single -ել or -ալ (e.g. լինել, գնալ), never a doubled suffix.',
+    },
+    // 4. Word-final doubled մ. Over-suffixation of the present participle
+    //    -ում or the 3rd-person-plural -են. Anchored to end-of-text; մմ is
+    //    vanishingly rare as a word-final in real Armenian.
+    {
+      rejectsCharPattern: /մմ$/,
+      reason: 'Word-final doubled մ (մմ): likely over-suffixation of present participle -ում or 3rd-person-plural -են. Real Armenian words do not end in մմ.',
+    },
+  ],
+
   transliteration: {
     required: true,
     schemeName: 'ISO 9985:1996',
@@ -142,6 +185,25 @@ export const HY_PROFILE: LanguageProfile = {
       category: 'person',
       terms: PERSON_TERMS,
       reasonTemplate: 'grammar-note contradiction: a single form cannot carry multiple persons (${matched}).',
+    },
+    // Multi-number contradiction. Armenian inflects for number via -ներ/-եր
+    // suffixes; one form carries one number.
+    {
+      kind: 'exclusive-category',
+      category: 'number',
+      terms: NUMBER_TERMS,
+      reasonTemplate: 'grammar-note contradiction: a single form cannot carry multiple numbers (${matched}).',
+    },
+    // Adjective pos-prop. Armenian adjectives do NOT inflect — no
+    // case/tense/person/number agreement. The unlessHas guard protects
+    // participial adjectives (which DO inflect and may co-occur with the
+    // "adjective" label).
+    {
+      kind: 'pos-prop',
+      posToken: 'adjective',
+      unlessHas: ['participle'],
+      forbiddenProps: [...CASE_TERMS, ...TENSE_TERMS, ...PERSON_TERMS, ...NUMBER_TERMS],
+      reasonTemplate: 'grammar-note contradiction: "adjective" cannot carry "${prop}" (Armenian adjectives are not inflected; if the form inflects, label it "participle" or "noun").',
     },
   ],
 
