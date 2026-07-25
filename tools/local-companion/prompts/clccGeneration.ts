@@ -157,9 +157,33 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
     scriptLabel: 'Armenian (Mesropian)',
     translitRequired: true,
     translitRuleText:
-      "* REQUIRED for Armenian (use ISO 9985: ես→es, լինել→linel, չ→ch, մայր→mayr, աշխարհ→ašxarh, Հայաստան→Hayastan).",
+      '* REQUIRED for Armenian (use ISO 9985:1996: ա→a, բ→b, գ→g, դ→d, ե→e, զ→z, է→ē, ը→ə, թ→tʿ, ժ→ž, ի→i, լ→l, խ→x, ծ→ç, կ→k, հ→h, ձ→dz, ղ→ł, ճ→č, մ→m, յ→y, ն→n, շ→š, ո→o, չ→čʿ, պ→p, ջ→j, ռ→ṙ, ս→s, վ→v, տ→t, ր→r, ց→cʿ, ւ→w, փ→pʿ, ք→kʿ, օ→ō, ֆ→f, և→ev. Examples: ես→es, լինել→linel, մայր→mayr, աշխարհ→ašxarh, Հայաստան→Hayastan, չգիտեմ→čgitem, գրքի→grkʿi).',
     translitAntiPatternNote:
       '- For Armenian, leaving transliteration null/empty (it is REQUIRED).',
+    grammarGuidance: `Armenian grammar guidance (for grammaticalNote):
+- Armenian has NO grammatical gender. Never write "masculine"/"feminine"/"neuter" for an Armenian form.
+- Armenian has SEVEN cases: nominative, accusative, genitive, dative, ablative (-ից), instrumental (-ով), locative (-ում). Note the case on a noun when relevant; syncretic forms may note "nominative/accusative" or "genitive/dative" together (that is correct, not a contradiction — the forms are identical).
+- Pick ONE person and ONE number on a finite verb (never a list): first/second/third person × singular/plural. Armenian verbs do not inflect for gender.
+- Armenian tenses you may note: present tense, past tense (the general past — prefer the specific one if known), imperfect, aorist (the major past perfective — most common past form), future tense, conditional, subjunctive, imperative. Pick ONE per form.
+- Infinitives end in -ել (-el) or -ալ (-al). Note them as "infinitive"; never mark an infinitive for tense/person/number/case.
+- Verb stems: Armenian verbs have TWO stems — present stem (e.g. գնում → գնց- "go") and past/aorist stem (e.g. գնաց-). Note which stem a finite form is built from when relevant.
+- Person/number endings on finite verbs. Present indicative copula: եմ/ես/է/ենք/եք/են. Imperfect: էի/էիր/էր/էինք/էիք/էին. Aorist endings: -ա/-եր/-եր/-անք/-աք/-ան. Note the ending on finite forms.
+- Negation: չ- proclitic on indicative verbs (գիտեմ "I know" → չգիտեմ "I don't know"); մ- proclitic on subjunctive/conditional/imperative. Note it as a particle when relevant.
+- Definite article: suffix -ը (գիրք "book" → գիրքը "the book"), with -ն before vowels/stops (գիրքն ու ...). Indefinite article is մի. Never label the article as a separate word; it is an enclitic suffix.
+- Plural suffixes: -ներ (-ner) for most nouns; -եր (-er) for certain consonant-final stems and a closed class. Note which when relevant.
+- Prepositions govern specific cases: ի + dative/accusative (motion), իր + genitive (location), ի վրա + genitive ("on"), ի մէջ + genitive ("among"). Note the governed case.
+- Armenian has NO ezâfe (unlike Persian). Possession and noun-adjective links are via the genitive case suffix or the գ of possession — never an unwritten -e/-ye connector.
+- Compound verbs: Armenian has many noun + անել/լինել/տալ compounds (e.g. ուսանել "to study", աշխատել "to work"). Note when a realization is a compound verb.
+- Eastern Armenian is the standard (Republic of Armenia). Western Armenian (diaspora) differs in consonant voicing (Eastern տ=/t/ vs Western տ=/d/) and some lexical choices. Note the dialect only when it matters; default to Eastern.
+- Reformed orthography (1922 Soviet, used in Republic of Armenia) vs Classical orthography (diaspora): the differences are systematic (e.g. Reformed երկիր vs Classical երկիր — same word, different suffix vowels in some positions). Pick one orthography per realization; do not mix within a single form.`,
+    // Constructed (not observed) for the initial hy hardening pass — mirror
+    // the over-suffixation failure class also enforced deterministically by
+    // orthography constraints 3 and 4. Real Armenian infinitives end in
+    // single -ել/-ալ (լինել, գնալ) and present participles in single -ում
+    // (գնում). Revise against observed failures after the first hy runs.
+    inventedWordAntiExamples: ['լինելել', 'գնումմ'],
+    stage3OrthographyAntiPattern:
+      '- For Armenian sourceText: do NOT use Cyrillic letters (Russian text bleed) — Armenian uses its own script (watch for visual confusables Russian а vs Armenian ա, Russian е vs Armenian ե, Russian о vs Armenian ո). Do NOT use Armenian modifier letters U+0559-U+055C (academic/liturgical only). Do NOT double the infinitive suffix (լինելել WRONG; լինել RIGHT). Do NOT double the մ of -ում (գնումմ WRONG; գնում RIGHT).',
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "ես", "transliteration": "es", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, nominative, Eastern Armenian", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "լինել", "transliteration": "linel", "gloss": "to be / to exist (copula)", "grammaticalNote": "verb, infinitive", "senseKind": "core" }
