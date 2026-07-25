@@ -115,6 +115,15 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
       '* REQUIRED for Persian (use BGN/PCGN: من→man, بودن→budan, ن→na/na-).',
     translitAntiPatternNote:
       '- For Persian, leaving transliteration null/empty (it is REQUIRED).',
+    grammarGuidance: `Persian grammar guidance (for grammaticalNote):
+- Persian has NO grammatical gender. Never write "masculine"/"feminine"/"neuter" for a Persian form.
+- Verbs: note person (first/second/third person) and number (singular/plural) for finite forms — pick ONE person and ONE number, never a list. Persian verbs do not inflect for gender.
+- Infinitives end in ـَـن (-an). Note them as "infinitive"; never mark an infinitive for tense/person/number.
+- Number: pick ONE — "singular" OR "plural" (ها/ان), never both on one form.
+- Nouns: note the plural suffix when used (ها or ان). Possession is shown via the ezâfe (-e/-ye), not by case.
+- Prepositions: Persian prepositions are flat (no case government, no agreement).
+- Compound verbs (light verb + noun, e.g. کار کردن "to work"): note when a realization is a compound verb.
+- Register: note written (کتابی) vs spoken (محاوره‌ای) only when the form differs between them.`,
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "من", "transliteration": "man", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, Persian-Arabic script", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "بودن", "transliteration": "budan", "gloss": "to be / to exist (copula)", "grammaticalNote": "verb, infinitive; present-tense copula is often omitted", "senseKind": "core" }
