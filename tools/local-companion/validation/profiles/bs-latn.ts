@@ -20,6 +20,25 @@ export const BS_LATN_PROFILE: LanguageProfile = {
   // No mixed-script rule — Latin is canonical.
   forbiddenLatinWhenNative: false,
 
+  // Latin-script BCS orthography constraints. Two script-bleed rules:
+  // Cyrillic (load-bearing — BCS Cyrillic is a different script, not a
+  // variant) and Greek (rare but unambiguous). Gaj's Latin IS standard
+  // Latin with 5 diacritical letters + 3 digraphs; no within-Latin
+  // confusable set, so bs-latn has thinner deterministic coverage than
+  // sr-cyrl. The reviewer carries more of the load.
+  orthographyConstraints: [
+    // 1. Cyrillic block — load-bearing constraint
+    {
+      rejectsCharPattern: /[\u0400-\u04FF]/,
+      reason: 'Cyrillic letter in Bosnian/Croatian text: this language uses Latin script (Gaj\'s orthography). Remove the Cyrillic text bleed.',
+    },
+    // 2. Greek block — rare but unambiguous
+    {
+      rejectsCharPattern: /[\u0370-\u03FF]/,
+      reason: 'Greek letter in Bosnian/Croatian text: BCS uses Latin script exclusively. Remove the Greek character.',
+    },
+  ],
+
   transliteration: {
     required: false,
     schemeName: 'identity',

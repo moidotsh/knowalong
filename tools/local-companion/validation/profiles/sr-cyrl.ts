@@ -39,6 +39,29 @@ export const SR_CYRL_PROFILE: LanguageProfile = {
   // Serbian Cyrillic does not mix Latin in canonical form.
   forbiddenLatinWhenNative: true,
 
+  // Serbian-specific orthography constraints. Three within-Cyrillic
+  // confusables: Russian-only, Ukrainian-only, Belarusian-only letters
+  // that pass nativeScriptPattern but aren't in Serbian's 30-letter
+  // alphabet. The engine's SCRIPT_MIXED check already catches Latin-in-
+  // Cyrillic; these are non-overlapping.
+  orthographyConstraints: [
+    // 1. Russian-only: Ё/ё Ъ/ъ Ы/ы Э/э
+    {
+      rejectsCharPattern: /[\u0401\u0451\u042A\u044A\u042B\u044B\u042D\u044D]/,
+      reason: 'Russian-only Cyrillic letter (Ё/ё Ъ/ъ Ы/ы Э/э) in Serbian text: Serbian Cyrillic has 30 letters and does not use these. Remove the Russian text bleed.',
+    },
+    // 2. Ukrainian-only: Є/є І/і Ї/ї Ґ/ґ
+    {
+      rejectsCharPattern: /[\u0404\u0454\u0406\u0456\u0407\u0457\u0490\u0491]/,
+      reason: 'Ukrainian-only Cyrillic letter (Є/є І/і Ї/ї Ґ/ґ) in Serbian text: Serbian Cyrillic does not use these letters. Remove the Ukrainian text bleed.',
+    },
+    // 3. Belarusian-only: Ў/ў (і already covered by Ukrainian set)
+    {
+      rejectsCharPattern: /[\u040E\u045E]/,
+      reason: 'Belarusian-only Cyrillic letter (Ў/ў) in Serbian text: Serbian Cyrillic does not use this letter. Remove the Belarusian text bleed.',
+    },
+  ],
+
   transliteration: {
     required: true,
     schemeName: 'Gaj Latinica',
