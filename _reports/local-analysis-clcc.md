@@ -11,7 +11,7 @@ This is the canonical Architecture Decision Record for the optional local compan
 KnowAlong's initial lyrics-domain checkpoint shipped (`fab4f9d`) with a typed-but-unconfigured `mediaAnalysisService` returning `{ status: 'unconfigured' }`. The spec now requires a real, local-LLM-assisted analysis workflow with verbose, visible processing for two capabilities:
 
 1. **Lyric/text analysis** — a learner-facing 9-stage pipeline over a learner's pasted lyrics/text. Produces per-source reviewable proposals (sections, segment spans, line translations, lemmas, forms, morphology, grammar patterns, concept mappings, cards).
-2. **CLCC generation** — an internal operator 5-stage pipeline scoped to French / Russian / Persian (fa). Generates per-concept realization proposals.
+2. **CLCC generation** — an internal operator 5-stage pipeline scoped to French / Russian / Persian (fa) / Armenian (hy) / Serbian Cyrillic (sr-cyrl) / BCS Latin (bs-latn). Generates per-concept realization proposals.
 
 Both run against an optional local companion that wraps a local Ollama instance and binds `127.0.0.1` only.
 
@@ -405,7 +405,7 @@ They are a **temporary unlinked internal operator surface** in the KnowAlong rep
 
 They will be **extracted or replaced by the separate future KnowAlong Studio admin application** after the learner/source-analysis and bridge-deck workflow have been validated.
 
-**CLCC language scope:** French / Russian / Persian (fa) ONLY in this checkpoint. Adding a language requires updating the Zod schema allowlist AND the companion pipeline's prompt catalogue.
+**CLCC language scope:** French / Russian / Persian (fa) / Armenian (hy) / Serbian Cyrillic (sr-cyrl) / BCS Latin (bs-latn) — six codes, all enabled end-to-end. Adding a language requires paired edits across four sites: the Zod schema allowlist, the shared-types `ClccLanguageCode` union, the companion prompt catalogue (`LANG_PROMPT_DATA` in `tools/local-companion/prompts/clccGeneration.ts`), and the companion's per-language validation profile (`tools/local-companion/validation/profiles/<code>.ts`) + router `supportedLanguages` list.
 
 ---
 
@@ -419,7 +419,7 @@ They will be **extracted or replaced by the separate future KnowAlong Studio adm
 | Source-level segment offsets | Removed | Two competing span systems invited ambiguity. Ordered `source_line_segments` is the sole authoritative span. |
 | True atomic multi-record promotion | Deferred | No RPC / Edge Function / remote transaction in this checkpoint. Per-proposal independent acceptance only. |
 | Deployed-HTTPS-to-loopback compatibility hardening | Deferred | Mixed-content / PNA per-browser variance. No TLS/cert/proxy workarounds in this checkpoint. |
-| Languages beyond fr/ru/fa | Deferred | Out of checkpoint scope. |
+| Languages beyond fr/ru/fa/hy/sr-cyrl/bs-latn | Deferred | Out of checkpoint scope. |
 | AnkiConnect/export | Deferred | Future vertical. |
 | Full FSRS scheduling | Deferred | Review loop is provisional/preview only. |
 | The separate future KnowAlong Studio admin application | Deferred | Reviewed import, versioned language-pack releases, secure server-side cloud jobs, learner read-only consumption. The current CLCC routes will be extracted or replaced by it. |
@@ -457,7 +457,7 @@ They will be **extracted or replaced by the separate future KnowAlong Studio adm
 
 | Test file | Load-bearing assertion |
 |---|---|
-| `__tests__/knowalong/companionSchemas.test.ts` | Zod schema validation; source-analysis does NOT restrict to fr/ru/fa but CLCC DOES; empty arrays rejected. |
+| `__tests__/knowalong/companionSchemas.test.ts` | Zod schema validation; source-analysis does NOT restrict to the 6-code CLCC scope but CLCC DOES; empty arrays rejected. |
 | `__tests__/knowalong/proposalReview.test.ts` | `deferredReasonFor` returns literal reasons for `segment` / `token_occurrence` / `realization` and `null` for every single-row destination kind. |
 | `__tests__/knowalong/segmentSpan.test.ts` | Multi-line reconstruction from `source_line_segments`; per-line offset validation; `sourceSegmentRepository` exposes NO write method. |
 | `__tests__/knowalong/companionCredential.test.ts` | Paste/save/clear lifecycle; NO client-side token generation; trims whitespace; rejects empty/schemeless values. |
