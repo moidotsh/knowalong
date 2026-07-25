@@ -1854,4 +1854,298 @@ describe('clccGeneration pipeline', () => {
     expect(stage3Prompt!).toContain('رفتنن');
     expect(stage3Prompt!).toContain('میکندن');
   });
+
+  // ── Hy deep-hardening: orthography + new pos-props + prompt presence ────
+  //
+  // End-to-end coverage of the engine + pipeline + prompt expansions landed
+  // in Commits 1-3 of the deep Armenian pass.
+
+  /** Clean Armenian row: passes every configured rule. */
+  const cleanHyExist = {
+    coreConceptCode: 'EXIST',
+    realizationType: 'word',
+    surfaceForm: 'լինել',
+    transliteration: 'linel',
+    gloss: 'to be / to exist (copula)',
+    grammaticalNote: 'verb, infinitive',
+    senseKind: 'core',
+  };
+
+  // Stage 2: orthography on surfaceForm. The engine rejects a realization
+  // whose surfaceForm contains a Cyrillic letter (Russian text bleed), and
+  // the retry returns a clean Armenian form.
+  it('Stage 2 drops a hy realization with Cyrillic а (U+0430) via ORTHOGRAPHY_VIOLATION', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                ...cleanHyExist,
+                // Cyrillic а (U+0430) embedded — visual confusable for Armenian ա.
+                surfaceForm: 'լին\u0430լ',
+                transliteration: 'linel',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanHyExist] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Armenian branch)', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-hy-ortho-sf', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'hy', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-hy-ortho-sf')!;
+    expect(result.result?.proposals.length).toBe(1);
+    const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('լինել');
+    // The Stage 2 retry prompt must carry the prior ORTHOGRAPHY_VIOLATION.
+    const stage2Calls = ollama.calls.filter((p) => p.includes('Concepts to realize'));
+    expect(stage2Calls.length).toBe(2);
+    const retryPrompt = stage2Calls[1];
+    expect(retryPrompt).toContain('ORTHOGRAPHY_VIOLATION');
+    expect(retryPrompt).toContain('U+0430');
+  });
+
+  // Stage 3: orthography on sourceText. The pipeline's checkOrthography call
+  // drops example sentences with Cyrillic letters.
+  it('Stage 3 drops a hy example sentence with Cyrillic е (U+0435) via the checkOrthography call', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Armenian branch)', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [
+            {
+              coreConceptCode: 'EXIST',
+              realizationType: 'word',
+              surfaceForm: 'լինել',
+              gloss: 'to be',
+              grammaticalNote: 'verb, infinitive',
+              senseKind: 'core',
+            },
+          ],
+        }),
+        // Both attempts: Cyrillic е (U+0435) in sourceText. The Armenian
+        // script-presence junk filter passes (Armenian letters are present),
+        // but the orthography check fires.
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            // Cyrillic е (U+0435) embedded among Armenian letters. Armenian
+            // ե (U+0565) is the visual confusable.
+            sourceText: 'Եր\u0435վանում կա մետրո։',
+            translation: 'There is a metro in Yerevan.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-hy-ortho-st', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'hy', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-hy-ortho-st')!;
+    expect(result.result?.proposals.length).toBe(1);
+    expect(result.result?.proposals[0].proposalKind).toBe('realization');
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.acceptedExamples).toBe(0);
+    expect(summary.droppedExampleCount).toBe(2);
+    // The drop reason must be the ORTHOGRAPHY_VIOLATION reason, NOT the
+    // script-aware junk-filter reason.
+    const droppedExamples = summary.droppedExamples as Array<{ code: string; reason: string }>;
+    expect(droppedExamples.every((d) => d.reason.includes('Cyrillic letter in Armenian text'))).toBe(true);
+    expect(droppedExamples.every((d) => d.reason.includes('U+0435'))).toBe(true);
+  });
+
+  it('hy particle pos-prop rejects "particle, singular" (companion profile)', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'չ',
+        transliteration: 'ch',
+        gloss: 'not',
+        grammaticalNote: 'particle, singular',
+      },
+      HY_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"particle"'))).toBe(true);
+  });
+
+  it('hy adjective pos-prop rejects "adjective, first person"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'լավ',
+        transliteration: 'lav',
+        gloss: 'good',
+        grammaticalNote: 'adjective, first person',
+      },
+      HY_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"adjective"'))).toBe(true);
+  });
+
+  it('hy multi-number rejects "noun, singular, plural"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'գիրք',
+        transliteration: 'grkʿ',
+        gloss: 'book',
+        grammaticalNote: 'noun, singular, plural',
+      },
+      HY_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_NUMBER')).toBe(true);
+  });
+
+  // Profile-driven junk-filter guard: a Latin-only Armenian sourceText is
+  // still rejected by looksLikeExampleJunk (regression guard for the
+  // profile-driven refactor landed in the Persian pass).
+  it('hy stage 3 rejects Latin-only Armenian source text via the script-aware junk filter', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Armenian branch)', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [
+            {
+              coreConceptCode: 'EXIST',
+              realizationType: 'word',
+              surfaceForm: 'լինել',
+              gloss: 'to be',
+              grammaticalNote: 'verb, infinitive',
+              senseKind: 'core',
+            },
+          ],
+        }),
+        // Both attempts: Latin-only transliteration.
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            sourceText: 'Es gnum em tun.',
+            translation: 'I am going home.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-hy-latinst', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'hy', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-hy-latinst')!;
+    // 1 realization + 0 examples (both attempts failed script check).
+    expect(result.result?.proposals.length).toBe(1);
+    expect(result.result?.proposals[0].proposalKind).toBe('realization');
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.acceptedExamples).toBe(0);
+    expect(summary.droppedExampleCount).toBe(2);
+    const droppedExamples = summary.droppedExamples as Array<{ code: string; reason: string }>;
+    expect(droppedExamples.every((d) => d.reason.includes('script-aware junk filter'))).toBe(true);
+  });
+
+  // ── Hy Stage 2 / Stage 3 prompt-presence guards ──────────────────────
+
+  it('hy stage-2 prompt contains the expanded ISO 9985:1996 table and grammar guidance', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Armenian branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 0, realizationCount: 0, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-hy-prompt', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'hy', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Prompt = captured.find((p) => p.includes('Concepts to realize'));
+    expect(stage2Prompt).toBeDefined();
+    // Transliteration table — first alphabet entry.
+    expect(stage2Prompt!).toContain('ա→a');
+    expect(stage2Prompt!).toContain('ISO 9985:1996');
+    // Expanded grammar guidance keywords.
+    expect(stage2Prompt!).toContain('SEVEN cases');
+    expect(stage2Prompt!).toContain('Eastern Armenian');
+    expect(stage2Prompt!).toContain('Verb stems');
+    expect(stage2Prompt!).toContain('definite article');
+    expect(stage2Prompt!).toContain('aorist');
+  });
+
+  it('hy stage-3 prompt contains the Armenian-specific orthography anti-pattern bullet', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Armenian branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [{ coreConceptCode: 'EXIST', realizationType: 'word', surfaceForm: 'լինել', gloss: 'to be', grammaticalNote: 'verb, infinitive', senseKind: 'core' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to illustrate')) {
+          return { text: JSON.stringify({ examples: [{ coreConceptCode: 'EXIST', sourceText: 'Երևանում կա մետրո։', translation: 'There is a metro in Yerevan.' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-hy-stage3', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'hy', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage3Prompt = captured.find((p) => p.includes('Concepts to illustrate'));
+    expect(stage3Prompt).toBeDefined();
+    // The hy-specific sourceText orthography anti-pattern bullet.
+    expect(stage3Prompt!).toContain('Cyrillic');
+    expect(stage3Prompt!).toContain('U+0559-U+055C');
+    // Data-driven anti-examples — populated by Commit 3's hy population.
+    expect(stage3Prompt!).toContain('լինելել');
+    expect(stage3Prompt!).toContain('գնումմ');
+  });
 });
