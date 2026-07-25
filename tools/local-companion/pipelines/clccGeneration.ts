@@ -38,7 +38,7 @@ import {
 } from '../prompts/clccGeneration';
 import { logger } from '../../../utils/logger';
 import { validateRealizationEntry, getProfile } from '../validation';
-import type { RejectionCode } from '../validation';
+import type { RejectionCode, LanguageProfile } from '../validation';
 
 // ── Per-stage wrapper schemas (stages 1, 4, 5 stay loose; stage 3 is strict) ───
 const ProfileSchema = z.object({ profile: z.object({}).passthrough() });
@@ -155,25 +155,22 @@ function validateExampleEntry(
 }
 
 /**
- * Script-aware sanity check for example sentences. Catches the most common
- * small-model failure modes per target language:
- *   - Russian (ru) + Serbian Cyrillic (sr-cyrl): sourceText must contain at
- *     least one Cyrillic char. Invented stems like "валяя"/"деляю" pass this
- *     check (they're well-formed Cyrillic) but get caught by the review-vote
- *     stage; purely Latin or transliterated sentences are rejected here.
- *     Serbian Cyrillic is a subset of Russian Cyrillic so the same range
- *     applies.
- *   - Persian (fa): sourceText must contain at least one Arabic-script char.
- *     Latin-only transliteration is rejected.
- *   - Armenian (hy): sourceText must contain at least one Armenian char.
- *   - French (fr) + BCS Latin (bs-latn): sourceText must contain at least one
- *     Latin letter. Placeholder tokens ("TODO", "???", the concept code
- *     itself) are rejected.
+ * Script-aware sanity check for example sentences. The script-presence check
+ * is profile-driven: every registered language's profile carries a
+ * `nativeScriptPattern` that matches at least one native-script char in a
+ * surfaceForm. The placeholder + length checks are language-agnostic.
  *
  * Single-letter scripts (e.g. "Я иду.") contain spaces and short words; the
  * check only requires AT LEAST ONE char of the expected script, not a ratio.
+ *
+ * When `profile` is undefined (no profile registered for this code), the
+ * function fails closed by treating the row as junk — the operator sees the
+ * drop in the run summary.
  */
-function looksLikeExampleJunk(sourceText: string, targetLanguageCode: ClccLanguageCode): boolean {
+function looksLikeExampleJunk(
+  sourceText: string,
+  profile: LanguageProfile | undefined,
+): boolean {
   // Placeholder / surrogate token check applies to all languages.
   const trimmed = sourceText.trim();
   const PLACEHOLDER_TOKENS = new Set([
@@ -182,24 +179,8 @@ function looksLikeExampleJunk(sourceText: string, targetLanguageCode: ClccLangua
   if (PLACEHOLDER_TOKENS.has(trimmed.toLowerCase())) return true;
   if (trimmed.length < 2) return true;
 
-  if (targetLanguageCode === 'ru' || targetLanguageCode === 'sr-cyrl') {
-    // U+0400–U+04FF is the Cyrillic block. Also accept Cyrillic Supplement
-    // (U+0500–U+052F) for minority languages just in case. Serbian Cyrillic
-    // is a subset of this range.
-    return !/[\u0400-\u04FF\u0500-\u052F]/.test(sourceText);
-  }
-  if (targetLanguageCode === 'fa') {
-    // Arabic block (U+0600–U+06FF) + Arabic Presentation Forms-A/B
-    // (U+FB50–U FDFF, U+FE70–U+FEFF) cover Persian/Arabic script.
-    return !/[\u0600-\u06FF\uFB50-\uFDFF\uFE70-\uFEFF]/.test(sourceText);
-  }
-  if (targetLanguageCode === 'hy') {
-    // Armenian block (U+0530–U+058F) + Alphabetic Presentation Forms
-    // (U+FB13–U+FB17) cover Armenian + its four historic ligatures.
-    return !/[\u0530-\u058F\uFB13-\uFB17]/.test(sourceText);
-  }
-  // fr + bs-latn — require at least one Latin letter (incl. Latin-1 diacritics).
-  return !/[A-Za-zÀ-ÿ]/.test(sourceText);
+  if (!profile?.nativeScriptPattern) return true;
+  return !profile.nativeScriptPattern.test(sourceText);
 }
 
 // ── Pipeline entry point ──────────────────────────────────────────────
@@ -773,8 +754,8 @@ function extractCode(raw: unknown): string | undefined {
 
 // ── Stage-3 batch helpers ─────────────────────────────────────────────
 // Mirror Stage 2's two-attempt retry + finalize pattern. Stage 3 needs the
-// targetLanguageCode to drive the script-aware junk filter, so it's threaded
-// through the helper.
+// target-language profile to drive the script-aware junk filter + the
+// orthography check, so it's threaded through the helper.
 
 interface ExampleBatchResult {
   validated: ValidatedExampleEntry[];
@@ -793,6 +774,7 @@ async function generateAndValidateExampleBatch(
   targetLanguageCode: ClccLanguageCode,
   onToken?: (chunk: string) => void,
 ): Promise<ExampleBatchResult> {
+  const profile = getProfile(targetLanguageCode);
   const r1 = await deps.ollama.generate({
     model,
     temperature: 0.4,
@@ -817,9 +799,9 @@ async function generateAndValidateExampleBatch(
         model: r2.model,
       };
     }
-    return finalizeExampleBatch(parsed2.entries, batchCodes, allowedCodes, targetLanguageCode, r2);
+    return finalizeExampleBatch(parsed2.entries, batchCodes, allowedCodes, targetLanguageCode, profile, r2);
   }
-  const firstPass = finalizeExampleBatch(parsed1.entries, batchCodes, allowedCodes, targetLanguageCode, r1);
+  const firstPass = finalizeExampleBatch(parsed1.entries, batchCodes, allowedCodes, targetLanguageCode, profile, r1);
   const missingFromFirst = batchCodes.filter((c) => !firstPass.validated.some((v) => v.coreConceptCode === c));
   if (missingFromFirst.length === 0) {
     return firstPass;
@@ -847,7 +829,7 @@ async function generateAndValidateExampleBatch(
   if (parsed2.kind === 'parse-fail') {
     return firstPass;
   }
-  const secondPass = finalizeExampleBatch(parsed2.entries, missingFromFirst, allowedCodes, targetLanguageCode, r2);
+  const secondPass = finalizeExampleBatch(parsed2.entries, missingFromFirst, allowedCodes, targetLanguageCode, profile, r2);
   return {
     validated: [...firstPass.validated, ...secondPass.validated],
     dropped: [...firstPass.dropped, ...secondPass.dropped],
@@ -862,6 +844,7 @@ function finalizeExampleBatch(
   batchCodes: string[],
   allowedCodes: ReadonlySet<string>,
   targetLanguageCode: ClccLanguageCode,
+  profile: LanguageProfile | undefined,
   response: { text: string; model: string },
 ): ExampleBatchResult {
   const validated: ValidatedExampleEntry[] = [];
@@ -879,7 +862,7 @@ function finalizeExampleBatch(
       continue;
     }
     if (seen.has(v.value.coreConceptCode)) continue;
-    if (looksLikeExampleJunk(v.value.sourceText, targetLanguageCode)) {
+    if (looksLikeExampleJunk(v.value.sourceText, profile)) {
       dropped.push({
         code: v.value.coreConceptCode,
         reason: `sourceText "${v.value.sourceText}" failed script-aware junk filter for ${targetLanguageCode}`,

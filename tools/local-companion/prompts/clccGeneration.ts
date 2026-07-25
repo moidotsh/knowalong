@@ -63,6 +63,10 @@ interface LangPromptData {
    *  prompt's grammaticalNote field rule. Undefined for languages whose
    *  grammar hasn't been profiled yet — they get the generic rule only. */
   grammarGuidance?: string;
+  /** Invented-word anti-examples for the stage-3 anti-hallucination callout.
+   *  Empty array (or omitted) emits the language-general callout instead of
+   *  the per-language "(e.g. X, Y are NOT real <Lang>)" form. */
+  inventedWordAntiExamples?: string[];
 }
 
 const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPromptData> = {
@@ -81,6 +85,7 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
 - Nouns: note grammatical gender (masculine/feminine/neuter) and animacy when relevant.
 - Prepositions: note which case(s) the preposition governs (genitive/dative/accusative/instrumental/prepositional).
 - Register: note when relevant (ты/вы; colloquial particles ведь, же).`,
+    inventedWordAntiExamples: ['валяя', 'деляю'],
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "я", "transliteration": "ya", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, nominative case, singular", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "быть", "transliteration": "byt'", "gloss": "to be (existential copula)", "grammaticalNote": "verb, infinitive, imperfective aspect", "senseKind": "core" }
@@ -431,7 +436,9 @@ Field rules (NON-NEGOTIABLE):
 ${examples}
 
 Anti-patterns (NEVER produce these):
-- Invented or fabricated ${langName} words (e.g. "валяя", "деляю" are NOT real Russian). If you are unsure of a word, write a SIMPLER real sentence using vocabulary you do know.
+${langData.inventedWordAntiExamples && langData.inventedWordAntiExamples.length > 0
+  ? `- Invented or fabricated ${langName} words (e.g. ${langData.inventedWordAntiExamples.map((w) => `"${w}"`).join(', ')} are NOT real ${langName}). If you are unsure of a word, write a SIMPLER real sentence using vocabulary you do know.`
+  : '- Invented or fabricated ' + langName + ' words are NOT acceptable. If you are unsure of a word, write a SIMPLER real sentence using vocabulary you do know.'}
 - Mixed-script sentences (English words glued into ${langName} grammar, e.g. "I am не going").
 - Transliterated ${langName} written in Latin script when ${langName} has its own script — keep sourceText in the native script; the Latin form goes in "transliteration", never in "sourceText".
 - Fake cognates or "sounds-plausible" phonotactic nonsense that is not a real word.
