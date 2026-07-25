@@ -2148,4 +2148,531 @@ describe('clccGeneration pipeline', () => {
     expect(stage3Prompt!).toContain('լինելել');
     expect(stage3Prompt!).toContain('գնումմ');
   });
+
+  // ── BCS deep-hardening: sr-cyrl + bs-latn orthography + new pos-props ──
+  //
+  // End-to-end coverage of the engine + pipeline + prompt expansions landed
+  // in Commits 1-3 of the deep BCS pass. sr-cyrl uses within-Cyrillic
+  // confusables (Russian/Ukrainian/Belarusian-only letters); bs-latn uses
+  // script-bleed (Cyrillic, Greek).
+
+  /** Clean Serbian Cyrillic row: passes every configured rule. */
+  const cleanSrCyrlExist = {
+    coreConceptCode: 'EXIST',
+    realizationType: 'word',
+    surfaceForm: 'бити',
+    transliteration: 'biti',
+    gloss: 'to be (copula)',
+    grammaticalNote: 'verb, infinitive',
+    senseKind: 'core',
+  };
+
+  /** Clean BCS Latin row: passes every configured rule. */
+  const cleanBsLatnExist = {
+    coreConceptCode: 'EXIST',
+    realizationType: 'word',
+    surfaceForm: 'biti',
+    gloss: 'to be (copula)',
+    grammaticalNote: 'verb, infinitive',
+    senseKind: 'core',
+  };
+
+  // Stage 2 sr-cyrl: orthography on surfaceForm. The engine rejects a
+  // realization whose surfaceForm contains a Russian-only letter (ъ
+  // U+044A — passes nativeScriptPattern but isn't in Serbian's 30-letter
+  // alphabet), and the retry returns a clean Serbian Cyrillic form.
+  it('Stage 2 drops a sr-cyrl realization with Russian ъ (U+044A) via ORTHOGRAPHY_VIOLATION', async () => {
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                ...cleanSrCyrlExist,
+                // Russian ъ (U+044A) embedded — Russian-only Cyrillic letter.
+                surfaceForm: 'би\u044Aти',
+                transliteration: 'biti',
+              },
+            ],
+          }),
+          JSON.stringify({ realizations: [cleanSrCyrlExist] }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-srcyrl-ortho-sf', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'sr-cyrl', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-srcyrl-ortho-sf')!;
+    expect(result.result?.proposals.length).toBe(1);
+    const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('бити');
+    // The Stage 2 retry prompt must carry the prior ORTHOGRAPHY_VIOLATION.
+    const stage2Calls = ollama.calls.filter((p) => p.includes('Concepts to realize'));
+    expect(stage2Calls.length).toBe(2);
+    const retryPrompt = stage2Calls[1];
+    expect(retryPrompt).toContain('ORTHOGRAPHY_VIOLATION');
+    expect(retryPrompt).toContain('U+044A');
+  });
+
+  // Stage 3 bs-latn: orthography on sourceText. The pipeline's
+  // checkOrthography call drops example sentences with Cyrillic letters.
+  it('Stage 3 drops a bs-latn example sentence with Cyrillic (U+0440) via the checkOrthography call', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [
+            {
+              coreConceptCode: 'EXIST',
+              realizationType: 'word',
+              surfaceForm: 'biti',
+              gloss: 'to be',
+              grammaticalNote: 'verb, infinitive',
+              senseKind: 'core',
+            },
+          ],
+        }),
+        // Both attempts: Cyrillic р (U+0440) embedded in Latin text.
+        // bs-latn has no native-script requirement so the script-aware
+        // junk filter passes (Latin letters are present); the orthography
+        // check fires on the Cyrillic letter.
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            // Cyrillic р (U+0440) in a Latin-script sentence.
+            sourceText: 'U g\u0440adu postoji park.',
+            translation: 'There is a park in the city.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-bslatn-ortho-st', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'bs-latn', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-bslatn-ortho-st')!;
+    expect(result.result?.proposals.length).toBe(1);
+    expect(result.result?.proposals[0].proposalKind).toBe('realization');
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.acceptedExamples).toBe(0);
+    expect(summary.droppedExampleCount).toBe(2);
+    // The drop reason must be the ORTHOGRAPHY_VIOLATION reason, NOT the
+    // script-aware junk-filter reason.
+    const droppedExamples = summary.droppedExamples as Array<{ code: string; reason: string }>;
+    expect(droppedExamples.every((d) => d.reason.includes('Cyrillic letter in Bosnian/Croatian text'))).toBe(true);
+    expect(droppedExamples.every((d) => d.reason.includes('U+04'))).toBe(true);
+  });
+
+  // ── BCS shared grammar rules (BCS adjective inflects; multi-gender fires) ──
+
+  it('sr-cyrl particle pos-prop rejects "particle, present tense"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'не',
+        transliteration: 'ne',
+        gloss: 'not',
+        grammaticalNote: 'particle, present tense',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"particle"'))).toBe(true);
+  });
+
+  it('bs-latn particle pos-prop rejects "particle, present tense"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'ne',
+        gloss: 'not',
+        grammaticalNote: 'particle, present tense',
+      },
+      BS_LATN_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"particle"'))).toBe(true);
+  });
+
+  it('sr-cyrl adjective pos-prop rejects "adjective, present tense" but accepts "adjective, masculine, singular, dative"', () => {
+    // BCS adjectives inflect for case/number/gender — they DO NOT carry
+    // tense. The unlessHas 'participle' guard protects participial
+    // adjectives carrying verbal properties. Verify both branches.
+    const bad = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'леп',
+        transliteration: 'lep',
+        gloss: 'beautiful',
+        grammaticalNote: 'adjective, present tense',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(bad.verdict).toBe('malformed');
+    expect(bad.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"adjective"'))).toBe(true);
+
+    const good = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'лепом',
+        transliteration: 'lepom',
+        gloss: 'beautiful (masc sg dat)',
+        grammaticalNote: 'adjective, masculine, singular, dative',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(good.verdict).toBe('valid');
+    expect(good.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION')).toBe(false);
+  });
+
+  it('sr-cyrl adjective unlessHas guard: "adjective, participle, past tense" passes', () => {
+    // A participial adjective carries verbal properties (tense). The
+    // unlessHas 'participle' guard exempts it from the adjective rule.
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'прочитан',
+        transliteration: 'pročitan',
+        gloss: 'read (past participle, masc sg)',
+        grammaticalNote: 'adjective, participle, past tense',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"adjective"'))).toBe(false);
+  });
+
+  it('sr-cyrl noun pos-prop rejects "noun, present tense"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'књига',
+        transliteration: 'knjiga',
+        gloss: 'book',
+        grammaticalNote: 'noun, present tense',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"noun"'))).toBe(true);
+  });
+
+  it('sr-cyrl multi-gender rejects "noun, masculine, feminine" (BCS-specific)', () => {
+    // BCS has grammatical gender (unlike Persian/Armenian). The
+    // multi-gender exclusive-category rule is unique to BCS profiles.
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'књига',
+        transliteration: 'knjiga',
+        gloss: 'book',
+        grammaticalNote: 'noun, masculine, feminine',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_GENDER')).toBe(true);
+  });
+
+  it('bs-latn multi-gender rejects "noun, masculine, feminine"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'knjiga',
+        gloss: 'book',
+        grammaticalNote: 'noun, masculine, feminine',
+      },
+      BS_LATN_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_GENDER')).toBe(true);
+  });
+
+  it('sr-cyrl multi-number rejects "noun, singular, plural"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'књига',
+        transliteration: 'knjiga',
+        gloss: 'book',
+        grammaticalNote: 'noun, singular, plural',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_NUMBER')).toBe(true);
+  });
+
+  it('sr-cyrl recognizes aorist as a legitimate tense (regression guard for 8-term union)', () => {
+    // BCS TENSE_TERMS now includes 'aorist' (was missing on the Studio side
+    // before the deep-BCS harmonization). A single 'aorist' label on a
+    // finite verb must NOT fire multi-tense.
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'видех',
+        transliteration: 'videh',
+        gloss: 'I saw (aorist)',
+        grammaticalNote: 'verb, first person, singular, aorist',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_TENSE')).toBe(false);
+  });
+
+  it('sr-cyrl multi-tense fires when aorist combines with another tense', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'видех',
+        transliteration: 'videh',
+        gloss: 'I saw',
+        grammaticalNote: 'verb, aorist, present tense',
+      },
+      SR_CYRL_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_TENSE')).toBe(true);
+  });
+
+  // Profile-driven junk-filter guard: a Latin-only sr-cyrl sourceText is
+  // still rejected by looksLikeExampleJunk (regression guard for the
+  // profile-driven refactor and the new orthography constraints).
+  it('sr-cyrl stage 3 rejects Latin-only Serbian source text via the script-aware junk filter', async () => {
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [
+            {
+              coreConceptCode: 'EXIST',
+              realizationType: 'word',
+              surfaceForm: 'бити',
+              transliteration: 'biti',
+              gloss: 'to be',
+              grammaticalNote: 'verb, infinitive',
+              senseKind: 'core',
+            },
+          ],
+        }),
+        // Both attempts: Latin-only transliteration.
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            sourceText: 'Ja idem kuci.',
+            translation: 'I am going home.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-srcyrl-latinst', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'sr-cyrl', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-srcyrl-latinst')!;
+    // 1 realization + 0 examples (both attempts failed script check).
+    expect(result.result?.proposals.length).toBe(1);
+    expect(result.result?.proposals[0].proposalKind).toBe('realization');
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.acceptedExamples).toBe(0);
+    expect(summary.droppedExampleCount).toBe(2);
+    const droppedExamples = summary.droppedExamples as Array<{ code: string; reason: string }>;
+    expect(droppedExamples.every((d) => d.reason.includes('script-aware junk filter'))).toBe(true);
+  });
+
+  // ── sr-cyrl Stage 2 / Stage 3 prompt-presence guards ──────────────────
+
+  it('sr-cyrl stage-2 prompt contains the expanded Gaj Latinica table and shared grammar guidance', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 0, realizationCount: 0, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-srcyrl-prompt', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'sr-cyrl', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Prompt = captured.find((p) => p.includes('Concepts to realize'));
+    expect(stage2Prompt).toBeDefined();
+    // Transliteration table — first alphabet entry.
+    expect(stage2Prompt!).toContain('а→a');
+    expect(stage2Prompt!).toContain('Gaj Latinica');
+    // Shared grammar guidance keywords.
+    expect(stage2Prompt!).toContain('SEVEN cases');
+    expect(stage2Prompt!).toContain('THREE grammatical genders');
+    expect(stage2Prompt!).toContain('ekavian');
+    expect(stage2Prompt!).toContain('Wackernagel');
+    expect(stage2Prompt!).toContain('aspectual');
+  });
+
+  it('sr-cyrl stage-3 prompt contains the Serbian-specific orthography anti-pattern bullet', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [{ coreConceptCode: 'EXIST', realizationType: 'word', surfaceForm: 'бити', transliteration: 'biti', gloss: 'to be', grammaticalNote: 'verb, infinitive', senseKind: 'core' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to illustrate')) {
+          return { text: JSON.stringify({ examples: [{ coreConceptCode: 'EXIST', sourceText: 'У граду постоји парк.', translation: 'There is a park in the city.' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-srcyrl-stage3', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'sr-cyrl', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage3Prompt = captured.find((p) => p.includes('Concepts to illustrate'));
+    expect(stage3Prompt).toBeDefined();
+    // The sr-cyrl-specific sourceText orthography anti-pattern bullet.
+    // Codepoints appear in compact notation (single U+ prefix for the group):
+    //   U+0401/0451/042A/044A/...
+    expect(stage3Prompt!).toContain('Russian-only');
+    expect(stage3Prompt!).toContain('044A');
+    // Data-driven anti-examples — populated by Commit 3's BCS population.
+    expect(stage3Prompt!).toContain('bititi');
+    expect(stage3Prompt!).toContain('govorititi');
+  });
+
+  // ── bs-latn Stage 2 / Stage 3 prompt-presence guards ──────────────────
+
+  it('bs-latn stage-2 prompt contains the shared BCS grammar guidance', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 0, realizationCount: 0, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-bslatn-prompt', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'bs-latn', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Prompt = captured.find((p) => p.includes('Concepts to realize'));
+    expect(stage2Prompt).toBeDefined();
+    // Shared grammar guidance keywords (same BCS_GRAMMAR_GUIDANCE).
+    expect(stage2Prompt!).toContain('SEVEN cases');
+    expect(stage2Prompt!).toContain('THREE grammatical genders');
+    expect(stage2Prompt!).toContain('ekavian');
+    expect(stage2Prompt!).toContain('Wackernagel');
+    expect(stage2Prompt!).toContain('aspectual');
+  });
+
+  it('bs-latn stage-3 prompt contains the Bosnian/Croatian-specific orthography anti-pattern bullet', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Indo-European (Slavic branch)', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [{ coreConceptCode: 'EXIST', realizationType: 'word', surfaceForm: 'biti', gloss: 'to be', grammaticalNote: 'verb, infinitive', senseKind: 'core' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to illustrate')) {
+          return { text: JSON.stringify({ examples: [{ coreConceptCode: 'EXIST', sourceText: 'U gradu postoji park.', translation: 'There is a park in the city.' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-bslatn-stage3', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'bs-latn', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage3Prompt = captured.find((p) => p.includes('Concepts to illustrate'));
+    expect(stage3Prompt).toBeDefined();
+    // The bs-latn-specific sourceText orthography anti-pattern bullet.
+    expect(stage3Prompt!).toContain('Cyrillic');
+    // Data-driven anti-examples — populated by Commit 3's BCS population.
+    expect(stage3Prompt!).toContain('bititi');
+    expect(stage3Prompt!).toContain('govorititi');
+  });
 });
