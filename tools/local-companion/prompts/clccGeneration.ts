@@ -67,6 +67,10 @@ interface LangPromptData {
    *  Empty array (or omitted) emits the language-general callout instead of
    *  the per-language "(e.g. X, Y are NOT real <Lang>)" form. */
   inventedWordAntiExamples?: string[];
+  /** Optional sourceText-orthography anti-pattern note injected into the
+   *  stage-3 anti-pattern list. Undefined for languages whose orthography
+   *  is reviewer-owned only (e.g. ru — stress marks) or trivially correct. */
+  stage3OrthographyAntiPattern?: string;
 }
 
 const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPromptData> = {
@@ -117,7 +121,7 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
     scriptLabel: 'Persian-Arabic',
     translitRequired: true,
     translitRuleText:
-      '* REQUIRED for Persian (use BGN/PCGN: من→man, بودن→budan, ن→na/na-).',
+      '* REQUIRED for Persian (use BGN/PCGN Persian 1956: آ→ā, ب→b, پ→p, ت→t, ث→s, ج→j, چ→ch, ح→h, خ→kh, د→d, ذ→z, ر→r, ز→z, ژ→zh, س→s, ش→sh, ص→s, ض→z, ط→t, ظ→z, ع→ʿ, غ→gh, ف→f, ق→q, ک→k, گ→g, ل→l, م→m, ن→n, و→v, ه→h, ی→y. Short vowels are unwritten; do not infer them. Examples: من→man, بودن→budan, کتاب→ketāb, نمی‌دانم→nemidānam, خوشحال→khoshhāl).',
     translitAntiPatternNote:
       '- For Persian, leaving transliteration null/empty (it is REQUIRED).',
     grammarGuidance: `Persian grammar guidance (for grammaticalNote):
@@ -128,7 +132,17 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
 - Nouns: note the plural suffix when used (ها or ان). Possession is shown via the ezâfe (-e/-ye), not by case.
 - Prepositions: Persian prepositions are flat (no case government, no agreement).
 - Compound verbs (light verb + noun, e.g. کار کردن "to work"): note when a realization is a compound verb.
-- Register: note written (کتابی) vs spoken (محاوره‌ای) only when the form differs between them.`,
+- Register: note written (کتابی) vs spoken (محاوره‌ای) only when the form differs between them.
+- Verb stems: Persian verbs have TWO stems — past stem (e.g. رفت→raft) and present stem (e.g. رو→rav). Note which stem a realization is built from; the infinitive is the past stem + ـَـن (-an).
+- Person/number endings on finite verbs: 1sg ـَـم, 2sg ـی, 3sg ـَـد, 1pl ـیم, 2pl ـید, 3pl ـَـند. Note the ending explicitly for finite forms.
+- Compound verbs (light-verb compounds): Persian has very many noun + کردن/شدن/گرفتن/زدن compounds. Always note when a realization is a compound verb (e.g. کار کردن "to work", یاد گرفتن "to learn", شکست خوردن "to be defeated").
+- را (postposition): the specific direct-object marker. Note it on a noun phrase when the form exemplifies the accusative function; do NOT label it "accusative case" (Persian has no case system).
+- Plural suffix choice: ها (hā) for inanimates and generic plurals; ان (ān) for animates and high-style prose. Note which when relevant.
+- Ezâfe direction: noun -e adjective (کتابِ خوب "the good book"). The ezâfe is unwritten (pronounced -e/-ye) but load-bearing for noun-adjective links; note it where relevant.
+- Colloquial vs formal verb endings: formal می‌روم (miravam) vs colloquial میرم (miram). Note when a realization is the colloquial form.`,
+    inventedWordAntiExamples: ['رفتنن', 'میکندن'],
+    stage3OrthographyAntiPattern:
+      '- For Persian sourceText: do NOT drop the ZWNJ (U+200C) in compound-verb prefixes (میرم WRONG; می‌روم RIGHT). Do NOT use Arabic letters where Persian is standard (ي U+064A → ی U+06CC; ك U+0643 → ک U+06A9). Do NOT use Arabic-Indic digits (٤٥٦); use Persian Extended Arabic-Indic (۴۵۶).',
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "من", "transliteration": "man", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, Persian-Arabic script", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "بودن", "transliteration": "budan", "gloss": "to be / to exist (copula)", "grammaticalNote": "verb, infinitive; present-tense copula is often omitted", "senseKind": "core" }
@@ -442,7 +456,7 @@ ${langData.inventedWordAntiExamples && langData.inventedWordAntiExamples.length 
 - Mixed-script sentences (English words glued into ${langName} grammar, e.g. "I am не going").
 - Transliterated ${langName} written in Latin script when ${langName} has its own script — keep sourceText in the native script; the Latin form goes in "transliteration", never in "sourceText".
 - Fake cognates or "sounds-plausible" phonotactic nonsense that is not a real word.
-${langData.translitAntiPatternNote}
+${langData.stage3OrthographyAntiPattern ? langData.stage3OrthographyAntiPattern + '\n' : ''}${langData.translitAntiPatternNote}
 - Putting IPA, stress marks, syllable boundaries, or audio hints in transliteration.
 - Long multi-clause sentences; complex or literary vocabulary.
 - Translation that does not match sourceText.
