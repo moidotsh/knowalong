@@ -1577,4 +1577,281 @@ describe('clccGeneration pipeline', () => {
       expect(r.rejections).toEqual([]);
     });
   });
+
+  // ── Fa deep-hardening: orthography constraints + new pos-props ─────────
+  //
+  // End-to-end coverage of the engine + pipeline + prompt expansions
+  // landed in Commits 2-4 of the deep Persian pass.
+
+  // Stage 2: orthography on surfaceForm. The engine rejects a realization
+  // whose surfaceForm contains an Arabic letter where Persian is standard,
+  // and the retry returns a clean Persian form.
+  it('Stage 2 drops a fa realization with Arabic ي (U+064A) via ORTHOGRAPHY_VIOLATION', async () => {
+    // First attempt returns a surfaceForm containing the Arabic yā ي instead
+    // of the Persian ی. Retry returns the clean Persian form.
+    const ollama = fakeOllama({
+      responsesByCall: {
+        'Concepts to realize': [
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                // Arabic ي at end — should be Persian ی.
+                surfaceForm: 'مي',
+                transliteration: 'mi',
+                gloss: '(invalid surface form for the test)',
+                grammaticalNote: 'noun',
+                senseKind: 'core',
+              },
+            ],
+          }),
+          JSON.stringify({
+            realizations: [
+              {
+                coreConceptCode: 'EXIST',
+                realizationType: 'word',
+                surfaceForm: 'بودن',
+                transliteration: 'budan',
+                gloss: 'to be',
+                grammaticalNote: 'verb, infinitive',
+                senseKind: 'core',
+              },
+            ],
+          }),
+        ],
+      },
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Iranian', typologicalFeatures: [], notes: null } }),
+        'example': JSON.stringify({ examples: [] }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-fa-ortho-sf', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fa', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-fa-ortho-sf')!;
+    // The retry succeeded → 1 realization proposal with the clean form.
+    expect(result.result?.proposals.length).toBe(1);
+    const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
+    expect(payload.surfaceForm).toBe('بودن');
+    // The Stage 2 retry prompt must carry the prior ORTHOGRAPHY_VIOLATION
+    // rejection so the model knows exactly which char tripped the rule.
+    const stage2Calls = ollama.calls.filter((p) => p.includes('Concepts to realize'));
+    expect(stage2Calls.length).toBe(2);
+    const retryPrompt = stage2Calls[1];
+    expect(retryPrompt).toContain('ORTHOGRAPHY_VIOLATION');
+    expect(retryPrompt).toContain('U+064A');
+  });
+
+  // Stage 3: orthography on sourceText. The pipeline's new checkOrthography
+  // call on sourceText drops example sentences with Arabic letters.
+  it('Stage 3 drops a fa example sentence with Arabic ك (U+0643) via the new checkOrthography call', async () => {
+    // Both attempts return a sourceText containing the Arabic kāf ك instead
+    // of the Persian ک. The pipeline must drop both via the new
+    // checkOrthography call (NOT via the script-aware junk filter alone).
+    const ollama = fakeOllama({
+      responses: {
+        'Profile the': JSON.stringify({ profile: { languageFamily: 'Iranian', typologicalFeatures: [], notes: null } }),
+        'Concepts to realize': JSON.stringify({
+          realizations: [
+            {
+              coreConceptCode: 'EXIST',
+              realizationType: 'word',
+              surfaceForm: 'بودن',
+              gloss: 'to be',
+              grammaticalNote: 'verb, infinitive',
+              senseKind: 'core',
+            },
+          ],
+        }),
+        // Both attempts: Arabic ك in sourceText. The script-aware junk
+        // filter passes (Arabic ك is in the Arabic block), but the
+        // orthography check fires.
+        'example': JSON.stringify({
+          examples: [{
+            coreConceptCode: 'EXIST',
+            // Arabic ك (U+0643) in the middle of the word. Persian would use ک (U+06A9).
+            sourceText: 'كتاب على الطاولة.',
+            translation: 'A book on the table.',
+          }],
+        }),
+        'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
+        'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
+      },
+    });
+    const job = jobManager.create('c-fa-ortho-st', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fa', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const result = jobManager.get('c-fa-ortho-st')!;
+    // 1 realization + 0 examples (both attempts dropped via orthography).
+    expect(result.result?.proposals.length).toBe(1);
+    expect(result.result?.proposals[0].proposalKind).toBe('realization');
+    const summary = result.result?.summary as Record<string, unknown>;
+    expect(summary.acceptedExamples).toBe(0);
+    expect(summary.droppedExampleCount).toBe(2);
+    // The drop reason must be the ORTHOGRAPHY_VIOLATION reason, NOT the
+    // script-aware junk-filter reason. This is the load-bearing assertion:
+    // it proves the new checkOrthography call on sourceText is firing,
+    // not just the pre-existing script-presence check.
+    const droppedExamples = summary.droppedExamples as Array<{ code: string; reason: string }>;
+    expect(droppedExamples.every((d) => d.reason.includes('Arabic letter where Persian is standard'))).toBe(true);
+    expect(droppedExamples.every((d) => d.reason.includes('U+0643'))).toBe(true);
+  });
+
+  // New fa pos-prop: particle cannot carry verbal properties.
+  it('fa particle pos-prop rejects "particle, present tense"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'نه',
+        transliteration: 'na',
+        gloss: 'not',
+        grammaticalNote: 'particle, present tense',
+      },
+      FA_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"particle"'))).toBe(true);
+  });
+
+  // New fa pos-prop: noun cannot carry verbal properties.
+  it('fa noun pos-prop rejects "noun, first person"', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'کتاب',
+        transliteration: 'ketāb',
+        gloss: 'book',
+        grammaticalNote: 'noun, first person',
+      },
+      FA_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('malformed');
+    expect(r.rejections.some((x) => x.code === 'GRAMMAR_POS_PROP_CONTRADICTION' && x.reason.includes('"noun"'))).toBe(true);
+  });
+
+  it('fa noun pos-prop does NOT fire on "noun, plural" (noun carries number)', () => {
+    const r = validateRealizationEntry(
+      {
+        coreConceptCode: 'X',
+        realizationType: 'word',
+        surfaceForm: 'کتاب',
+        transliteration: 'ketāb',
+        gloss: 'book',
+        grammaticalNote: 'noun, plural',
+      },
+      FA_PROFILE,
+      KNOWN_CODES,
+    );
+    expect(r.verdict).toBe('valid');
+  });
+
+  // ── Fa Stage 2 prompt-presence guards ─────────────────────────────────
+  //
+  // The deep-fa pass expanded translitRuleText (full BGN/PCGN Persian
+  // 1959 consonant table), grammarGuidance (15 bullets), and populated
+  // inventedWordAntiExamples. These guards prove the data flows into the
+  // actual prompt string the model sees.
+
+  it('fa stage-2 prompt contains the expanded BGN/PCGN Persian 1956 table', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Iranian', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 0, realizationCount: 0, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-fa-prompt', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fa', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage2Prompt = captured.find((p) => p.includes('Concepts to realize'));
+    expect(stage2Prompt).toBeDefined();
+    // Transliteration table.
+    expect(stage2Prompt!).toContain('BGN/PCGN Persian 1956');
+    expect(stage2Prompt!).toContain('آ→ā');
+    expect(stage2Prompt!).toContain('ketāb');
+    expect(stage2Prompt!).toContain('nemidānam');
+    // Expanded grammar guidance keywords.
+    expect(stage2Prompt!).toContain('Verb stems');
+    expect(stage2Prompt!).toContain('Compound verbs');
+    expect(stage2Prompt!).toContain('کردن/شدن/گرفتن');
+    expect(stage2Prompt!).toContain('direct-object marker');
+    expect(stage2Prompt!).toContain('Colloquial vs formal');
+    // Data-driven anti-examples — these are emitted in the Stage 3
+    // anti-pattern list, NOT in the Stage 2 prompt. Stage 2 carries the
+    // language-general anti-invented-word callout. Verified via the
+    // Stage 3 prompt presence test instead.
+  });
+
+  it('fa stage-3 prompt contains the Persian-specific orthography anti-pattern bullet', async () => {
+    const captured: string[] = [];
+    const ollama = {
+      ...fakeOllama({}),
+      async generate(callOpts: { prompt: string }) {
+        captured.push(callOpts.prompt);
+        if (callOpts.prompt.includes('Profile the')) {
+          return { text: JSON.stringify({ profile: { languageFamily: 'Iranian', typologicalFeatures: [], notes: null } }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to realize')) {
+          return { text: JSON.stringify({ realizations: [{ coreConceptCode: 'EXIST', realizationType: 'word', surfaceForm: 'بودن', gloss: 'to be', grammaticalNote: 'verb, infinitive', senseKind: 'core' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Concepts to illustrate')) {
+          return { text: JSON.stringify({ examples: [{ coreConceptCode: 'EXIST', sourceText: 'در تهران مترو هست.', translation: 'There is a metro in Tehran.' }] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Cross-check')) {
+          return { text: JSON.stringify({ missing: [], lowConfidence: [] }), model: 'llama3.2:3b' };
+        }
+        if (callOpts.prompt.includes('Summarize')) {
+          return { text: JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }), model: 'llama3.2:3b' };
+        }
+        throw new Error('No fake response matched');
+      },
+    };
+    const job = jobManager.create('c-fa-stage3', 'clcc_generation', {});
+    await runClccPipeline(
+      job,
+      { targetLanguageCode: 'fa', coreConceptCodes: ['EXIST'] },
+      { ollama },
+    );
+    const stage3Prompt = captured.find((p) => p.includes('Concepts to illustrate'));
+    expect(stage3Prompt).toBeDefined();
+    // The fa-specific sourceText orthography anti-pattern bullet.
+    expect(stage3Prompt!).toContain('U+200C');
+    expect(stage3Prompt!).toContain('U+064A');
+    expect(stage3Prompt!).toContain('U+0643');
+    expect(stage3Prompt!).toContain('Arabic-Indic digits');
+    // Data-driven anti-examples — populated by Commit 1's data-driving
+    // + Commit 4's fa population. The Stage 3 anti-pattern list
+    // interpolates inventedWordAntiExamples into its callout.
+    expect(stage3Prompt!).toContain('رفتنن');
+    expect(stage3Prompt!).toContain('میکندن');
+  });
 });
