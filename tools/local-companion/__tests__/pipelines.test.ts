@@ -185,6 +185,20 @@ const wellFormedExist = {
   senseKind: 'core',
 };
 
+/** French well-formed EXIST entry. The fr profile now ships Cyrillic /
+ *  non-French-Latin orthography constraints, so pipeline-mechanics tests
+ *  that drive `targetLanguageCode: 'fr'` cannot reuse the Russian fixture
+ *  above (Cyrillic être would be rejected). This mirrors the Russian shape
+ *  with a real French infinitive. */
+const wellFormedExistFr = {
+  coreConceptCode: 'EXIST',
+  realizationType: 'word',
+  surfaceForm: 'être',
+  gloss: 'to be (existential copula)',
+  grammaticalNote: 'verb, infinitive',
+  senseKind: 'core',
+};
+
 /**
  * Same fixture with transliteration populated (ISO 9 romanization for ru).
  * The transliteration field is optional in the schema so models can omit it
@@ -204,7 +218,7 @@ describe('clccGeneration pipeline', () => {
     const ollama = fakeOllama({
       responses: {
         'Profile the': JSON.stringify({ profile: { languageFamily: 'Romance', typologicalFeatures: [], notes: null } }),
-        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExist] }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExistFr] }),
         'example': JSON.stringify({ examples: [] }),
         'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
         'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
@@ -660,7 +674,7 @@ describe('clccGeneration pipeline', () => {
     const ollama = fakeOllama({
       responses: {
         'Profile the': JSON.stringify({ profile: { languageFamily: 'Romance', typologicalFeatures: [], notes: null } }),
-        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExist] }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExistFr] }),
         'example': JSON.stringify({ examples: [] }),
         'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
         'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
@@ -674,7 +688,7 @@ describe('clccGeneration pipeline', () => {
     );
     const result = jobManager.get('c12')!;
     const payload = result.result?.proposals[0]?.payload as Record<string, unknown>;
-    expect(payload.surfaceForm).toBe('быть');
+    expect(payload.surfaceForm).toBe('être');
     expect(payload.transliteration).toBeUndefined();
   });
 
@@ -742,7 +756,7 @@ describe('clccGeneration pipeline', () => {
     const ollama = fakeOllama({
       responses: {
         'Profile the': JSON.stringify({ profile: { languageFamily: 'Romance', typologicalFeatures: [], notes: null } }),
-        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExist] }),
+        'Concepts to realize': JSON.stringify({ realizations: [wellFormedExistFr] }),
         'example': JSON.stringify({ examples: [] }),
         'Cross-check': JSON.stringify({ missing: [], lowConfidence: [] }),
         'Summarize': JSON.stringify({ summary: { conceptCount: 1, realizationCount: 1, notes: null } }),
