@@ -37,7 +37,7 @@ import {
   type ClccPromptInput,
 } from '../prompts/clccGeneration';
 import { logger } from '../../../utils/logger';
-import { validateRealizationEntry, getProfile } from '../validation';
+import { validateRealizationEntry, getProfile, checkOrthography } from '../validation';
 import type { RejectionCode, LanguageProfile } from '../validation';
 
 // ── Per-stage wrapper schemas (stages 1, 4, 5 stay loose; stage 3 is strict) ───
@@ -868,6 +868,16 @@ function finalizeExampleBatch(
         reason: `sourceText "${v.value.sourceText}" failed script-aware junk filter for ${targetLanguageCode}`,
       });
       continue;
+    }
+    if (profile) {
+      const orthographyRejections = checkOrthography(v.value.sourceText, profile);
+      if (orthographyRejections.length > 0) {
+        dropped.push({
+          code: v.value.coreConceptCode,
+          reason: orthographyRejections[0].reason,
+        });
+        continue;
+      }
     }
     seen.add(v.value.coreConceptCode);
     validated.push(v.value);

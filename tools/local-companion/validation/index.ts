@@ -6,6 +6,7 @@
 // profiles/index.ts. No engine edit, no pipeline edit.
 
 export { validateRealizationEntry, getProfile } from './engine';
+export { checkOrthography } from './orthographyChecks';
 export { ALL_REJECTION_CODES } from './rejectionCodes';
 export type { RejectionCode } from './rejectionCodes';
 export type {
@@ -18,5 +19,6 @@ export type {
   PosComboContradiction,
   ExclusiveCategoryContradiction,
   RealizationTypeConstraint,
+  OrthographyConstraint,
 } from './types';
 export { PROFILE_BY_CODE, RU_PROFILE, FA_PROFILE, FR_PROFILE, HY_PROFILE, SR_CYRL_PROFILE, BS_LATN_PROFILE } from './profiles';

@@ -16,6 +16,7 @@ import type {
 import { checkStructural, checkScriptComposition } from './scriptChecks';
 import { checkTransliteration } from './transliteration';
 import { checkGrammarNote } from './grammarChecks';
+import { checkOrthography } from './orthographyChecks';
 import { PROFILE_BY_CODE } from './profiles';
 
 /** Per-realizationType shape check (e.g. realizationType='word' rejects
@@ -55,17 +56,20 @@ export function validateRealizationEntry(
   // 2. Script composition (profile-driven).
   rejections.push(...checkScriptComposition(entry.surfaceForm, profile));
 
-  // 3. Transliteration (profile-driven; only when required and present).
+  // 3. Orthography constraints (profile-driven; no-op when empty).
+  rejections.push(...checkOrthography(entry.surfaceForm, profile));
+
+  // 4. Transliteration (profile-driven; only when required and present).
   if (profile.transliteration.required && entry.transliteration && entry.transliteration.trim().length > 0) {
     rejections.push(
       ...checkTransliteration(entry.surfaceForm, entry.transliteration, profile),
     );
   }
 
-  // 4. Grammar-note contradictions (profile-driven; no-op when empty).
+  // 5. Grammar-note contradictions (profile-driven; no-op when empty).
   rejections.push(...checkGrammarNote(entry.grammaticalNote, profile));
 
-  // 5. Realization-type shape (profile-driven).
+  // 6. Realization-type shape (profile-driven).
   rejections.push(...checkRealizationTypeShape(entry, profile));
 
   if (rejections.length === 0) {

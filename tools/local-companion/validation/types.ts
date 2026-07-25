@@ -30,6 +30,9 @@ export type RejectionCode =
   | 'GRAMMAR_MULTI_ASPECT'
   | 'GRAMMAR_MULTI_GENDER'
   | 'GRAMMAR_MULTI_NUMBER'
+  // Orthography (profile-driven; letter-form discipline, diacritic rejection,
+  // numeral-form enforcement, ZWNJ discipline).
+  | 'ORTHOGRAPHY_VIOLATION'
   // Realization-type family shape (profile-driven)
   | 'REALIZATION_TYPE_SHAPE';
 
@@ -96,6 +99,12 @@ export interface LanguageProfile {
    *  array is valid — the engine skips grammar checks gracefully. */
   contradictionRules: ContradictionRule[];
 
+  /** Optional profile-driven orthography constraints (letter-form discipline,
+   *  diacritic rejection, numeral-form enforcement, ZWNJ discipline). The
+   *  engine applies each constraint's rejectsCharPattern against the text;
+   *  matches emit ORTHOGRAPHY_VIOLATION rejections. */
+  orthographyConstraints?: OrthographyConstraint[];
+
   /** Per-realizationType shape constraints. Language-neutral in practice but
    *  profile-driven so a future language can override or extend. */
   realizationTypeConstraints: RealizationTypeConstraint[];
@@ -142,5 +151,15 @@ export interface ExclusiveCategoryContradiction {
 export interface RealizationTypeConstraint {
   realizationType: string; // 'word'
   rejectsSurfaceFormPattern: RegExp; // /\s/
+  reason: string;
+}
+
+export interface OrthographyConstraint {
+  /** Matches any single forbidden character (char-class regex). The check
+   *  fires once per constraint whose pattern tests positive. The matched
+   *  character is interpolated into the rejection reason so the
+   *  model/operator sees which char tripped the rule. */
+  rejectsCharPattern: RegExp;
+  /** Stable, action-oriented reason text. */
   reason: string;
 }
