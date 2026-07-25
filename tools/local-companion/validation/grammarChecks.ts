@@ -22,6 +22,7 @@ const EXCLUSIVE_CATEGORY_CODE: Record<string, RejectionCode> = {
   person: 'GRAMMAR_MULTI_PERSON',
   aspect: 'GRAMMAR_MULTI_ASPECT',
   gender: 'GRAMMAR_MULTI_GENDER',
+  number: 'GRAMMAR_MULTI_NUMBER',
 };
 
 function substitute(template: string, vars: Record<string, string>): string {

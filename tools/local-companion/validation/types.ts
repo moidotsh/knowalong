@@ -29,6 +29,7 @@ export type RejectionCode =
   | 'GRAMMAR_MULTI_PERSON'
   | 'GRAMMAR_MULTI_ASPECT'
   | 'GRAMMAR_MULTI_GENDER'
+  | 'GRAMMAR_MULTI_NUMBER'
   // Realization-type family shape (profile-driven)
   | 'REALIZATION_TYPE_SHAPE';
 
