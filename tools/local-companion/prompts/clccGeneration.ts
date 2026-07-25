@@ -59,6 +59,10 @@ interface LangPromptData {
   fewShotRealizations: string;
   /** Stage-3 few-shot anchors (same concept trio). */
   fewShotSentences: string;
+  /** Optional per-language grammar guidance block injected into the stage-2
+   *  prompt's grammaticalNote field rule. Undefined for languages whose
+   *  grammar hasn't been profiled yet — they get the generic rule only. */
+  grammarGuidance?: string;
 }
 
 const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPromptData> = {
@@ -70,6 +74,13 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
       '* REQUIRED for Russian (use ISO 9: я→ya, быть→byt\', не→ne, ё→e/yo, ж→zh, ш→sh, щ→shch, ц→ts, ч→ch, ы→y, й→y, ю→yu, я→ya, ъ→\', ь→\').',
     translitAntiPatternNote:
       '- For Russian, leaving transliteration null/empty (it is REQUIRED).',
+    grammarGuidance: `Russian grammar guidance (for grammaticalNote):
+- Verbs: pick ONE aspect and note it ("imperfective aspect" OR "perfective aspect"), never both. Note tense + person/number/gender for finite forms; aspect for all verb forms.
+- Motion verbs: for motion concepts, prefer the indeterminate (multi-directional) partner (ходить, ездить) unless the concept specifically implies one-way motion (идти, ехать).
+- Reflexive: if the verb carries -ся/-сь, note it as reflexive.
+- Nouns: note grammatical gender (masculine/feminine/neuter) and animacy when relevant.
+- Prepositions: note which case(s) the preposition governs (genitive/dative/accusative/instrumental/prepositional).
+- Register: note when relevant (ты/вы; colloquial particles ведь, же).`,
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "я", "transliteration": "ya", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, nominative case, singular", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "быть", "transliteration": "byt'", "gloss": "to be (existential copula)", "grammaticalNote": "verb, infinitive, imperfective aspect", "senseKind": "core" }
@@ -308,7 +319,7 @@ Field rules (NON-NEGOTIABLE):
     * This is transliteration ONLY — NOT IPA, NOT stress marks, NOT pronunciation guidance. Just the romanized form of "surfaceForm".
 - "gloss": a SHORT English translation of surfaceForm. REQUIRED — never null, never empty. Examples: "I (1sg pronoun)", "to be", "not (negation particle)".
 - "grammaticalNote": one short note on part of speech + notable grammar. REQUIRED — never null, never empty. Call out: part of speech, aspect/case/gender where relevant, register if unusual.
-- "senseKind": "core" for the canonical mapping (almost always "core" for this task).
+${langData.grammarGuidance ? langData.grammarGuidance + '\n' : ''}- "senseKind": "core" for the canonical mapping (almost always "core" for this task).
 
 ${examples}
 
