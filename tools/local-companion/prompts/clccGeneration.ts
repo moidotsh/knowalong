@@ -12,6 +12,7 @@
 
 import type { CompanionClccConceptInput } from '../../../shared/types/knowalong/companion';
 import type { RejectionCode } from '../validation';
+import { BCS_GRAMMAR_GUIDANCE, BCS_INVENTED_WORD_ANTI_EXAMPLES } from '../validation/profiles/bcs-shared';
 
 export interface ClccPromptInput {
   targetLanguageCode: 'fr' | 'ru' | 'fa' | 'hy' | 'sr-cyrl' | 'bs-latn';
@@ -198,13 +199,17 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
     scriptLabel: 'Serbian Cyrillic',
     translitRequired: true,
     translitRuleText:
-      "* REQUIRED for Serbian (use Gaj Latinica: ја→ja, бити→biti, не→ne, љубав→ljubav, ћирилица→ćirilica, новина→novina).",
+      '* REQUIRED for Serbian (use Gaj Latinica, the 1:1 bijection with the 30 Serbian Cyrillic letters: а→a, б→b, в→v, г→g, д→d, ђ→đ, е→e, ж→ž, з→z, и→i, ј→j, к→k, л→l, љ→lj, м→m, н→n, њ→nj, о→o, п→p, р→r, с→s, т→t, ћ→ć, у→u, ф→f, х→h, ц→c, ч→č, џ→dž, ш→š. Examples: ја→ja, бити→biti, не→ne, љубав→ljubav, ћирилица→ćirilica, књига→knjiga).',
     translitAntiPatternNote:
       '- For Serbian, leaving transliteration null/empty (it is REQUIRED).',
+    grammarGuidance: BCS_GRAMMAR_GUIDANCE,
+    inventedWordAntiExamples: BCS_INVENTED_WORD_ANTI_EXAMPLES,
+    stage3OrthographyAntiPattern:
+      '- For Serbian sourceText: do NOT use Russian-only Cyrillic letters (Ё/ё Ъ/ъ Ы/ы Э/э — U+0401/0451/042A/044A/042B/044B/042D/044D — Serbian Cyrillic has 30 letters, not the Russian 33). Do NOT use Ukrainian-only Cyrillic letters (Є/є І/і Ї/ї Ґ/ґ). Do NOT use Belarusian-only (Ў/ў). Do NOT double the infinitive suffix (битити WRONG; бити RIGHT).',
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "ја", "transliteration": "ja", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, nominative", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "бити", "transliteration": "biti", "gloss": "to be (copula)", "grammaticalNote": "verb, infinitive; also used as auxiliary", "senseKind": "core" }
-{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "не", "transliteration": "ne", "gloss": "not (general negation)", "grammaticalNote": "negation particle, proclitic; Serbian also has negated verb forms (не знам)", "senseKind": "core" }`,
+{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "не", "transliteration": "ne", "gloss": "not (general negation)", "grammaticalNote": "negation particle, proclitic; negated verb forms written as one word (не знам → незнам also valid)", "senseKind": "core" }`,
     fewShotSentences: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "sourceText": "Ја идем кући.", "transliteration": "Ja idem kući.", "translation": "I am going home." }
 { "coreConceptCode": "EXIST", "sourceText": "У граду постоји парк.", "transliteration": "U gradu postoji park.", "translation": "There is a park in the city." }
@@ -218,10 +223,14 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
       "* OPTIONAL for Bosnian/Croatian (Latin script — romanization is trivially the surface form itself; you may omit this field for bs-latn).",
     translitAntiPatternNote:
       '- For Bosnian/Croatian, omitting transliteration is fine (Latin script).',
+    grammarGuidance: BCS_GRAMMAR_GUIDANCE,
+    inventedWordAntiExamples: BCS_INVENTED_WORD_ANTI_EXAMPLES,
+    stage3OrthographyAntiPattern:
+      "- For Bosnian/Croatian sourceText: do NOT use Cyrillic letters (U+0400-U+04FF — bs-latn uses Gaj's Latin orthography, not Cyrillic). Do NOT use Greek letters (U+0370-U+03FF). Do NOT double the infinitive suffix (bititi WRONG; biti RIGHT).",
     fewShotRealizations: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "realizationType": "word", "surfaceForm": "ja", "gloss": "I (first-person singular pronoun)", "grammaticalNote": "personal pronoun, singular, nominative", "senseKind": "core" }
 { "coreConceptCode": "EXIST", "realizationType": "word", "surfaceForm": "biti", "gloss": "to be (copula)", "grammaticalNote": "verb, infinitive; also used as auxiliary", "senseKind": "core" }
-{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "ne", "gloss": "not (general negation)", "grammaticalNote": "negation particle, proclitic; negated verb forms are written as one word (ne znam)", "senseKind": "core" }`,
+{ "coreConceptCode": "NEGATION", "realizationType": "morpheme", "surfaceForm": "ne", "gloss": "not (general negation)", "grammaticalNote": "negation particle, proclitic; negated verb forms written as one word (ne znam → neznam also valid)", "senseKind": "core" }`,
     fewShotSentences: `Examples of well-formed entries (do NOT copy these concepts — only use them as shape reference):
 { "coreConceptCode": "FIRST_PERSON", "sourceText": "Ja idem kući.", "translation": "I am going home." }
 { "coreConceptCode": "EXIST", "sourceText": "U gradu postoji park.", "translation": "There is a park in the city." }
