@@ -27,6 +27,8 @@ export type RejectionCode =
   | 'GRAMMAR_POS_COMBO_CONTRADICTION'
   | 'GRAMMAR_MULTI_TENSE'
   | 'GRAMMAR_MULTI_PERSON'
+  | 'GRAMMAR_MULTI_ASPECT'
+  | 'GRAMMAR_MULTI_GENDER'
   // Realization-type family shape (profile-driven)
   | 'REALIZATION_TYPE_SHAPE';
 

@@ -29,6 +29,7 @@ const TENSE_TERMS = ['present tense', 'past tense', 'future tense'];
 const PERSON_TERMS = ['first person', 'second person', 'third person'];
 const NUMBER_TERMS = ['singular', 'plural'];
 const GENDER_TERMS = ['masculine', 'feminine', 'neuter', 'common'];
+const ASPECT_TERMS = ['imperfective aspect', 'perfective aspect'];
 
 export const RU_PROFILE: LanguageProfile = {
   languageCode: 'ru',
@@ -137,6 +138,20 @@ export const RU_PROFILE: LanguageProfile = {
       category: 'person',
       terms: PERSON_TERMS,
       reasonTemplate: 'grammar-note contradiction: a single form cannot carry multiple persons (${matched}).',
+    },
+    // Multi-aspect contradiction (a single verb form is one aspect).
+    {
+      kind: 'exclusive-category',
+      category: 'aspect',
+      terms: ASPECT_TERMS,
+      reasonTemplate: 'grammar-note contradiction: a single form cannot carry both aspects (${matched}).',
+    },
+    // Multi-gender contradiction (a single form carries one gender).
+    {
+      kind: 'exclusive-category',
+      category: 'gender',
+      terms: GENDER_TERMS,
+      reasonTemplate: 'grammar-note contradiction: a single form cannot carry multiple genders (${matched}).',
     },
   ],
 

@@ -20,6 +20,8 @@ import type {
 const EXCLUSIVE_CATEGORY_CODE: Record<string, RejectionCode> = {
   tense: 'GRAMMAR_MULTI_TENSE',
   person: 'GRAMMAR_MULTI_PERSON',
+  aspect: 'GRAMMAR_MULTI_ASPECT',
+  gender: 'GRAMMAR_MULTI_GENDER',
 };
 
 function substitute(template: string, vars: Record<string, string>): string {
@@ -28,6 +30,20 @@ function substitute(template: string, vars: Record<string, string>): string {
     out = out.replaceAll(`\${${key}}`, value);
   }
   return out;
+}
+
+/** Escape literal text for safe embedding in a RegExp. */
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Word-boundary term match for exclusive-category rules. Unlike plain
+ *  includes(), this prevents false positives where one category term contains
+ *  another as a substring (e.g. "perfective aspect" inside "imperfective
+ *  aspect" — a plain includes() counts both, falsely firing on a single-aspect
+ *  note). Terms are ASCII English grammatical labels, so \b is sufficient. */
+function matchesTermBoundary(noteLower: string, term: string): boolean {
+  return new RegExp(`\\b${escapeRegex(term)}\\b`).test(noteLower);
 }
 
 function applyRule(
@@ -65,7 +81,7 @@ function applyRule(
   }
 
   // exclusive-category
-  const matched = rule.terms.filter(has);
+  const matched = rule.terms.filter((t) => matchesTermBoundary(noteLower, t));
   if (matched.length < 2) return null;
   const code = EXCLUSIVE_CATEGORY_CODE[rule.category] ?? 'GRAMMAR_POS_PROP_CONTRADICTION';
   return {
