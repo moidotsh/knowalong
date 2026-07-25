@@ -28,6 +28,44 @@ export const FA_PROFILE: LanguageProfile = {
   // Persian does not mix Latin; flag mixed-script surfaceForms.
   forbiddenLatinWhenNative: true,
 
+  // Persian-specific orthography constraints. Each is a single char-class
+  // regex with zero false positives on canonical Persian text. Together they
+  // cover the six Persian-specific failure modes a deterministic engine can
+  // catch: Arabic letters where Persian is standard, Arabic-Indic numerals,
+  // Arabic vowel diacritics, tatweel/kashida, Arabic hamza forms, and the
+  // نمی‌ prefix missing its ZWNJ. (می alone is not enforced here because it
+  // is also a literary word for "wine"; that stays reviewer-only.)
+  orthographyConstraints: [
+    {
+      rejectsCharPattern: /[\u064A\u0643]/, // Arabic yā ي + Arabic kāf ك
+      reason: 'Arabic letter where Persian is standard: use ی U+06CC (Persian yeh) not ي U+064A, and ک U+06A9 (Persian kaf) not ك U+0643.',
+    },
+    {
+      rejectsCharPattern: /[\u0660-\u0669]/, // Arabic-Indic digits ٠-٩
+      reason: 'Arabic-Indic digit where Persian numeral is standard: use U+06F0..U+06F9 (۰-۹), not Arabic-Indic U+0660..U+0669.',
+    },
+    {
+      rejectsCharPattern: /[\u064B-\u0652]/, // fathatan..sukun (8 marks)
+      reason: 'Arabic vowel diacritic where Persian writes no short vowels: remove the diacritic.',
+    },
+    {
+      rejectsCharPattern: /\u0640/,
+      reason: 'Arabic tatweel/kashida (U+0640) is calligraphic decoration; Persian typography never uses it.',
+    },
+    {
+      rejectsCharPattern: /[\u0623\u0625\u0624\u0626]/, // أ إ ؤ ئ
+      reason: 'Arabic hamza form where Persian uses plain letters: use آ (U+0622) for the madda sound; otherwise Persian uses ا و ی without hamza.',
+    },
+    {
+      // نمی immediately followed by a Persian letter with no ZWNJ is always
+      // wrong — نمی is never a standalone Persian word, it is always a
+      // negation+present verbal prefix. The Persian-letter range below
+      // covers independent letters (ء..ي) + extended Persian (ٱ..ڥ).
+      rejectsCharPattern: /\u0646\u0645\u06CC[\u0621-\u064A\u0671-\u06D5]/,
+      reason: 'Missing ZWNJ (U+200C) in نمی‌ prefix: negation+present prefix must be نمی‌X (e.g. نمی‌دانم), not نمیX.',
+    },
+  ],
+
   transliteration: {
     required: true,
     schemeName: 'BGN/PCGN',
@@ -92,6 +130,23 @@ export const FA_PROFILE: LanguageProfile = {
       posToken: 'ordinal',
       forbiddenProps: [...TENSE_TERMS, ...PERSON_TERMS],
       reasonTemplate: 'grammar-note contradiction: "ordinal" cannot carry "${prop}".',
+    },
+    // Particle does not inflect. Persian particles are invariable (نه, می,
+    // بـ, چند, etc.).
+    {
+      kind: 'pos-prop',
+      posToken: 'particle',
+      forbiddenProps: [...TENSE_TERMS, ...PERSON_TERMS, ...NUMBER_TERMS],
+      reasonTemplate: 'grammar-note contradiction: "particle" cannot carry "${prop}" (Persian particles are invariable).',
+    },
+    // Noun does not carry verbal properties. unlessHas guards pronoun/noun-
+    // phrase labels that may co-occur with person.
+    {
+      kind: 'pos-prop',
+      posToken: 'noun',
+      unlessHas: ['pronoun', 'noun phrase'],
+      forbiddenProps: [...TENSE_TERMS, ...PERSON_TERMS],
+      reasonTemplate: 'grammar-note contradiction: "noun" cannot carry verbal property "${prop}".',
     },
     // Multi-tense listing contradiction.
     {
