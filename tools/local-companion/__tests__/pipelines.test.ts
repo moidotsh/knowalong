@@ -733,6 +733,9 @@ describe('clccGeneration pipeline', () => {
     // Pronunciation guidance is explicitly excluded.
     expect(stage2Call).toContain('NOT IPA');
     expect(stage2Call).toContain('NOT stress marks');
+    // Russian grammar guidance block landed in the prompt.
+    expect(stage2Call).toContain('Russian grammar guidance');
+    expect(stage2Call).toContain('imperfective');
   });
 
   it('stage 3 prompt for fr marks transliteration optional', async () => {
@@ -864,6 +867,30 @@ describe('clccGeneration pipeline', () => {
     it('does NOT flag "verb, infinitive, imperfective aspect" (clean)', () => {
       // Aspect + infinitive is a valid combination.
       expect(detectGrammarNoteContradictions('verb, infinitive, imperfective aspect')).toEqual([]);
+    });
+
+    it('flags "verb, imperfective aspect, perfective aspect" (multi-aspect)', () => {
+      const contradictions = detectGrammarNoteContradictions(
+        'verb, imperfective aspect, perfective aspect',
+      );
+      expect(contradictions.length).toBeGreaterThan(0);
+      expect(contradictions.some((c) => c.includes('both aspects'))).toBe(true);
+    });
+
+    it('flags "noun, masculine, feminine" (multi-gender)', () => {
+      const contradictions = detectGrammarNoteContradictions(
+        'noun, masculine, feminine',
+      );
+      expect(contradictions.length).toBeGreaterThan(0);
+      expect(contradictions.some((c) => c.includes('multiple genders'))).toBe(true);
+    });
+
+    it('does NOT flag "verb, imperfective aspect" alone (single aspect, clean)', () => {
+      expect(detectGrammarNoteContradictions('verb, imperfective aspect')).toEqual([]);
+    });
+
+    it('does NOT flag "noun, masculine singular" alone (single gender, clean)', () => {
+      expect(detectGrammarNoteContradictions('noun, masculine singular')).toEqual([]);
     });
 
     it('does NOT flag "verb, past tense, feminine singular" (clean)', () => {
@@ -1312,6 +1339,24 @@ describe('clccGeneration pipeline', () => {
         KNOWN_CODES,
       );
       expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_PERSON')).toBe(true);
+    });
+
+    it('rejects "verb, imperfective aspect, perfective aspect" (multi-aspect, synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'verb, imperfective aspect, perfective aspect' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_ASPECT')).toBe(true);
+    });
+
+    it('rejects "noun, masculine, feminine" (multi-gender, synthetic)', () => {
+      const r = validateRealizationEntry(
+        { ...cleanRuEntry, grammaticalNote: 'noun, masculine, feminine' },
+        RU_PROFILE,
+        KNOWN_CODES,
+      );
+      expect(r.rejections.some((x) => x.code === 'GRAMMAR_MULTI_GENDER')).toBe(true);
     });
   });
 
