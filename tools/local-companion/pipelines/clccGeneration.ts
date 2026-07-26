@@ -54,8 +54,8 @@ const SummarySchema = z.object({ summary: z.object({}).passthrough() });
 // fields, surrogate codes, out-of-enum realizationType); the strict schema
 // is the rejection gate.
 //
-// `transliteration` carries the romanized surface form (ISO 9 for Russian,
-// ALA-LC/BGN/PCGN for Persian, BGN/PCGN/ISO 9985 for Armenian). It is
+// `transliteration` carries the romanized surface form (BGN/PCGN 1947 for
+// Russian, BGN/PCGN Persian 1956 for Persian, BGN/PCGN/ISO 9985 for Armenian). It is
 // OPTIONAL in the schema so models can omit it for Latin-script languages
 // (French, Swedish — romanization is trivially the surface form itself)
 // and so older callers stay backwards-compatible. For Russian it is the
@@ -115,7 +115,7 @@ function validateEntry(
 // The strict schema + script-aware junk filter is the rejection gate.
 //
 // `transliteration` carries the romanized sourceText (same scheme as the
-// realization: ISO 9 for Russian). Optional — see RealizationEntrySchema
+// realization: BGN/PCGN 1947 for Russian). Optional — see RealizationEntrySchema
 // header for the rationale.
 const ExampleEntrySchema = z
   .object({

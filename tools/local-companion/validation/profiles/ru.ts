@@ -1,17 +1,21 @@
 // validation/profiles/ru.ts
 // Russian validation profile. Fully populated in this checkpoint. The three
 // Russian-specific DATA pieces live here, not in the engine:
-//   1. ISO 9:1995 romanization table (ISO9_LOWER).
+//   1. BGN/PCGN 1947 romanization digraph table (ISO9_LOWER — legacy name).
 //   2. Cyrillic Unicode range (nativeScriptPattern).
 //   3. ё→yo tolerance formula (transliteration.toleranceFor).
 // The engine reads these generically; it references no Russian strings.
 
 import type { LanguageProfile } from '../types';
 
-/** ISO 9:1995 romanization (lowercase). ASCII-friendly variant the Stage 2
- *  prompt instructs the model to follow (я→ya, ж→zh, ш→sh, щ→shch, ц→ts,
- *  ч→ch, ы→y, й→y, ю→yu, я→ya, ъ→'', ь→''). ё maps to "e" here; the
- *  toleranceFor callback lets the model emit "yo" for ё and still pass. */
+/** BGN/PCGN-style romanization digraphs (lowercase). Plausibility-check
+ *  reference for legacy/imported transliteration data. The digraphs (я→ya,
+ *  ж→zh, ш→sh, щ→shch, ц→ts, ч→ch, ю→yu) are BGN/PCGN; this table keeps
+ *  ё→"e" and ь→"" as relaxed reference variants. The canonical write-time
+ *  scheme (lib/transliteration/profiles/ru.ts) uses ё→"yo" and ь→"'"; the
+ *  multiset check here drops non-[a-z] chars (so the soft-sign apostrophe is
+ *  invisible) and toleranceFor absorbs the ё→"yo" shift, so freshly computed
+ *  values still pass. */
 const ISO9_LOWER: Record<string, string> = {
   а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e',
   ё: 'e', ж: 'zh', з: 'z', и: 'i', й: 'y', к: 'k',
@@ -40,7 +44,7 @@ export const RU_PROFILE: LanguageProfile = {
 
   transliteration: {
     required: true,
-    schemeName: 'ISO 9:1995',
+    schemeName: 'BGN/PCGN 1947',
     charMap: ISO9_LOWER,
     // ~1 char-diff per 5 chars + 3 per ё. The per-length floor absorbs common
     // model variants (х→"h" vs "kh", "сс"→"s", unstressed о→"a"); the ё bonus

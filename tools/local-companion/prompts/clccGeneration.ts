@@ -80,7 +80,7 @@ const LANG_PROMPT_DATA: Record<ClccPromptInput['targetLanguageCode'], LangPrompt
     scriptLabel: 'Cyrillic',
     translitRequired: true,
     translitRuleText:
-      '* REQUIRED for Russian (use ISO 9: я→ya, быть→byt\', не→ne, ё→e/yo, ж→zh, ш→sh, щ→shch, ц→ts, ч→ch, ы→y, й→y, ю→yu, я→ya, ъ→\', ь→\').',
+      '* REQUIRED for Russian (use BGN/PCGN 1947: я→ya, быть→byt\', не→ne, ё→e/yo, ж→zh, ш→sh, щ→shch, ц→ts, ч→ch, ы→y, й→y, ю→yu, я→ya, ъ→\', ь→\').',
     translitAntiPatternNote:
       '- For Russian, leaving transliteration null/empty (it is REQUIRED).',
     grammarGuidance: `Russian grammar guidance (for grammaticalNote):

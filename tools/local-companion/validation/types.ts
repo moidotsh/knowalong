@@ -87,7 +87,7 @@ export interface LanguageProfile {
   transliteration: {
     /** When false, the engine skips the transliteration check entirely. */
     required: boolean;
-    schemeName: string; // 'ISO 9:1995' / 'BGN/PCGN' / 'identity'
+    schemeName: string; // 'BGN/PCGN 1947' / 'BGN/PCGN Persian 1956' / 'ISO 9985:1996' / 'identity'
     /** Romanization table: native char → Latin expansion. */
     charMap: Record<string, string>;
     /** Per-surface-form tolerance bonus added to the multiset-diff threshold

@@ -200,7 +200,7 @@ const wellFormedExistFr = {
 };
 
 /**
- * Same fixture with transliteration populated (ISO 9 romanization for ru).
+ * Same fixture with transliteration populated (BGN/PCGN 1947 romanization for ru).
  * The transliteration field is optional in the schema so models can omit it
  * for Latin-script languages; for ru the prompt asks for it explicitly.
  */
@@ -641,8 +641,8 @@ describe('clccGeneration pipeline', () => {
 
   // ── Transliteration tests ──────────────────────────────────────────────
   //
-  // The transliteration field is the Phase-1 addition for ru (ISO 9) and fa
-  // (BGN/PCGN). It is optional in the schema so older callers and Latin-script
+  // The transliteration field is the Phase-1 addition for ru (BGN/PCGN 1947)
+  // and fa (BGN/PCGN Persian 1956). It is optional in the schema so older callers and Latin-script
   // languages (fr) continue to validate cleanly. When the model emits it, it
   // must ride through to the proposal payload unchanged.
 
@@ -722,7 +722,7 @@ describe('clccGeneration pipeline', () => {
     expect(examplePayload.transliteration).toBe("V Moskve yest' metro.");
   });
 
-  it('stage 2 prompt for ru includes the ISO 9 transliteration instruction', async () => {
+  it('stage 2 prompt for ru includes the BGN/PCGN 1947 transliteration instruction', async () => {
     // The prompt body is a load-bearing contract: it must tell the model
     // which scheme to use, and must distinguish transliteration from
     // pronunciation guidance (no IPA, no stress marks).
@@ -742,7 +742,7 @@ describe('clccGeneration pipeline', () => {
       { ollama },
     );
     const stage2Call = ollama.calls.find((p) => p.includes('Concepts to realize'))!;
-    expect(stage2Call).toContain('ISO 9');
+    expect(stage2Call).toContain('BGN/PCGN 1947');
     expect(stage2Call).toContain('transliteration');
     // Pronunciation guidance is explicitly excluded.
     expect(stage2Call).toContain('NOT IPA');
@@ -838,13 +838,13 @@ describe('clccGeneration pipeline', () => {
   });
 
   describe('rejectTransliterationMismatch', () => {
-    it('rejects "zhity" for "жить" (wrong ISO 9)', () => {
+    it('rejects "zhity" for "жить" (wrong BGN/PCGN 1947)', () => {
       const reason = rejectTransliterationMismatch('жить', 'zhity');
       expect(reason).not.toBeNull();
-      expect(reason).toContain('does not match ISO 9');
+      expect(reason).toContain('does not match BGN/PCGN 1947');
     });
 
-    it('accepts correct ISO 9 transliterations', () => {
+    it('accepts correct BGN/PCGN 1947 transliterations', () => {
       expect(rejectTransliterationMismatch('быть', "byt'")).toBeNull();
       expect(rejectTransliterationMismatch('знать', "znat'")).toBeNull();
       expect(rejectTransliterationMismatch('жить', "zhit'")).toBeNull();
@@ -870,7 +870,7 @@ describe('clccGeneration pipeline', () => {
     });
 
     it('tolerates ё→yo expansion for ё-bearing surfaceForms', () => {
-      // "сёл" → ISO 9 with ё→e gives "sel"; model emitting "syol" (ё→yo) is OK.
+      // "сёл" → BGN/PCGN with ё→e gives "sel"; model emitting "syol" (ё→yo) is OK.
       expect(rejectTransliterationMismatch('сёл', 'syol')).toBeNull();
       expect(rejectTransliterationMismatch('ёж', 'yozh')).toBeNull();
     });
@@ -1007,7 +1007,7 @@ describe('clccGeneration pipeline', () => {
         transliteration: 'zhity',
         grammaticalNote: 'verb, infinitive, imperfective aspect',
       });
-      expect(reasons.some((r) => r.includes('does not match ISO 9'))).toBe(true);
+      expect(reasons.some((r) => r.includes('does not match BGN/PCGN 1947'))).toBe(true);
     });
 
     it('accepts clean canonical rows', () => {
@@ -1165,7 +1165,7 @@ describe('clccGeneration pipeline', () => {
     const droppedInEvents = warningEvents.flatMap(
       (e) => (e.payload?.dropped as Array<{ code: string; reason: string }>) ?? [],
     );
-    expect(droppedInEvents.some((d) => d.reason.includes('does not match ISO 9'))).toBe(true);
+    expect(droppedInEvents.some((d) => d.reason.includes('does not match BGN/PCGN 1947'))).toBe(true);
   });
 
   it('Stage 2 drops grammar contradiction "verb, present tense, nominative singular"', async () => {
