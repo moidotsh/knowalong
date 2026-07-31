@@ -129,6 +129,38 @@ export interface ConceptRealization extends Timestamps {
   gloss: string | null;
   grammaticalNote: string | null;
   lemmaId: string | null;
+  /**
+   * Operator-authored paradigm shipped verbatim from Studio (Phase R1b).
+   * Studio's Grammar shape: { nominal?, verbal?, government?, aspect? }.
+   * The consumer derives feature tags from it; Studio derives no
+   * pedagogical structure. Nullable — older rows have no paradigm.
+   */
+  grammarJson: ConceptRealizationGrammar | null;
+  /**
+   * Cited example sentences shipped verbatim from Studio (Phase R1b),
+   * locked at publish time. Nullable — older rows have no examples.
+   */
+  examplesJson: ConceptRealizationExample[] | null;
+}
+
+/**
+ * Structured paradigm on a realization. The four paradigm kinds mirror
+ * Studio's Grammar type; each is an opaque blob the consumer narrows
+ * (the full cell-level shape is Studio-owned and language-specific).
+ */
+export interface ConceptRealizationGrammar {
+  nominal?: unknown;
+  verbal?: unknown;
+  government?: unknown;
+  aspect?: unknown;
+}
+
+/** One cited example sentence shipped with a realization (Studio R1a). */
+export interface ConceptRealizationExample {
+  sourceText: string;
+  translation: string;
+  sourceCorpus: string;
+  sourceAttribution: string;
 }
 
 /** Per-user evidence level per concept per language. */

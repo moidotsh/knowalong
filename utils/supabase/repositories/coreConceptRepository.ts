@@ -35,6 +35,8 @@ interface ConceptRealizationRow {
   gloss: string | null;
   grammatical_note: string | null;
   lemma_id: string | null;
+  grammar_json: unknown | null;
+  examples_json: unknown | null;
   created_at: string;
   updated_at: string;
 }
@@ -74,6 +76,8 @@ function toConceptRealization(row: ConceptRealizationRow): ConceptRealization {
     gloss: row.gloss,
     grammaticalNote: row.grammatical_note,
     lemmaId: row.lemma_id,
+    grammarJson: (row.grammar_json ?? null) as ConceptRealization['grammarJson'],
+    examplesJson: (row.examples_json ?? null) as ConceptRealization['examplesJson'],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
