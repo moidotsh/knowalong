@@ -23,7 +23,11 @@ import {
   navigateToLessons,
   navigateToProgress,
   navigateToAchievements,
+  navigateToVocabulary,
+  navigateToDaily,
 } from '../navigation';
+import { ITEM_ICONS } from '../utils/knowalong/icons';
+import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { SCREEN_BODY_STYLE } from '../constants';
 import {
   LEARNING_PATH,
@@ -114,6 +118,38 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <Text style={{ fontSize: 22, color: colors.brand }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Daily challenge CTA */}
+        <Pressable onPress={() => navigateToDaily()} style={{ marginTop: 8 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="target" size={28} color={colors.status.warning} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Daily challenge</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  5 phrases · 2 minutes · beat your streak
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: colors.status.warning }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Vocabulary CTA */}
+        <Pressable onPress={() => navigateToVocabulary()} style={{ marginTop: 8 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="book" size={28} color={colors.brand} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Vocabulary</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  Browse all {LEARNER_STATS.conceptsTotal} learned phrases
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: colors.brand }}>→</Text>
             </View>
           </MobileSurface>
         </Pressable>

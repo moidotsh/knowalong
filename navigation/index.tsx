@@ -18,6 +18,8 @@ export {
   navigateToLesson,
   navigateToProgress,
   navigateToAchievements,
+  navigateToVocabulary,
+  navigateToDaily,
   navigateToSource,
   navigateToSection,
   navigateToLemma,

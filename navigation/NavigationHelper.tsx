@@ -134,6 +134,14 @@ export function navigateToAchievements() {
   router.push('/achievements');
 }
 
+export function navigateToVocabulary() {
+  router.push('/vocabulary');
+}
+
+export function navigateToDaily() {
+  router.push('/daily');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }
