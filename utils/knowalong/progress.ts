@@ -8,7 +8,7 @@
 // iff i === 0 OR lesson i-1 is completed. The first lesson of every
 // section is always unlocked.
 
-import type { Lesson, SubDeck } from './fixtures/decks';
+import { ALL_DECKS, type Deck, type Lesson, type SubDeck } from './fixtures/decks';
 
 export interface Progress {
   done: number;
@@ -37,4 +37,38 @@ export function deckProgress(subDecks: SubDeck[], completedIds: readonly string[
     0,
   );
   return { done, total, pct: total === 0 ? 0 : Math.round((done / total) * 100) };
+}
+
+/** A deck's lessons in display order: flat decks use `lessons`; sub-deck decks
+ *  (songs, CLCC) flatten their sections' lessons in order. */
+export function deckLessonsInOrder(deck: Deck): Lesson[] {
+  return deck.subDecks && deck.subDecks.length > 0
+    ? deck.subDecks.flatMap((sd) => sd.lessons)
+    : deck.lessons;
+}
+
+/** Speakable texts (phrase + each word form) for the first `stepsPerLesson`
+ *  steps of the NEXT incomplete lesson in each deck — used to pre-warm audio
+ *  on the dashboard so the next lesson a learner opens already has its first
+ *  cards cached. Skips decks the learner has fully completed. Capped by
+ *  `maxDecks` to bound background synthesis. Pure + side-effect-free. */
+export function nextLessonAudioTexts(
+  completedIds: readonly string[],
+  maxDecks = 5,
+  stepsPerLesson = 2,
+): string[] {
+  const done = new Set(completedIds);
+  const texts: string[] = [];
+  let used = 0;
+  for (const deck of ALL_DECKS) {
+    if (used >= maxDecks) break;
+    const next = deckLessonsInOrder(deck).find((l) => !done.has(l.id));
+    if (!next) continue; // deck fully completed
+    used += 1;
+    for (const step of next.steps.slice(0, stepsPerLesson)) {
+      texts.push(step.surfaceForm);
+      for (const w of step.words) texts.push(w.form);
+    }
+  }
+  return texts;
 }

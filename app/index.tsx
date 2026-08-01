@@ -19,6 +19,9 @@ import { LEARNING_ITEMS, type LearningItem } from '../utils/knowalong/fixtures/l
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { useStreakStore } from '../stores/streakStore';
+import { useLessonProgressStore } from '../stores/lessonProgressStore';
+import { nextLessonAudioTexts } from '../utils/knowalong/progress';
+import { prefetchAudio } from '../utils/knowalong/tts';
 import { SCREEN_BODY_STYLE } from '../constants';
 
 type NodeState = 'mastered' | 'in-progress' | 'locked';
@@ -53,6 +56,7 @@ export default function HomeScreen() {
   const streakDays = useStreakStore((s) => s.getStreak(5).streak);
   const mistakeCodes = useStreakStore((s) => s.mistakeCodes);
   const sessionsToday = useStreakStore((s) => s.totalSessions);
+  const completedLessonIds = useLessonProgressStore((s) => s.completedLessonIds);
   const [selectedNode, setSelectedNode] = useState<StreamNode | null>(null);
   const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
   const scrollRef = useRef<ScrollView>(null);
@@ -72,6 +76,16 @@ export default function HomeScreen() {
     }, 100);
     return () => clearTimeout(t);
   }, []);
+
+  // Returning users (Piper model already cached): pre-warm the first cards of
+  // the next incomplete lesson across decks, so whatever they open next is
+  // instant. First-timers (conceptsMastered === 0) are skipped — their first
+  // lesson's loading gate handles prefetch, avoiding a surprise download.
+  useEffect(() => {
+    if (conceptsMastered === 0) return;
+    const texts = nextLessonAudioTexts(completedLessonIds);
+    if (texts.length) void prefetchAudio(texts);
+  }, [conceptsMastered, completedLessonIds]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedNodes((prev) => {
