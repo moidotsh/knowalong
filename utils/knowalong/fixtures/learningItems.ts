@@ -42,6 +42,10 @@ export interface LearningItem {
   note: string | null;
   buildsOn: string[];
   words: WordPart[];
+  /** Unicode emoji for visual association (concrete concepts only —
+   *  abstract grammar like tense/case gets no emoji). The character
+   *  IS the stable semantic ID; the app renders it natively. */
+  emoji?: string;
   /** When present, the study page shows a construction-intro card BEFORE
    *  the chips — explaining the literal decomposition for non-obvious
    *  mappings (e.g. "I like" ≠ word-for-word in Russian). */
@@ -60,6 +64,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     note: 'The pronoun "I". Always lowercase unless sentence-initial.',
     buildsOn: [],
     words: [{ form: 'я', gloss: 'I', role: 'pronoun' }],
+    emoji: '🧑',
   },
   {
     id: '2',
@@ -73,6 +78,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'вижу', gloss: 'see', role: 'verb' },
     ],
+    emoji: '👀',
   },
   {
     id: '3',
@@ -86,6 +92,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'знаю', gloss: 'know', role: 'verb' },
     ],
+    emoji: '🧠',
   },
   {
     id: '4',
@@ -99,6 +106,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'хочу', gloss: 'want', role: 'verb' },
     ],
+    emoji: '🤲',
   },
   {
     id: '5',
@@ -112,6 +120,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'иду', gloss: 'go', role: 'verb' },
     ],
+    emoji: '🚶',
   },
   {
     id: '6',
@@ -125,6 +134,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'живу', gloss: 'live', role: 'verb' },
     ],
+    emoji: '🏠',
   },
   {
     id: '7',
@@ -146,6 +156,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       ],
     },
     contextSentence: { ru: 'Мне нравится музыка.', en: 'I like music.' },
+    emoji: '❤️',
   },
   {
     id: '8',
@@ -169,6 +180,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       ],
     },
     contextSentence: { ru: 'Я не знаю.', en: "I don't know." },
+    emoji: '🤷',
   },
   {
     id: '9',
@@ -178,6 +190,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: null,
     note: 'Add an object: "море" (sea). Russian has no articles — no "the".',
     buildsOn: ['1', '2'],
+    emoji: '🌊',
     words: [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'вижу', gloss: 'see', role: 'verb' },
@@ -192,6 +205,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: null,
     note: 'Add an object: "чай" (tea). "я хочу чай" — simple subject-verb-object.',
     buildsOn: ['1', '4'],
+    emoji: '🍵',
     words: [
       { form: 'я', gloss: 'I', role: 'pronoun' },
       { form: 'хочу', gloss: 'want', role: 'verb' },

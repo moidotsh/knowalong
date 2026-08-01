@@ -118,6 +118,9 @@ export default function StudyScreen() {
             <Text style={[styles.promptLabel, { color: colors.textMuted }]}>
               Build this in Russian:
             </Text>
+            {question.item.emoji ? (
+              <Text style={styles.promptEmoji}>{question.item.emoji}</Text>
+            ) : null}
             <Text style={[styles.prompt, { color: colors.text }]}>
               {question.prompt}
             </Text>
@@ -265,6 +268,7 @@ const styles = StyleSheet.create({
   bodyContent: { padding: 16 },
   promptLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   prompt: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
+  promptEmoji: { fontSize: 48, textAlign: 'center', marginBottom: 4 },
   slotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 20 },
   slotFilled: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderLeftWidth: 4, minWidth: 70, alignItems: 'center' },
   slotEmpty: { width: 70, height: 56, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed' },
