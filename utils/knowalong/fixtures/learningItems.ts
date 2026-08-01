@@ -17,6 +17,22 @@ export interface WordPart {
   role: WordRole;
 }
 
+export interface ConstructionBreakdownPart {
+  form: string;
+  literal: string;
+  note: string;
+}
+
+export interface ConstructionNote {
+  intro: string;
+  breakdown: ConstructionBreakdownPart[];
+}
+
+export interface ContextSentence {
+  ru: string;
+  en: string;
+}
+
 export interface LearningItem {
   id: string;
   surfaceForm: string;
@@ -26,6 +42,12 @@ export interface LearningItem {
   note: string | null;
   buildsOn: string[];
   words: WordPart[];
+  /** When present, the study page shows a construction-intro card BEFORE
+   *  the chips — explaining the literal decomposition for non-obvious
+   *  mappings (e.g. "I like" ≠ word-for-word in Russian). */
+  construction?: ConstructionNote;
+  /** A real sentence using the phrase, shown after the learner solves it. */
+  contextSentence?: ContextSentence;
 }
 
 export const LEARNING_ITEMS: readonly LearningItem[] = [
@@ -110,12 +132,20 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     meaning: 'I like',
     transliteration: 'mne nravitsya',
     ipa: 'mnʲe nrɐˈvʲit͡sə',
-    note: 'Special: "мне" (to me) + "нравится" (pleases). Literally "it pleases me" = "I like it".',
+    note: 'Special: "мне" (to me) + "нравится" (is pleasing). Literally "to me, it is pleasing" = "I like it".',
     buildsOn: ['1'],
     words: [
       { form: 'мне', gloss: 'to me', role: 'pronoun' },
-      { form: 'нравится', gloss: 'pleases', role: 'verb' },
+      { form: 'нравится', gloss: 'is pleasing', role: 'verb' },
     ],
+    construction: {
+      intro: "Russian doesn't say 'I like'. It says 'to me, it is pleasing' — the structure is flipped. You already know я = I. Мне is the dative form of я — 'to me'. Russian uses dative for the person experiencing the feeling.",
+      breakdown: [
+        { form: 'мне', literal: 'to me', note: 'the dative form of я (I)' },
+        { form: 'нравится', literal: 'is pleasing', note: 'the thing being liked' },
+      ],
+    },
+    contextSentence: { ru: 'Мне нравится музыка.', en: 'I like music.' },
   },
   {
     id: '8',
@@ -130,6 +160,15 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
       { form: 'не', gloss: 'not', role: 'particle' },
       { form: 'знаю', gloss: 'know', role: 'verb' },
     ],
+    construction: {
+      intro: "To negate a verb in Russian, place 'не' (not) directly before it. The word order stays the same — just slip 'не' in front of the verb.",
+      breakdown: [
+        { form: 'я', literal: 'I', note: 'subject (unchanged)' },
+        { form: 'не', literal: 'not', note: 'negation particle — goes right before the verb' },
+        { form: 'знаю', literal: 'know', note: 'the verb being negated' },
+      ],
+    },
+    contextSentence: { ru: 'Я не знаю.', en: "I don't know." },
   },
   {
     id: '9',

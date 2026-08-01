@@ -155,6 +155,43 @@ export default function StudyScreen() {
                     {question.item.note}
                   </Text>
                 ) : null}
+                {question.item.contextSentence ? (
+                  <View style={[styles.contextBox, { borderColor: colors.cardBorder }]}>
+                    <Text style={[styles.contextRu, { color: colors.text }]}>
+                      {question.item.contextSentence.ru}
+                    </Text>
+                    <Text style={[styles.contextEn, { color: colors.textSecondary }]}>
+                      {question.item.contextSentence.en}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* Construction intro (for non-obvious mappings) */}
+            {!isSolved && question.item.construction ? (
+              <View style={[styles.constructionBox, { backgroundColor: colors.brand + '10', borderColor: colors.brand + '30' }]}>
+                <Text style={[styles.constructionIntro, { color: colors.text }]}>
+                  {question.item.construction.intro}
+                </Text>
+                <View style={styles.constructionBreakdown}>
+                  {question.item.construction.breakdown.map((part, i) => (
+                    <View key={i} style={styles.breakdownRow}>
+                      <Text style={[styles.breakdownForm, { color: colors.brand }]}>
+                        {part.form}
+                      </Text>
+                      <Text style={[styles.breakdownArrow, { color: colors.textMuted }]}>
+                        =
+                      </Text>
+                      <Text style={[styles.breakdownLiteral, { color: colors.text }]}>
+                        {part.literal}
+                      </Text>
+                      <Text style={[styles.breakdownNote, { color: colors.textMuted }]}>
+                        ({part.note})
+                      </Text>
+                    </View>
+                  ))}
+                </View>
               </View>
             ) : null}
 
@@ -246,4 +283,15 @@ const styles = StyleSheet.create({
   legendText: { fontSize: 11, textTransform: 'capitalize' },
   completeTitle: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   completeBody: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  constructionBox: { marginTop: 12, marginBottom: 12, padding: 14, borderRadius: 12, borderWidth: 1 },
+  constructionIntro: { fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  constructionBreakdown: { gap: 6 },
+  breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  breakdownForm: { fontSize: 16, fontWeight: '700' },
+  breakdownArrow: { fontSize: 14 },
+  breakdownLiteral: { fontSize: 14, fontWeight: '500' },
+  breakdownNote: { fontSize: 12, fontStyle: 'italic' },
+  contextBox: { marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
+  contextRu: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  contextEn: { fontSize: 13, textAlign: 'center', marginTop: 4, fontStyle: 'italic' },
 });
