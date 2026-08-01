@@ -1,350 +1,91 @@
 // app/index.tsx
-// KnowAlong home — the learning dashboard. Shows the learner's journey:
-// continue-learning hero, learning path (tiered concept chips), quick stats,
-// + the lyrics library (demoted to secondary). Answers "what next?" + "how
-// am I doing?" Prototype fixtures drive the UI (no live DB).
+// KnowAlong home — minimal. One thing to do next + a clean grid of
+// everything else. No card soup.
 
 import React from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  MobileAtmosphere,
-  MobileSurface,
-  MobileHeader,
-  MobilePrimaryButton,
-  MobileActionFooter,
-  MobileSectionEyebrow,
-} from '../components/MobilePremium';
+import { MobileAtmosphere, MobileSurface, MobileHeader } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import {
-  navigateToImport,
-  navigateToStudy,
-  navigateToSettings,
-  navigateToLessons,
-  navigateToProgress,
-  navigateToAchievements,
-  navigateToVocabulary,
-  navigateToDaily,
-  navigateToConversation,
-  navigateToProfile,
-  navigateToGrammar,
-  navigateToListen,
-  navigateToMatch,
-  navigateToReading,
-  navigateToMistakes,
-  navigateToSongs,
+  navigateToStudy, navigateToSettings, navigateToLessons,
+  navigateToProgress, navigateToSongs, navigateToConversation,
 } from '../navigation';
+import { SCREEN_BODY_STYLE } from '../constants';
+import { LEARNER_STATS, NEXT_ACTION } from '../utils/knowalong/fixtures/learnerPath';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
-import { SCREEN_BODY_STYLE } from '../constants';
-import {
-  LEARNING_PATH,
-  LEARNER_STATS,
-  NEXT_ACTION,
-  type PathConcept,
-  type MasteryState,
-} from '../utils/knowalong/fixtures/learnerPath';
 
-function masteryColor(colors: ReturnType<typeof useAppTheme>['colors'], state: MasteryState): string {
-  if (state === 'mastered') return colors.status.success;
-  if (state === 'in-progress') return colors.brand;
-  return colors.textMuted;
-}
-
-function masteryIcon(state: MasteryState): string {
-  if (state === 'mastered') return '✓';
-  if (state === 'in-progress') return '●';
-  return '—';
-}
-
-function StatCard({ value, label, color, mutedColor }: { value: string; label: string; color: string; mutedColor: string }) {
-  return (
-    <View style={{ flex: 1 }}>
-      <Text style={{ fontSize: 22, fontWeight: '700', color }}>{value}</Text>
-      <Text style={{ fontSize: 11, color: mutedColor, marginTop: 2 }}>{label}</Text>
-    </View>
-  );
-}
-
-function PathChip({ concept, colors }: { concept: PathConcept; colors: ReturnType<typeof useAppTheme>['colors'] }) {
-  const mc = masteryColor(colors, concept.state);
-  return (
-    <Pressable
-      onPress={() => navigateToStudy()}
-      style={{
-        paddingVertical: 10,
-        paddingHorizontal: 14,
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: mc + '40',
-        backgroundColor: mc + '12',
-        alignItems: 'center',
-        minWidth: 80,
-      }}
-    >
-      <ConceptIcon name={ITEM_ICONS[concept.code] ?? 'star'} size={26} color={masteryColor(colors, concept.state)} />
-      <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{concept.surfaceForm}</Text>
-      <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 1 }}>{concept.meaning}</Text>
-      <Text style={{ fontSize: 10, color: mc, marginTop: 3, fontWeight: '700' }}>
-        {masteryIcon(concept.state)}
-      </Text>
-    </Pressable>
-  );
+interface GridItem {
+  icon: Parameters<typeof ConceptIcon>[0]['name'];
+  label: string;
+  onPress: () => void;
+  color: string;
 }
 
 export default function HomeScreen() {
   const { colors } = useAppTheme();
 
+  const grid: GridItem[] = [
+    { icon: 'book', label: 'Lessons', onPress: navigateToLessons, color: colors.brand },
+    { icon: 'sparkles', label: 'Conversation', onPress: navigateToConversation, color: colors.status.success },
+    { icon: 'waves', label: 'Songs', onPress: navigateToSongs, color: colors.textSecondary },
+    { icon: 'star', label: 'Progress', onPress: navigateToProgress, color: colors.status.warning },
+  ];
+
   return (
-    <SafeAreaView style={[styles.shell, { backgroundColor: colors.backgroundDeep }]} edges={['top', 'bottom']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundDeep }} edges={['top', 'bottom']}>
       <MobileAtmosphere surface="training" />
       <MobileHeader
-        title="Learn Russian"
-        eyebrow="KnowAlong"
+        title="Russian"
+        eyebrow={`${LEARNER_STATS.streakDays}-day streak`}
         rightAction={
           <Pressable onPress={navigateToSettings} hitSlop={8}>
-            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand }}>Settings</Text>
+            <ConceptIcon name="user" size={22} color={colors.textSecondary} />
           </Pressable>
         }
       />
 
-      <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={styles.bodyContent}>
-        {/* Continue learning hero */}
-        <Pressable onPress={() => navigateToStudy()}>
-          <MobileSurface padding={20}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <ConceptIcon name={ITEM_ICONS['4'] ?? 'star'} size={44} color={colors.brand} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Continue learning
-                </Text>
-                <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, marginTop: 2 }}>
-                  {NEXT_ACTION.label}
-                </Text>
-                <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>
-                  {NEXT_ACTION.subtitle}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 22, color: colors.brand }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
+      <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 40 }}>
 
-        {/* Daily challenge CTA */}
-        <Pressable onPress={() => navigateToDaily()} style={{ marginTop: 8 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="target" size={28} color={colors.status.warning} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Daily challenge</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  5 phrases · 2 minutes · beat your streak
-                </Text>
-              </View>
-              <Text style={{ fontSize: 18, color: colors.status.warning }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Vocabulary CTA */}
-        <Pressable onPress={() => navigateToVocabulary()} style={{ marginTop: 8 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="book" size={28} color={colors.brand} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Vocabulary</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Browse all {LEARNER_STATS.conceptsTotal} learned phrases
-                </Text>
-              </View>
-              <Text style={{ fontSize: 18, color: colors.brand }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Quick stats */}
-        <View style={{ flexDirection: 'row', gap: 12, marginTop: 16 }}>
-          <MobileSurface padding={14}>
-            <StatCard value={`${LEARNER_STATS.conceptsMastered}/${LEARNER_STATS.conceptsTotal}`} label="concepts" color={colors.status.success} mutedColor={colors.textMuted} />
-          </MobileSurface>
-          <MobileSurface padding={14}>
-            <StatCard value={`${LEARNER_STATS.streakDays}`} label="day streak" color={colors.status.warning} mutedColor={colors.textMuted} />
-          </MobileSurface>
-          <MobileSurface padding={14}>
-            <StatCard value={`${LEARNER_STATS.accuracyPct}%`} label="accuracy" color={colors.brand} mutedColor={colors.textMuted} />
-          </MobileSurface>
-        </View>
-
-        {/* Learning path */}
-        <View style={{ marginTop: 20 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-            <MobileSectionEyebrow>Your learning path</MobileSectionEyebrow>
-            <View style={{ flexDirection: 'row', gap: 12 }}>
-              <Pressable onPress={() => navigateToAchievements()}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Achievements</Text>
-              </Pressable>
-              <Pressable onPress={() => navigateToProgress()}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Progress →</Text>
-              </Pressable>
-            </View>
-          </View>
-          {LEARNING_PATH.map((tier) => (
-            <View key={tier.tier} style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>
-                Tier {tier.tier} · {tier.label}
+        {/* The only thing that matters: continue */}
+        <Pressable onPress={navigateToStudy}>
+          <MobileSurface padding={28}>
+            <View style={{ alignItems: 'center' }}>
+              <ConceptIcon name={ITEM_ICONS['4'] ?? 'star'} size={48} color={colors.brand} />
+              <Text style={{ fontSize: 36, fontWeight: '700', color: colors.text, marginTop: 12 }}>
+                {NEXT_ACTION.label}
               </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {tier.concepts.map((concept) => (
-                  <PathChip key={concept.code} concept={concept} colors={colors} />
-                ))}
+              <Text style={{ fontSize: 15, color: colors.textSecondary, marginTop: 4 }}>
+                {NEXT_ACTION.subtitle}
+              </Text>
+              <View style={{
+                marginTop: 16, paddingVertical: 10, paddingHorizontal: 28, borderRadius: 24,
+                backgroundColor: colors.brand,
+              }}>
+                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.textOnBrand }}>
+                  Continue
+                </Text>
               </View>
             </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Minimal grid — everything else */}
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 }}>
+          {grid.map((item) => (
+            <Pressable key={item.label} onPress={item.onPress} style={{ flex: 1, minWidth: '45%' }}>
+              <MobileSurface padding={18}>
+                <View style={{ alignItems: 'center', gap: 8 }}>
+                  <ConceptIcon name={item.icon} size={28} color={item.color} />
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{item.label}</Text>
+                </View>
+              </MobileSurface>
+            </Pressable>
           ))}
         </View>
 
-        {/* Gradient lessons CTA */}
-        <Pressable onPress={() => navigateToLessons()} style={{ marginTop: 8 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="book" size={28} color={colors.brand} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Gradient lessons</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Build phrases step by step — "I" → "I see" → "I see the sea"
-                </Text>
-              </View>
-              <Text style={{ fontSize: 18, color: colors.brand }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Conversation practice CTA */}
-        <Pressable onPress={() => navigateToConversation()} style={{ marginTop: 8 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="sparkles" size={28} color={colors.status.success} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Conversation practice</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Answer real questions — build responses from chips
-                </Text>
-              </View>
-              <Text style={{ fontSize: 18, color: colors.status.success }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Lyrics learning CTA */}
-        <Pressable onPress={() => navigateToImport()} style={{ marginTop: 8 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="book" size={28} color={colors.textSecondary} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Learn from lyrics</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Import a song → study the concepts each verse needs
-                </Text>
-              </View>
-              <Text style={{ fontSize: 18, color: colors.textSecondary }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Profile link */}
-        <Pressable onPress={() => navigateToProfile()} style={{ marginTop: 16 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="user" size={24} color={colors.textSecondary} />
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Profile</Text>
-              <Text style={{ fontSize: 16, color: colors.textMuted, marginLeft: 'auto' }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Practice hub — listening, matching, reading */}
-        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-          <Pressable onPress={() => navigateToListen()} style={{ flex: 1, borderRadius: 14 }}>
-            <MobileSurface padding={14}>
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <ConceptIcon name="waves" size={26} color={colors.status.success} />
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Listen</Text>
-              </View>
-            </MobileSurface>
-          </Pressable>
-          <Pressable onPress={() => navigateToMatch()} style={{ flex: 1, borderRadius: 14 }}>
-            <MobileSurface padding={14}>
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <ConceptIcon name="target" size={26} color={colors.status.warning} />
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Match</Text>
-              </View>
-            </MobileSurface>
-          </Pressable>
-          <Pressable onPress={() => navigateToReading()} style={{ flex: 1, borderRadius: 14 }}>
-            <MobileSurface padding={14}>
-              <View style={{ alignItems: 'center', gap: 6 }}>
-                <ConceptIcon name="book" size={26} color={colors.brand} />
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Read</Text>
-              </View>
-            </MobileSurface>
-          </Pressable>
-        </View>
-
-        {/* Mistakes review CTA (conditional) */}
-        <Pressable onPress={() => navigateToMistakes()} style={{ marginTop: 8, borderRadius: 14 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="sparkles" size={24} color={colors.status.error} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Mistakes review</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted }}>Review concepts you struggled with</Text>
-              </View>
-              <Text style={{ fontSize: 16, color: colors.status.error }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Grammar reference CTA */}
-        <Pressable onPress={() => navigateToGrammar()} style={{ marginTop: 8 }}>
-          <MobileSurface padding={16}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <ConceptIcon name="brain" size={28} color={colors.textSecondary} />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Grammar reference</Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  Cases, conjugations, patterns — look it up
-                </Text>
-              </View>
-              <Text style={{ fontSize: 18, color: colors.textSecondary }}>→</Text>
-            </View>
-          </MobileSurface>
-        </Pressable>
-
-        {/* Lyrics library (demoted) */}
-        <View style={{ marginTop: 24 }}>
-          <MobileSectionEyebrow>Lyrics library</MobileSectionEyebrow>
-          <Pressable onPress={() => navigateToImport()}>
-            <MobileSurface padding={16}>
-              <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
-                No lyrics imported yet. Paste a song to learn from its verses.
-              </Text>
-            </MobileSurface>
-          </Pressable>
-        </View>
       </ScrollView>
-
-      <MobileActionFooter>
-        <MobilePrimaryButton onPress={() => navigateToStudy()} variant="primary">
-          Continue learning
-        </MobilePrimaryButton>
-        <MobilePrimaryButton onPress={() => navigateToLessons()} variant="secondary">
-          Browse lessons
-        </MobilePrimaryButton>
-      </MobileActionFooter>
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  shell: { flex: 1 },
-  bodyContent: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 80 },
-});
