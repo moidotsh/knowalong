@@ -142,6 +142,18 @@ export function navigateToDaily() {
   router.push('/daily');
 }
 
+export function navigateToOnboarding() {
+  router.push('/onboarding');
+}
+
+export function navigateToConversation() {
+  router.push('/conversation');
+}
+
+export function navigateToProfile() {
+  router.push('/profile');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }

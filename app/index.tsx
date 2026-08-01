@@ -25,6 +25,8 @@ import {
   navigateToAchievements,
   navigateToVocabulary,
   navigateToDaily,
+  navigateToConversation,
+  navigateToProfile,
 } from '../navigation';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
@@ -206,6 +208,49 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <Text style={{ fontSize: 18, color: colors.brand }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Conversation practice CTA */}
+        <Pressable onPress={() => navigateToConversation()} style={{ marginTop: 8 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="sparkles" size={28} color={colors.status.success} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Conversation practice</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  Answer real questions — build responses from chips
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: colors.status.success }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Lyrics learning CTA */}
+        <Pressable onPress={() => navigateToImport()} style={{ marginTop: 8 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="book" size={28} color={colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Learn from lyrics</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  Import a song → study the concepts each verse needs
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: colors.textSecondary }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Profile link */}
+        <Pressable onPress={() => navigateToProfile()} style={{ marginTop: 16 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="user" size={24} color={colors.textSecondary} />
+              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Profile</Text>
+              <Text style={{ fontSize: 16, color: colors.textMuted, marginLeft: 'auto' }}>→</Text>
             </View>
           </MobileSurface>
         </Pressable>
