@@ -270,3 +270,37 @@ export function stopSpeaking(): void {
     try { synth.cancel(); } catch { /* S10 */ }
   }
 }
+
+/** True once `text` is already synthesized + cached (plays instantly). */
+export function isAudioCached(text: string): boolean {
+  return audioCache.has((text ?? '').trim());
+}
+
+/** Synthesize a set of texts into the cache WITHOUT playing (preload). Skips
+ *  empty + already-cached strings; loads the engine first; runs sequentially
+ *  so it doesn't spike the single-threaded wasm. Resolves when all are cached
+ *  (or skipped/failed). Safe to call with overlapping sets — concurrent dedup
+ *  is best-effort (a duplicate synth is harmless). */
+export async function prefetchAudio(texts: readonly string[]): Promise<void> {
+  const todo: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of texts) {
+    const k = (raw ?? '').trim();
+    if (!k || seen.has(k) || audioCache.has(k)) continue;
+    seen.add(k);
+    todo.push(k);
+  }
+  if (todo.length === 0) return;
+  const synth = await loadSynth();
+  if (!synth) return;
+  for (const text of todo) {
+    if (audioCache.has(text)) continue; // may have been cached concurrently
+    try {
+      const out = await synth(text);
+      const o = Array.isArray(out) ? out[0] : out;
+      if (o?.audio?.length) audioCache.set(text, { audio: o.audio, sampleRate: o.sampling_rate });
+    } catch {
+      // skip this text; leaves it to synthesize on-demand later
+    }
+  }
+}

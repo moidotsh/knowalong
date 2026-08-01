@@ -9,7 +9,7 @@
 // (stores/wordMasteryStore.ts) — the same store the Study screen writes — so
 // a word graduated anywhere fades here too.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -18,7 +18,9 @@ import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToLessons, navigateToLesson, navigateToDeck, navigateToSubDeck } from '../../navigation';
 import { SCREEN_BODY_STYLE } from '../../constants';
 import { getLesson, getLessonDeck, getLessonSubDeck } from '../../utils/knowalong/fixtures/decks';
+import { prefetchAudio } from '../../utils/knowalong/tts';
 import { LessonRound } from '../../components/knowalong/LessonRound';
+import { LoadingSpinner } from '../../components/primitives';
 import { ConfettiEffect } from '../../components/Celebration/ConfettiEffect';
 import { useStreakStore } from '../../stores/streakStore';
 import { useLessonProgressStore } from '../../stores/lessonProgressStore';
@@ -34,6 +36,29 @@ export default function LessonPlayerScreen() {
   const [solved, setSolved] = useState(false);
   const [score, setScore] = useState({ correct: 0, mistakes: 0 });
   const [showConfetti, setShowConfetti] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
+
+  // Speakable text per step = the phrase + each word's form. (Resolved before
+  // the not-found early return so the hooks below stay hook-order-stable.)
+  const audioTexts = useMemo(
+    () => (lesson?.steps ?? []).flatMap((s) => [s.surfaceForm, ...s.words.map((w) => w.form)]),
+    [lesson],
+  );
+
+  // Gate the first card behind a spinner until the engine + first ~2 cards'
+  // audio are synthesized; prefetch the rest in the background.
+  useEffect(() => {
+    if (audioTexts.length === 0) { setAudioReady(true); return; }
+    let cancelled = false;
+    setAudioReady(false);
+    const FIRST_BATCH = 8;
+    void prefetchAudio(audioTexts.slice(0, FIRST_BATCH)).then(() => {
+      if (cancelled) return;
+      setAudioReady(true);
+      void prefetchAudio(audioTexts.slice(FIRST_BATCH));
+    });
+    return () => { cancelled = true; };
+  }, [audioTexts]);
 
   const recordMistake = useStreakStore((s) => s.recordMistake);
   const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
@@ -112,7 +137,7 @@ export default function LessonPlayerScreen() {
               </Text>
             ))}
           </MobileSurface>
-        ) : (
+        ) : audioReady ? (
           <LessonRound
             key={step.itemId}
             step={step}
@@ -123,6 +148,11 @@ export default function LessonPlayerScreen() {
             onExposure={recordExposure}
             onSolvedChange={handleSolvedChange}
           />
+        ) : (
+          <View style={{ padding: 48, alignItems: 'center' }}>
+            <LoadingSpinner size="large" color={colors.brand} />
+            <Text style={{ marginTop: 12, fontSize: 14, color: colors.textSecondary }}>Loading audio…</Text>
+          </View>
         )}
       </ScrollView>
 

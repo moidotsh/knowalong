@@ -12,7 +12,7 @@
 // This shell owns sequencing + scoring + the mastery summary; LessonRound owns
 // the per-step interaction, mode branching, gloss fade, and TTS.
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -27,7 +27,9 @@ import { SCREEN_BODY_STYLE } from '../constants';
 import type { LessonStep } from '../utils/knowalong/fixtures/decks';
 import { generateAdaptiveLesson } from '../utils/knowalong/generateLesson';
 import { summarizeMastery } from '../utils/knowalong/mastery';
+import { prefetchAudio } from '../utils/knowalong/tts';
 import { MasterySummaryCard } from '../components/knowalong/MasterySummary';
+import { LoadingSpinner } from '../components/primitives';
 import { LessonRound } from '../components/knowalong/LessonRound';
 import { ConfettiEffect } from '../components/Celebration/ConfettiEffect';
 import { useStreakStore } from '../stores/streakStore';
@@ -48,7 +50,29 @@ export default function StudyScreen() {
   const [solved, setSolved] = useState(false);
   const [score, setScore] = useState({ correct: 0, mistakes: 0 });
   const [showConfetti, setShowConfetti] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
   const stepHadMistake = useRef(false);
+
+  // Speakable text per step = the phrase + each word's form.
+  const audioTexts = useMemo(
+    () => steps.flatMap((s) => [s.surfaceForm, ...s.words.map((w) => w.form)]),
+    [steps],
+  );
+
+  // Gate the first card behind a spinner until the engine + first ~2 cards'
+  // audio are synthesized; prefetch the rest in the background while the
+  // learner works the first card.
+  useEffect(() => {
+    let cancelled = false;
+    setAudioReady(false);
+    const FIRST_BATCH = 8;
+    void prefetchAudio(audioTexts.slice(0, FIRST_BATCH)).then(() => {
+      if (cancelled) return;
+      setAudioReady(true);
+      void prefetchAudio(audioTexts.slice(FIRST_BATCH));
+    });
+    return () => { cancelled = true; };
+  }, [audioTexts]);
 
   const step = steps[index];
   const total = steps.length;
@@ -124,7 +148,7 @@ export default function StudyScreen() {
               <MasterySummaryCard summary={summary} />
             </View>
           </>
-        ) : (
+        ) : audioReady ? (
           <LessonRound
             key={step.itemId}
             step={step}
@@ -135,6 +159,11 @@ export default function StudyScreen() {
             onExposure={recordExposure}
             onSolvedChange={handleSolvedChange}
           />
+        ) : (
+          <View style={styles.loadingAudio}>
+            <LoadingSpinner size="large" color={colors.brand} />
+            <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading audio…</Text>
+          </View>
         )}
       </ScrollView>
 
@@ -165,4 +194,6 @@ const styles = StyleSheet.create({
   completeCard: { borderRadius: 16, padding: 24 },
   completeTitle: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   completeBody: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  loadingAudio: { padding: 48, alignItems: 'center' },
+  loadingText: { marginTop: 12, fontSize: 14 },
 });
