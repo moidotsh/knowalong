@@ -114,6 +114,18 @@ export function navigateToImport() {
   router.push('/import');
 }
 
+export function navigateToStudy() {
+  router.push('/study');
+}
+
+export function navigateToLessons() {
+  router.push('/lessons');
+}
+
+export function navigateToProgress() {
+  router.push('/progress');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }

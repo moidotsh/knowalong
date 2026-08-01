@@ -17,7 +17,7 @@ import {
   SkeletonBlock,
 } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
-import { navigateToImport, navigateToSource, navigateToSettings } from '../navigation';
+import { navigateToImport, navigateToSource, navigateToSettings, navigateToStudy } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
 import { useLearningSources, useSourceReadiness } from '../hooks';
 import type { LearningSource, ReadinessResult } from '@shared/types';
@@ -117,7 +117,10 @@ export default function LibraryScreen() {
         )}
       </ScrollView>
       <MobileActionFooter>
-        <MobilePrimaryButton onPress={navigateToImport}>
+        <MobilePrimaryButton onPress={navigateToStudy} variant="primary">
+          Study CLCCs
+        </MobilePrimaryButton>
+        <MobilePrimaryButton onPress={navigateToImport} variant="secondary">
           Add lyrics
         </MobilePrimaryButton>
       </MobileActionFooter>
