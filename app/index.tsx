@@ -12,7 +12,7 @@ import { useAppTheme } from '../context';
 import {
   navigateToStudy, navigateToSettings, navigateToConcept, navigateToLessons,
   navigateToSongs, navigateToConversation, navigateToProgress, navigateToMistakes,
-  navigateToSvetofor,
+  navigateToLesson,
 } from '../navigation';
 import { LEARNING_ITEMS, type LearningItem } from '../utils/knowalong/fixtures/learningItems';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
@@ -208,7 +208,7 @@ export default function HomeScreen() {
         {/* Quiet entry points */}
         <View style={{ marginTop: 24, flexDirection: 'row', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
           <Pressable onPress={() => navigateToLessons()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Lessons</Text></Pressable>
-          <Pressable onPress={() => navigateToSvetofor()}><Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Светофор</Text></Pressable>
+          <Pressable onPress={() => navigateToLesson('svetofor-intro')}><Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Светофор</Text></Pressable>
           <Pressable onPress={() => navigateToSongs()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Songs</Text></Pressable>
           <Pressable onPress={() => navigateToConversation()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Conversation</Text></Pressable>
           {mistakeCodes.length > 0 ? (
