@@ -1,15 +1,19 @@
 // app/study.tsx
-// KnowAlong "Build" interaction — the learner assembles Russian phrases from
-// word chips. Each chip shows BOTH the Russian word AND its English gloss +
-// is color-coded by grammatical role (pronoun=blue, verb=green, noun=orange,
-// particle=gray). The learner taps chips in the correct ORDER to build the
-// phrase — actively learning word order + decomposition (not just ordering
-// opaque tokens like Duolingo).
+// KnowAlong adaptive "Build" interaction — the learner assembles Russian
+// phrases from word chips. Each chip shows the Russian word + (while still
+// being learned) its English gloss, color-coded by grammatical role
+// (pronoun=blue, verb=green, noun=orange, particle=gray). The learner taps
+// chips in the correct ORDER to build the phrase — actively learning word
+// order + decomposition (not just ordering opaque tokens).
 //
-// Compositional gradient: "я" → "я вижу" → "я вижу море" (not isolated
-// infinitives). Each phrase BUILDS on earlier ones.
+// Adaptive: the lesson is GENERATED from the learner's per-word mastery
+// (utils/knowalong/generateLesson.ts) — warmup with known words → drill issue
+// words → introduce 1 new word (i+1). Per-word mastery is tracked globally by
+// the chip's Cyrillic `form` (stores/wordMasteryStore.ts); a word's English
+// gloss hides once it's been placed correctly 5 times in a row, and a wrong
+// tap resets that streak. "Next lesson" regenerates from the latest mastery.
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -22,15 +26,15 @@ import {
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToHome } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
-import {
-  buildQuiz,
-  ROLE_COLOR_KEYS,
-  type BuildQuestion,
-  type WordChip,
-  type WordRole,
-} from '../utils/knowalong/fixtures/learningItems';
+import { ROLE_COLOR_KEYS, type WordRole } from '../utils/knowalong/fixtures/learningItems';
+import { buildChipsForStep, type Chip } from '../utils/knowalong/fixtures/chips';
+import type { LessonStep } from '../utils/knowalong/fixtures/decks';
+import { generateAdaptiveLesson } from '../utils/knowalong/generateLesson';
+import { shouldShowGloss, summarizeMastery, type MasteryMap } from '../utils/knowalong/mastery';
+import { MasterySummaryCard } from '../components/knowalong/MasterySummary';
 import { ConfettiEffect } from '../components/Celebration/ConfettiEffect';
 import { useStreakStore } from '../stores/streakStore';
+import { useWordMasteryStore } from '../stores/wordMasteryStore';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 
@@ -41,39 +45,77 @@ function roleColor(colors: ReturnType<typeof useAppTheme>['colors'], role: WordR
   return colors.status[key as 'success' | 'warning'];
 }
 
+interface AdaptQuestion {
+  step: LessonStep;
+  chips: Chip[];
+  slotCount: number;
+}
+
+/** Build a fresh adaptive lesson (phrases + chips) from current mastery. */
+function buildAdaptive(mastery: MasteryMap): AdaptQuestion[] {
+  return generateAdaptiveLesson(mastery).map((step) => ({
+    step,
+    chips: buildChipsForStep(step),
+    slotCount: step.words.length,
+  }));
+}
+
 export default function StudyScreen() {
   const { colors } = useAppTheme();
-  const [questions] = useState<BuildQuestion[]>(() => buildQuiz());
+  const mastery = useWordMasteryStore((s) => s.mastery);
+  const recordExposure = useWordMasteryStore((s) => s.recordExposure);
+  const recordWordCorrect = useWordMasteryStore((s) => s.recordCorrect);
+  const recordWordMistake = useWordMasteryStore((s) => s.recordMistake);
+  const recordStudySession = useStreakStore((s) => s.recordStudySession);
+  const recordMistake = useStreakStore((s) => s.recordMistake);
+  const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
+
+  const [questions, setQuestions] = useState<AdaptQuestion[]>(() => buildAdaptive(mastery));
   const [index, setIndex] = useState(0);
   const [placedIds, setPlacedIds] = useState<string[]>([]);
   const [wrongId, setWrongId] = useState<string | null>(null);
   const [score, setScore] = useState({ correct: 0, mistakes: 0 });
   const [showConfetti, setShowConfetti] = useState(false);
-  const recordStudySession = useStreakStore((s) => s.recordStudySession);
-  const recordMistake = useStreakStore((s) => s.recordMistake);
-  const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
   const wrongTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exposedRef = useRef<string | null>(null);
 
   const question = questions[index];
   const total = questions.length;
   const isComplete = index >= total;
-  const isSolved = question && placedIds.length === question.slotCount;
+  const isSolved = !!question && placedIds.length === question.slotCount;
 
-  const handleTapChip = useCallback((chip: WordChip) => {
-    if (isSolved || placedIds.includes(chip.id)) return;
-    if (chip.isCorrect && chip.correctPosition === placedIds.length) {
+  // Record exposure (one count per active phrase) when a new question becomes
+  // active. Sync effect — R1-safe; exposedRef guards against re-counting.
+  useEffect(() => {
+    if (question && exposedRef.current !== question.step.itemId) {
+      exposedRef.current = question.step.itemId;
+      recordExposure(question.step.words.map((w) => w.form));
+    }
+  }, [question, recordExposure]);
+
+  const showGloss = useCallback((form: string) => shouldShowGloss(mastery[form]), [mastery]);
+
+  const handleTapChip = useCallback((chip: Chip) => {
+    if (!question || isSolved || placedIds.includes(chip.id)) return;
+    const slot = placedIds.length;
+    if (chip.isCorrect && chip.correctPosition === slot) {
+      recordWordCorrect(question.step.words[slot].form);
       setPlacedIds((prev) => [...prev, chip.id]);
-      if (placedIds.length + 1 === question!.slotCount) {
+      if (slot + 1 === question.slotCount) {
         setScore((s) => ({ ...s, correct: s.correct + (wrongId ? 0 : 1) }));
       }
     } else {
+      const target = question.step.words[slot]?.form;
+      if (target) {
+        recordWordMistake(target);
+        recordMistake(question.step.itemId);
+      }
       setWrongId(chip.id);
       setScore((s) => ({ ...s, mistakes: s.mistakes + 1 }));
-      recordMistake(question.item.id);
       if (wrongTimer.current) clearTimeout(wrongTimer.current);
       wrongTimer.current = setTimeout(() => setWrongId(null), 600);
     }
-  }, [isSolved, placedIds, question, wrongId, recordMistake]);
+  }, [question, isSolved, placedIds, wrongId, recordWordCorrect, recordWordMistake, recordMistake]);
 
   const handleContinue = useCallback(() => {
     setPlacedIds([]);
@@ -89,25 +131,28 @@ export default function StudyScreen() {
     });
   }, [total, recordStudySession, addMasteredConcept]);
 
-  const handleRestart = useCallback(() => {
+  const regenerate = useCallback(() => {
     setIndex(0);
     setPlacedIds([]);
     setWrongId(null);
     setScore({ correct: 0, mistakes: 0 });
+    exposedRef.current = null;
+    setQuestions(buildAdaptive(useWordMasteryStore.getState().mastery));
   }, []);
 
   const progress = total > 0 ? ((index + (isSolved ? 1 : 0)) / total) * 100 : 0;
   const placedChips = question ? placedIds
     .map((id) => question.chips.find((c) => c.id === id))
-    .filter((c): c is WordChip => c !== undefined) : [];
+    .filter((c): c is Chip => c !== undefined) : [];
   const availableChips = question ? question.chips.filter((c) => !placedIds.includes(c.id)) : [];
+  const summary = summarizeMastery(Object.keys(mastery), mastery);
 
   return (
     <SafeAreaView style={[styles.shell, { backgroundColor: colors.backgroundDeep }]} edges={['top', 'bottom']}>
       <MobileAtmosphere surface="training" />
       <MobileHeader
         title={isComplete ? 'Lesson complete' : `Build ${index + 1} / ${total}`}
-        eyebrow="Learn Russian"
+        eyebrow="Adaptive practice"
         onBack={safeGoBack}
       />
 
@@ -119,27 +164,32 @@ export default function StudyScreen() {
 
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={styles.bodyContent}>
         {isComplete || !question ? (
-          <MobileSurface padding={24}>
-            <Text style={[styles.completeTitle, { color: colors.text }]}>
-              {score.correct} / {total} built correctly
-            </Text>
-            <Text style={[styles.completeBody, { color: colors.textSecondary }]}>
-              {score.mistakes === 0
-                ? 'Flawless! No mistakes — every phrase built first try.'
-                : `${score.mistakes} mistake${score.mistakes === 1 ? '' : 's'} along the way. Try again to go flawless.`}
-            </Text>
-          </MobileSurface>
+          <>
+            <MobileSurface padding={24}>
+              <Text style={[styles.completeTitle, { color: colors.text }]}>
+                {score.correct} / {total} built correctly
+              </Text>
+              <Text style={[styles.completeBody, { color: colors.textSecondary }]}>
+                {score.mistakes === 0
+                  ? 'Flawless! No mistakes — every phrase built first try.'
+                  : `${score.mistakes} mistake${score.mistakes === 1 ? '' : 's'} along the way. Keep going to lock them in.`}
+              </Text>
+            </MobileSurface>
+            <View style={{ marginTop: 12 }}>
+              <MasterySummaryCard summary={summary} />
+            </View>
+          </>
         ) : (
           <MobileSurface padding={20}>
             {/* Prompt */}
             <Text style={[styles.promptLabel, { color: colors.textMuted }]}>
               Build this in Russian:
             </Text>
-            {ITEM_ICONS[question.item.id] ? (
-              <View style={styles.promptEmojiWrap}><ConceptIcon name={ITEM_ICONS[question.item.id] ?? 'star'} size={48} color={colors.brand} /></View>
+            {ITEM_ICONS[question.step.itemId] ? (
+              <View style={styles.promptEmojiWrap}><ConceptIcon name={ITEM_ICONS[question.step.itemId] ?? 'star'} size={48} color={colors.brand} /></View>
             ) : null}
             <Text style={[styles.prompt, { color: colors.text }]}>
-              {question.prompt}
+              {question.step.meaning}
             </Text>
 
             {/* Answer slots */}
@@ -151,7 +201,9 @@ export default function StudyScreen() {
                   return (
                     <View key={slotIdx} style={[styles.slotFilled, { borderLeftColor: rc, backgroundColor: rc + '12' }]}>
                       <Text style={[styles.chipForm, { color: colors.text }]}>{chip.form}</Text>
-                      <Text style={[styles.chipGloss, { color: colors.textMuted }]}>{chip.gloss}</Text>
+                      {showGloss(chip.form) ? (
+                        <Text style={[styles.chipGloss, { color: colors.textMuted }]}>{chip.gloss}</Text>
+                      ) : null}
                     </View>
                   );
                 }
@@ -165,23 +217,25 @@ export default function StudyScreen() {
             {isSolved ? (
               <View style={[styles.solvedBox, { backgroundColor: colors.status.success + '15' }]}>
                 <Text style={[styles.solvedTitle, { color: colors.status.success }]}>
-                  ✓ {question.item.surfaceForm}
+                  ✓ {question.step.surfaceForm}
                 </Text>
-                <Text style={[styles.solvedTranslit, { color: colors.textSecondary }]}>
-                  {question.item.transliteration}
-                </Text>
-                {question.item.note ? (
-                  <Text style={[styles.solvedNote, { color: colors.textSecondary }]}>
-                    {question.item.note}
+                {question.step.transliteration ? (
+                  <Text style={[styles.solvedTranslit, { color: colors.textSecondary }]}>
+                    {question.step.transliteration}
                   </Text>
                 ) : null}
-                {question.item.contextSentence ? (
+                {question.step.note ? (
+                  <Text style={[styles.solvedNote, { color: colors.textSecondary }]}>
+                    {question.step.note}
+                  </Text>
+                ) : null}
+                {question.step.contextSentence ? (
                   <View style={[styles.contextBox, { borderColor: colors.cardBorder }]}>
                     <Text style={[styles.contextRu, { color: colors.text }]}>
-                      {question.item.contextSentence.ru}
+                      {question.step.contextSentence.ru}
                     </Text>
                     <Text style={[styles.contextEn, { color: colors.textSecondary }]}>
-                      {question.item.contextSentence.en}
+                      {question.step.contextSentence.en}
                     </Text>
                   </View>
                 ) : null}
@@ -189,13 +243,13 @@ export default function StudyScreen() {
             ) : null}
 
             {/* Construction intro (for non-obvious mappings) */}
-            {!isSolved && question.item.construction ? (
+            {!isSolved && question.step.construction ? (
               <View style={[styles.constructionBox, { backgroundColor: colors.brand + '10', borderColor: colors.brand + '30' }]}>
                 <Text style={[styles.constructionIntro, { color: colors.text }]}>
-                  {question.item.construction.intro}
+                  {question.step.construction.intro}
                 </Text>
                 <View style={styles.constructionBreakdown}>
-                  {question.item.construction.breakdown.map((part, i) => (
+                  {question.step.construction.breakdown.map((part, i) => (
                     <View key={i} style={styles.breakdownRow}>
                       <Text style={[styles.breakdownForm, { color: colors.brand }]}>
                         {part.form}
@@ -236,7 +290,9 @@ export default function StudyScreen() {
                         ]}
                       >
                         <Text style={[styles.chipForm, { color: colors.text }]}>{chip.form}</Text>
-                        <Text style={[styles.chipGloss, { color: colors.textMuted }]}>{chip.gloss}</Text>
+                        {showGloss(chip.form) ? (
+                          <Text style={[styles.chipGloss, { color: colors.textMuted }]}>{chip.gloss}</Text>
+                        ) : null}
                       </Pressable>
                     );
                   })}
@@ -259,22 +315,18 @@ export default function StudyScreen() {
         )}
       </ScrollView>
 
-      {!isComplete && question ? (
+      {isComplete ? (
+        <MobileActionFooter>
+          <MobilePrimaryButton variant="primary" onPress={regenerate}>Next lesson</MobilePrimaryButton>
+          <MobilePrimaryButton variant="ghost" onPress={() => navigateToHome()}>Back to stream</MobilePrimaryButton>
+        </MobileActionFooter>
+      ) : question ? (
         <MobileActionFooter>
           {isSolved ? (
             <MobilePrimaryButton variant="primary" onPress={handleContinue}>
               {index + 1 >= total ? 'See results' : 'Continue'}
             </MobilePrimaryButton>
           ) : null}
-        </MobileActionFooter>
-      ) : isComplete ? (
-        <MobileActionFooter>
-          <MobilePrimaryButton variant="primary" onPress={() => navigateToHome()}>
-            Back to stream
-          </MobilePrimaryButton>
-          <MobilePrimaryButton variant="ghost" onPress={handleRestart}>
-            Study again
-          </MobilePrimaryButton>
         </MobileActionFooter>
       ) : null}
       <ConfettiEffect visible={showConfetti} intensity="intense" />

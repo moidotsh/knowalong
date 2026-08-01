@@ -16,6 +16,7 @@ export interface LessonStep {
   itemId: string;
   surfaceForm: string;
   meaning: string;
+  transliteration?: string;
   emoji?: string;
   words: LearningItem['words'];
   construction?: LearningItem['construction'];
@@ -68,6 +69,7 @@ function lessonFromItems(id: string, title: string, subtitle: string, icon: Less
       itemId: item.id,
       surfaceForm: item.surfaceForm,
       meaning: item.meaning,
+      transliteration: item.transliteration,
       emoji: item.emoji,
       words: item.words,
       construction: item.construction,

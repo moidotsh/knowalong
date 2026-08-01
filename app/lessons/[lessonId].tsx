@@ -2,9 +2,16 @@
 // Lesson player — the chip-builder sequenced through a lesson's steps.
 // Each step: construction intro (if non-obvious) → chip-builder round
 // (tap words in order to build the phrase) → solved feedback with
-// transliteration + note + context sentence. Completion → "Back to stream".
+// transliteration + note + context sentence. Completion → context-aware
+// "next lesson / back to section" footer.
+//
+// Per-word mastery is tracked globally by the chip's Cyrillic `form`
+// (stores/wordMasteryStore.ts) — the same store the Study screen writes — so
+// a word graduated anywhere fades here too. A chip's English gloss hides once
+// the word has been placed correctly 5× in a row; a wrong tap on its slot
+// resets that streak.
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
@@ -12,22 +19,15 @@ import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, Mob
 import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToLessons, navigateToLesson, navigateToDeck, navigateToSubDeck } from '../../navigation';
 import { SCREEN_BODY_STYLE } from '../../constants';
-import { getLesson, getLessonDeck, getLessonSubDeck, type LessonStep } from '../../utils/knowalong/fixtures/decks';
-import { LEARNING_ITEMS } from '../../utils/knowalong/fixtures/learningItems';
+import { getLesson, getLessonDeck, getLessonSubDeck } from '../../utils/knowalong/fixtures/decks';
+import { buildChipsForStep, type Chip } from '../../utils/knowalong/fixtures/chips';
+import { shouldShowGloss } from '../../utils/knowalong/mastery';
 import { ITEM_ICONS } from '../../utils/knowalong/icons';
 import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
 import { ConfettiEffect } from '../../components/Celebration/ConfettiEffect';
 import { useStreakStore } from '../../stores/streakStore';
 import { useLessonProgressStore } from '../../stores/lessonProgressStore';
-
-function shuffle<T>(arr: readonly T[]): T[] {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
+import { useWordMasteryStore } from '../../stores/wordMasteryStore';
 
 function roleColorKey(role: string): 'brand' | 'success' | 'warning' | 'textMuted' {
   if (role === 'pronoun') return 'brand';
@@ -43,29 +43,6 @@ function rc(colors: ReturnType<typeof useAppTheme>['colors'], role: string): str
   return colors.status[key as 'success' | 'warning'];
 }
 
-// Build distractor chips from OTHER items' words.
-function buildChipsForStep(step: LessonStep): Array<{ id: string; form: string; gloss: string; role: string; correctPos: number }> {
-  const correctChips = step.words.map((w, i) => ({
-    id: `c-${i}`, form: w.form, gloss: w.gloss, role: w.role, correctPos: i,
-  }));
-
-  // Distractors: words from other items that aren't in this step
-  const distractorPool: Array<{ form: string; gloss: string; role: string }> = [];
-  for (const item of LEARNING_ITEMS) {
-    for (const w of item.words) {
-      if (!step.words.some((sw) => sw.form === w.form)) {
-        distractorPool.push({ form: w.form, gloss: w.gloss, role: w.role });
-      }
-    }
-  }
-  const distractorCount = Math.max(2, 5 - step.words.length);
-  const distractors = shuffle(distractorPool).slice(0, distractorCount).map((w, i) => ({
-    id: `d-${i}`, form: w.form, gloss: w.gloss, role: w.role, correctPos: -1,
-  }));
-
-  return shuffle([...correctChips, ...distractors]);
-}
-
 export default function LessonPlayerScreen() {
   const { colors } = useAppTheme();
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
@@ -78,10 +55,27 @@ export default function LessonPlayerScreen() {
   const [score, setScore] = useState({ correct: 0, mistakes: 0 });
   const [showConfetti, setShowConfetti] = useState(false);
   const wrongTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const exposedRef = useRef<string | null>(null);
 
   const recordMistake = useStreakStore((s) => s.recordMistake);
   const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
   const markLessonComplete = useLessonProgressStore((s) => s.markLessonComplete);
+  const mastery = useWordMasteryStore((s) => s.mastery);
+  const recordExposure = useWordMasteryStore((s) => s.recordExposure);
+  const recordWordCorrect = useWordMasteryStore((s) => s.recordCorrect);
+  const recordWordMistake = useWordMasteryStore((s) => s.recordMistake);
+
+  // Hooks must run before the early return. The active step for exposure is
+  // resolved defensively from the lesson (possibly null) here.
+  const exposedStep = lesson?.steps[stepIndex];
+  useEffect(() => {
+    if (exposedStep && exposedRef.current !== exposedStep.itemId) {
+      exposedRef.current = exposedStep.itemId;
+      recordExposure(exposedStep.words.map((w) => w.form));
+    }
+  }, [exposedStep, recordExposure]);
+
+  const showGloss = useCallback((form: string) => shouldShowGloss(mastery[form]), [mastery]);
 
   if (!lesson || !deck) {
     return (
@@ -102,21 +96,27 @@ export default function LessonPlayerScreen() {
 
   const step = lesson.steps[stepIndex];
   const isComplete = stepIndex >= lesson.steps.length;
-  const isSolved = step && placedIds.length === step.words.length;
-  const chips = step ? buildChipsForStep(step) : [];
+  const isSolved = !!step && placedIds.length === step.words.length;
+  const chips = useMemo(() => (step ? buildChipsForStep(step) : []), [step]);
 
-  const handleTapChip = useCallback((chipId: string, correctPos: number) => {
-    if (isSolved || placedIds.includes(chipId)) return;
-    if (correctPos === placedIds.length) {
-      setPlacedIds((prev) => [...prev, chipId]);
+  const handleTapChip = useCallback((chip: Chip) => {
+    if (!step || isSolved || placedIds.includes(chip.id)) return;
+    const slot = placedIds.length;
+    if (chip.correctPosition === slot) {
+      recordWordCorrect(step.words[slot].form);
+      setPlacedIds((prev) => [...prev, chip.id]);
     } else {
-      setWrongId(chipId);
+      const target = step.words[slot]?.form;
+      if (target) {
+        recordWordMistake(target);
+        recordMistake(step.itemId);
+      }
+      setWrongId(chip.id);
       setScore((s) => ({ ...s, mistakes: s.mistakes + 1 }));
-      if (step) recordMistake(step.itemId);
       if (wrongTimer.current) clearTimeout(wrongTimer.current);
       wrongTimer.current = setTimeout(() => setWrongId(null), 600);
     }
-  }, [isSolved, placedIds, step, recordMistake]);
+  }, [step, isSolved, placedIds, recordWordCorrect, recordWordMistake, recordMistake]);
 
   const handleContinue = useCallback(() => {
     setPlacedIds([]);
@@ -237,7 +237,9 @@ export default function LessonPlayerScreen() {
                   {placed ? (
                     <>
                       <Text style={{ fontSize: 17, fontWeight: '600', color: colors.text }}>{w.form}</Text>
-                      <Text style={{ fontSize: 10, color: colors.textMuted }}>{w.gloss}</Text>
+                      {showGloss(w.form) ? (
+                        <Text style={{ fontSize: 10, color: colors.textMuted }}>{w.gloss}</Text>
+                      ) : null}
                     </>
                   ) : null}
                 </View>
@@ -251,6 +253,11 @@ export default function LessonPlayerScreen() {
               <Text style={{ fontSize: 20, fontWeight: '700', color: colors.status.success, textAlign: 'center' }}>
                 {step.surfaceForm}
               </Text>
+              {step.transliteration ? (
+                <Text style={{ fontSize: 13, color: colors.textMuted, textAlign: 'center', marginTop: 2, fontStyle: 'italic' }}>
+                  {step.transliteration}
+                </Text>
+              ) : null}
               {step.contextSentence ? (
                 <View style={{ marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.cardBorder }}>
                   <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'center' }}>{step.contextSentence.ru}</Text>
@@ -274,7 +281,7 @@ export default function LessonPlayerScreen() {
                   <Pressable
                     key={chip.id}
                     disabled={isPlaced}
-                    onPress={() => handleTapChip(chip.id, chip.correctPos)}
+                    onPress={() => handleTapChip(chip)}
                     style={{
                       paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10,
                       borderWidth: 2, borderLeftWidth: 4, borderLeftColor: color,
@@ -284,7 +291,9 @@ export default function LessonPlayerScreen() {
                     }}
                   >
                     <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>{chip.form}</Text>
-                    <Text style={{ fontSize: 11, color: colors.textMuted }}>{chip.gloss}</Text>
+                    {showGloss(chip.form) ? (
+                      <Text style={{ fontSize: 11, color: colors.textMuted }}>{chip.gloss}</Text>
+                    ) : null}
                   </Pressable>
                 );
               })}
