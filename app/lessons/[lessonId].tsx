@@ -38,12 +38,8 @@ export default function LessonPlayerScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
 
-  // Speakable text per step = the phrase + each word's form. (Resolved before
-  // the not-found early return so the hooks below stay hook-order-stable.)
-  const audioTexts = useMemo(
-    () => (lesson?.steps ?? []).flatMap((s) => [s.surfaceForm, ...s.words.map((w) => w.form)]),
-    [lesson],
-  );
+  // Prefetch only the full sentences (words use Web Speech now). Lighter gate.
+  const audioTexts = useMemo(() => (lesson?.steps ?? []).map((s) => s.surfaceForm), [lesson]);
 
   // Gate the first card behind a spinner until the engine + first ~2 cards'
   // audio are synthesized; prefetch the rest in the background.

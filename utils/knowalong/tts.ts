@@ -34,7 +34,7 @@ function isWeb(): boolean {
 
 // ── Web Speech (immediate fallback) ────────────────────────────────────
 
-interface SpeechVoice { lang: string; }
+interface SpeechVoice { lang: string; name?: string; }
 interface SpeechSynth {
   speak: (u: unknown) => void;
   cancel: () => void;
@@ -52,9 +52,19 @@ function getSynth(): SpeechSynth | null {
   return synth && typeof synth.speak === 'function' ? synth : null;
 }
 
+// Best-effort male Russian voice — Web Speech exposes no gender field, so we
+// match known male voice names (e.g. macOS "Yuri"); falls back to the first
+// Russian voice if none matches. Platform-dependent.
+const MALE_VOICE_HINTS = [
+  'yuri', 'yuriy', 'pavel', 'dmitri', 'dmitriy', 'maxim', 'alexandr', 'alexander',
+  'nikolay', 'andrei', 'andrey', 'sergey', 'kirill', 'lev', 'male',
+];
+
 function pickRuVoice(synth: SpeechSynth): SpeechVoice | null {
   try {
-    return synth.getVoices().find((v) => v.lang?.toLowerCase().startsWith('ru')) ?? null;
+    const ru = synth.getVoices().filter((v) => v.lang?.toLowerCase().startsWith('ru'));
+    if (ru.length === 0) return null;
+    return ru.find((v) => MALE_VOICE_HINTS.some((h) => v.name?.toLowerCase().includes(h))) ?? ru[0];
   } catch {
     return null;
   }
@@ -247,11 +257,17 @@ export function isSpeechAvailable(): boolean {
   return isWeb() && (neuralReady || getSynth() !== null);
 }
 
-/** Vocalize `text` in Russian. Neural when ready; Web Speech otherwise. No-op
- *  off-web or on empty input. Never throws. */
+/** Vocalize `text` in Russian. Hybrid routing: isolated words (no space) →
+ *  Web Speech (correct pronunciation, commercial-safe); multi-word sentences
+ *  → neural (natural) with a Web Speech fallback while it warms. No-op off-web
+ *  or on empty input. Never throws. */
 export function speak(text: string, opts: { lang?: string; rate?: number } = {}): void {
   const trimmed = text?.trim();
   if (!trimmed || !isWeb()) return;
+  if (!trimmed.includes(' ')) {
+    speakWebSpeech(trimmed, opts);
+    return;
+  }
   if (neuralReady) {
     void speakNeural(trimmed).then((ok) => {
       if (!ok) speakWebSpeech(trimmed, opts);
@@ -259,7 +275,7 @@ export function speak(text: string, opts: { lang?: string; rate?: number } = {})
     return;
   }
   void loadSynth(); // warm in the background
-  speakWebSpeech(trimmed, opts); // immediate fallback
+  speakWebSpeech(trimmed, opts); // immediate fallback while neural loads
 }
 
 /** Stop any in-flight speech (neural audio + Web Speech). */

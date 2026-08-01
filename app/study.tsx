@@ -53,11 +53,8 @@ export default function StudyScreen() {
   const [audioReady, setAudioReady] = useState(false);
   const stepHadMistake = useRef(false);
 
-  // Speakable text per step = the phrase + each word's form.
-  const audioTexts = useMemo(
-    () => steps.flatMap((s) => [s.surfaceForm, ...s.words.map((w) => w.form)]),
-    [steps],
-  );
+  // Prefetch only the full sentences (words use Web Speech now). Lighter gate.
+  const audioTexts = useMemo(() => steps.map((s) => s.surfaceForm), [steps]);
 
   // Gate the first card behind a spinner until the engine + first ~2 cards'
   // audio are synthesized; prefetch the rest in the background while the
