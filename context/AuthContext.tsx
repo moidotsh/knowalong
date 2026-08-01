@@ -15,6 +15,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import { AuthService, type AuthSession } from '../utils/supabase';
 import { logger } from '../utils';
 import { useAuthStore } from '../stores';
+import { DEMO_MODE } from '../utils/supabase/repositories';
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -44,6 +45,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // gone provider (audit R1). Each session write mirrors into
   // authStore so the AuthGuard + safeGoBack() can read live status.
   useEffect(() => {
+    // Dev-mode auth bypass: when DEMO_MODE (no Supabase configured),
+    // skip the login flow + set a mock session so the operator can
+    // explore the app without credentials. This is the arqavellum
+    // consumer's built-in "I don't have a backend yet" path.
+    if (DEMO_MODE) {
+      const mockSession: AuthSession = {
+        userId: 'demo-user',
+        email: 'demo@knowalong.app',
+        accessToken: 'demo-access-token',
+        refreshToken: 'demo-refresh-token',
+      };
+      setSession(mockSession);
+      useAuthStore.getState().setSession({
+        userId: mockSession.userId,
+        email: mockSession.email,
+      });
+      return;
+    }
+
     let cancelled = false;
     let unsubscribe = () => {};
 
