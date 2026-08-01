@@ -122,8 +122,16 @@ export function navigateToLessons() {
   router.push('/lessons');
 }
 
+export function navigateToLesson(lessonId: string) {
+  router.push(`/lessons/${lessonId}`);
+}
+
 export function navigateToProgress() {
   router.push('/progress');
+}
+
+export function navigateToAchievements() {
+  router.push('/achievements');
 }
 
 export function navigateToSource(sourceId: string) {

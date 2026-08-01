@@ -22,6 +22,7 @@ import {
   navigateToSettings,
   navigateToLessons,
   navigateToProgress,
+  navigateToAchievements,
 } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
 import {
@@ -134,9 +135,14 @@ export default function HomeScreen() {
         <View style={{ marginTop: 20 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <MobileSectionEyebrow>Your learning path</MobileSectionEyebrow>
-            <Pressable onPress={() => navigateToProgress()}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Progress →</Text>
-            </Pressable>
+            <View style={{ flexDirection: 'row', gap: 12 }}>
+              <Pressable onPress={() => navigateToAchievements()}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>🏆 Achievements</Text>
+              </Pressable>
+              <Pressable onPress={() => navigateToProgress()}>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Progress →</Text>
+              </Pressable>
+            </View>
           </View>
           {LEARNING_PATH.map((tier) => (
             <View key={tier.tier} style={{ marginBottom: 16 }}>

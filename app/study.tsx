@@ -29,6 +29,8 @@ import {
   type WordChip,
   type WordRole,
 } from '../utils/knowalong/fixtures/learningItems';
+import { ConfettiEffect } from '../components/Celebration/ConfettiEffect';
+import { useStreakStore } from '../stores/streakStore';
 
 function roleColor(colors: ReturnType<typeof useAppTheme>['colors'], role: WordRole): string {
   const key = ROLE_COLOR_KEYS[role];
@@ -44,6 +46,8 @@ export default function StudyScreen() {
   const [placedIds, setPlacedIds] = useState<string[]>([]);
   const [wrongId, setWrongId] = useState<string | null>(null);
   const [score, setScore] = useState({ correct: 0, mistakes: 0 });
+  const [showConfetti, setShowConfetti] = useState(false);
+  const recordStudySession = useStreakStore((s) => s.recordStudySession);
   const wrongTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const question = questions[index];
@@ -69,8 +73,15 @@ export default function StudyScreen() {
   const handleContinue = useCallback(() => {
     setPlacedIds([]);
     setWrongId(null);
-    setIndex((i) => i + 1);
-  }, []);
+    setIndex((i) => {
+      if (i + 1 >= total) {
+        setShowConfetti(true);
+        recordStudySession();
+        setTimeout(() => setShowConfetti(false), 3500);
+      }
+      return i + 1;
+    });
+  }, [total, recordStudySession]);
 
   const handleRestart = useCallback(() => {
     setIndex(0);
@@ -257,6 +268,8 @@ export default function StudyScreen() {
           </MobilePrimaryButton>
         </MobileActionFooter>
       ) : null}
+      <ConfettiEffect visible={showConfetti} intensity="intense" />
+
     </SafeAreaView>
   );
 }
