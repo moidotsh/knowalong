@@ -46,7 +46,7 @@ function masteryColor(colors: ReturnType<typeof useAppTheme>['colors'], state: M
 function masteryIcon(state: MasteryState): string {
   if (state === 'mastered') return '✓';
   if (state === 'in-progress') return '●';
-  return '🔒';
+  return '—';
 }
 
 function StatCard({ value, label, color, mutedColor }: { value: string; label: string; color: string; mutedColor: string }) {
@@ -74,7 +74,7 @@ function PathChip({ concept, colors }: { concept: PathConcept; colors: ReturnTyp
         minWidth: 80,
       }}
     >
-      <Text style={{ fontSize: 22, marginBottom: 2 }}>{concept.emoji}</Text>
+      <ConceptIcon name={ITEM_ICONS[concept.code] ?? 'star'} size={26} color={masteryColor(colors, concept.state)} />
       <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{concept.surfaceForm}</Text>
       <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 1 }}>{concept.meaning}</Text>
       <Text style={{ fontSize: 10, color: mc, marginTop: 3, fontWeight: '700' }}>
@@ -105,7 +105,7 @@ export default function HomeScreen() {
         <Pressable onPress={() => navigateToStudy()}>
           <MobileSurface padding={20}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-              <Text style={{ fontSize: 44 }}>{NEXT_ACTION.emoji}</Text>
+              <ConceptIcon name={ITEM_ICONS['4'] ?? 'star'} size={44} color={colors.brand} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
                   Continue learning
@@ -160,7 +160,7 @@ export default function HomeScreen() {
             <StatCard value={`${LEARNER_STATS.conceptsMastered}/${LEARNER_STATS.conceptsTotal}`} label="concepts" color={colors.status.success} mutedColor={colors.textMuted} />
           </MobileSurface>
           <MobileSurface padding={14}>
-            <StatCard value={`${LEARNER_STATS.streakDays} 🔥`} label="day streak" color={colors.status.warning} mutedColor={colors.textMuted} />
+            <StatCard value={`${LEARNER_STATS.streakDays}`} label="day streak" color={colors.status.warning} mutedColor={colors.textMuted} />
           </MobileSurface>
           <MobileSurface padding={14}>
             <StatCard value={`${LEARNER_STATS.accuracyPct}%`} label="accuracy" color={colors.brand} mutedColor={colors.textMuted} />
@@ -173,7 +173,7 @@ export default function HomeScreen() {
             <MobileSectionEyebrow>Your learning path</MobileSectionEyebrow>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <Pressable onPress={() => navigateToAchievements()}>
-                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>🏆 Achievements</Text>
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Achievements</Text>
               </Pressable>
               <Pressable onPress={() => navigateToProgress()}>
                 <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Progress →</Text>
@@ -198,7 +198,7 @@ export default function HomeScreen() {
         <Pressable onPress={() => navigateToLessons()} style={{ marginTop: 8 }}>
           <MobileSurface padding={16}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <Text style={{ fontSize: 28 }}>📖</Text>
+              <ConceptIcon name="book" size={28} color={colors.brand} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Gradient lessons</Text>
                 <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>

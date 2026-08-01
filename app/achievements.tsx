@@ -10,10 +10,12 @@ import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
 import { useStreakStore } from '../stores/streakStore';
+import { ConceptIcon } from '../components/knowalong/ConceptIcon';
+import { ACHIEVEMENT_ICONS, type IconName } from '../utils/knowalong/icons';
 
 interface Achievement {
   id: string;
-  emoji: string;
+  icon: IconName;
   title: string;
   description: string;
   earned: boolean;
@@ -28,18 +30,18 @@ export default function AchievementsScreen() {
   const streak = useStreakStore((s) => s.getStreak(5).streak);
 
   const achievements: Achievement[] = [
-    { id: 'first-step', emoji: '👣', title: 'First Steps', description: 'Complete your first study session', earned: sessions >= 1 },
-    { id: 'streak-3', emoji: '🔥', title: 'On Fire', description: '3-day study streak', earned: streak >= 3 },
-    { id: 'streak-7', emoji: '🔥', title: 'Week Warrior', description: '7-day study streak', earned: streak >= 7 },
-    { id: 'streak-30', emoji: '🏆', title: 'Unstoppable', description: '30-day study streak', earned: streak >= 30 },
-    { id: 'concepts-5', emoji: '🧠', title: 'Quick Learner', description: 'Master 5 concepts', earned: concepts >= 5 },
-    { id: 'concepts-10', emoji: '🎓', title: 'Foundation Builder', description: 'Master 10 concepts', earned: concepts >= 10 },
-    { id: 'concepts-25', emoji: '📚', title: 'Vocabulary Vault', description: 'Master 25 concepts', earned: concepts >= 25 },
-    { id: 'lesson-1', emoji: '📖', title: 'Lesson Learned', description: 'Complete a gradient lesson', earned: lessons >= 1 },
-    { id: 'lesson-3', emoji: '✨', title: 'Pattern Builder', description: 'Complete 3 gradient lessons', earned: lessons >= 3 },
-    { id: 'sessions-10', emoji: '⭐', title: 'Dedicated', description: '10 study sessions', earned: sessions >= 10 },
-    { id: 'sessions-50', emoji: '💎', title: 'Diamond Mind', description: '50 study sessions', earned: sessions >= 50 },
-    { id: 'sessions-100', emoji: '👑', title: 'Centurion', description: '100 study sessions', earned: sessions >= 100 },
+    { id: 'first-step', icon: 'footprints', title: 'First Steps', description: 'Complete your first study session', earned: sessions >= 1 },
+    { id: 'streak-3', icon: 'flame', title: 'On Fire', description: '3-day study streak', earned: streak >= 3 },
+    { id: 'streak-7', icon: 'flame', title: 'Week Warrior', description: '7-day study streak', earned: streak >= 7 },
+    { id: 'streak-30', icon: 'trophy', title: 'Unstoppable', description: '30-day study streak', earned: streak >= 30 },
+    { id: 'concepts-5', icon: 'brain', title: 'Quick Learner', description: 'Master 5 concepts', earned: concepts >= 5 },
+    { id: 'concepts-10', icon: 'graduation', title: 'Foundation Builder', description: 'Master 10 concepts', earned: concepts >= 10 },
+    { id: 'concepts-25', icon: 'book', title: 'Vocabulary Vault', description: 'Master 25 concepts', earned: concepts >= 25 },
+    { id: 'lesson-1', icon: 'book', title: 'Lesson Learned', description: 'Complete a gradient lesson', earned: lessons >= 1 },
+    { id: 'lesson-3', icon: 'sparkles', title: 'Pattern Builder', description: 'Complete 3 gradient lessons', earned: lessons >= 3 },
+    { id: 'sessions-10', icon: 'star', title: 'Dedicated', description: '10 study sessions', earned: sessions >= 10 },
+    { id: 'sessions-50', icon: 'star', title: 'Diamond Mind', description: '50 study sessions', earned: sessions >= 50 },
+    { id: 'sessions-100', icon: 'trophy', title: 'Centurion', description: '100 study sessions', earned: sessions >= 100 },
   ];
 
   const earned = achievements.filter((a) => a.earned);
@@ -59,7 +61,7 @@ export default function AchievementsScreen() {
               <Text style={{ fontSize: 11, color: colors.textMuted }}>earned</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: colors.brand }}>{streak}🔥</Text>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: colors.brand }}>{streak}</Text>
               <Text style={{ fontSize: 11, color: colors.textMuted }}>streak</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
@@ -76,7 +78,7 @@ export default function AchievementsScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
               {earned.map((a) => (
                 <View key={a.id} style={{ width: '47%', padding: 14, borderRadius: 14, borderWidth: 2, borderColor: colors.status.success + '30', backgroundColor: colors.status.success + '08' }}>
-                  <Text style={{ fontSize: 32 }}>{a.emoji}</Text>
+                  <ConceptIcon name={a.icon} size={32} color={colors.status.success} />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 6 }}>{a.title}</Text>
                   <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{a.description}</Text>
                 </View>
@@ -92,7 +94,7 @@ export default function AchievementsScreen() {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 8 }}>
               {locked.map((a) => (
                 <View key={a.id} style={{ width: '47%', padding: 14, borderRadius: 14, borderWidth: 2, borderColor: colors.cardBorder, backgroundColor: colors.cardAlt, opacity: 0.6 }}>
-                  <Text style={{ fontSize: 32 }}>{a.emoji}</Text>
+                  <ConceptIcon name={a.icon} size={32} color={colors.textMuted} />
                   <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textSecondary, marginTop: 6 }}>{a.title}</Text>
                   <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{a.description}</Text>
                 </View>

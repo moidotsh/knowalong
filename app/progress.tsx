@@ -9,6 +9,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobileSectionEyebrow } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToStudy } from '../navigation';
+import { ConceptIcon } from '../components/knowalong/ConceptIcon';
+import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { SCREEN_BODY_STYLE } from '../constants';
 import {
   LEARNING_PATH,
@@ -44,7 +46,7 @@ export default function ProgressScreen() {
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {[
             { value: `${LEARNER_STATS.conceptsMastered}/${LEARNER_STATS.conceptsTotal}`, label: 'Concepts', color: colors.status.success },
-            { value: `${LEARNER_STATS.streakDays}🔥`, label: 'Streak', color: colors.status.warning },
+            { value: `${LEARNER_STATS.streakDays}`, label: 'Streak', color: colors.status.warning },
             { value: `${LEARNER_STATS.sessionsCompleted}`, label: 'Sessions', color: colors.brand },
             { value: `${LEARNER_STATS.minutesStudied}m`, label: 'Studied', color: colors.textSecondary },
           ].map((stat, i) => (
@@ -74,7 +76,7 @@ export default function ProgressScreen() {
                       alignItems: 'center',
                     }}
                   >
-                    <Text style={{ fontSize: 16 }}>{studied ? '🔥' : ''}</Text>
+                    <ConceptIcon name="flame" size={18} color={studied ? colors.status.warning : 'transparent'} />
                   </View>
                   <Text style={{ fontSize: 10, color: colors.textMuted }}>{DAYS[i]}</Text>
                 </View>
@@ -112,7 +114,7 @@ export default function ProgressScreen() {
                         minWidth: 72,
                       }}
                     >
-                      <Text style={{ fontSize: 20, marginBottom: 2 }}>{concept.emoji}</Text>
+                      <View style={{ marginBottom: 2 }}><ConceptIcon name={ITEM_ICONS[concept.code] ?? 'star'} size={22} color={masteryColor(colors, concept.state)} /></View>
                       <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>{concept.surfaceForm}</Text>
                       <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 1 }}>{concept.meaning}</Text>
                       <View style={{ marginTop: 4, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, backgroundColor: mc + '20' }}>

@@ -9,10 +9,12 @@ import { MobileAtmosphere, MobileSurface, MobileHeader } from '../components/Mob
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToLesson } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
+import { ConceptIcon } from '../components/knowalong/ConceptIcon';
+import type { IconName } from '../utils/knowalong/icons';
 
 interface LessonPreview {
   id: string;
-  emoji: string;
+  icon: IconName;
   title: string;
   subtitle: string;
   tierLabel: string;
@@ -20,9 +22,9 @@ interface LessonPreview {
 }
 
 const LESSONS: readonly LessonPreview[] = [
-  { id: 'foundations', emoji: '🧑', title: 'First Words', subtitle: 'я, я вижу, я знаю, я хочу', tierLabel: 'Tier 0', stepCount: 4 },
-  { id: 'daily-life', emoji: '🚶', title: 'Daily Life', subtitle: 'я иду, я живу, мне нравится', tierLabel: 'Tier 1', stepCount: 3 },
-  { id: 'expressions', emoji: '🌊', title: 'Making Sentences', subtitle: 'я не знаю, я вижу море, я хочу чай', tierLabel: 'Tier 2', stepCount: 3 },
+  { id: 'foundations', icon: 'user', title: 'First Words', subtitle: 'я, я вижу, я знаю, я хочу', tierLabel: 'Tier 0', stepCount: 4 },
+  { id: 'daily-life', icon: 'footprints', title: 'Daily Life', subtitle: 'я иду, я живу, мне нравится', tierLabel: 'Tier 1', stepCount: 3 },
+  { id: 'expressions', icon: 'waves', title: 'Making Sentences', subtitle: 'я не знаю, я вижу море, я хочу чай', tierLabel: 'Tier 2', stepCount: 3 },
 ] as const;
 
 export default function LessonsScreen() {
@@ -39,7 +41,7 @@ export default function LessonsScreen() {
           <Pressable key={lesson.id} onPress={() => navigateToLesson(lesson.id)} style={{ borderRadius: 14 }}>
             <MobileSurface padding={18}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
-                <Text style={{ fontSize: 36 }}>{lesson.emoji}</Text>
+                <ConceptIcon name={lesson.icon} size={36} color={colors.brand} />
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{lesson.title}</Text>
                   <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>{lesson.subtitle}</Text>

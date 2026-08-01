@@ -12,6 +12,8 @@ import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToLessons } from '../../navigation';
 import { SCREEN_BODY_STYLE } from '../../constants';
 import { LEARNING_ITEMS, type LearningItem } from '../../utils/knowalong/fixtures/learningItems';
+import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
+import { ITEM_ICONS } from '../../utils/knowalong/icons';
 
 const LESSON_ITEMS: Record<string, readonly LearningItem[]> = {
   foundations: LEARNING_ITEMS.slice(0, 4),
@@ -47,7 +49,7 @@ export default function LessonPlayerScreen() {
         <MobileHeader title="Lesson complete!" onBack={safeGoBack} />
         <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20 }}>
           <MobileSurface padding={24}>
-            <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>🎉</Text>
+            <ConceptIcon name="sparkles" size={40} color={colors.status.success} />
             <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
               {items.length} phrases mastered
             </Text>
@@ -56,7 +58,7 @@ export default function LessonPlayerScreen() {
             </Text>
             {items.map((it, i) => (
               <Text key={i} style={{ fontSize: 15, fontWeight: '600', color: colors.text, textAlign: 'center', marginTop: 8 }}>
-                {it.emoji} {it.surfaceForm} — {it.meaning}
+                {it.surfaceForm} — {it.meaning}
               </Text>
             ))}
           </MobileSurface>
@@ -80,8 +82,8 @@ export default function LessonPlayerScreen() {
       </View>
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20 }}>
         <MobileSurface padding={24}>
-          {item.emoji ? (
-            <Text style={{ fontSize: 56, textAlign: 'center', marginBottom: 8 }}>{item.emoji}</Text>
+          {ITEM_ICONS[item.id] ? (
+            <View style={{ alignItems: 'center', marginBottom: 8 }}><ConceptIcon name={ITEM_ICONS[item.id] ?? 'star'} size={56} color={colors.brand} /></View>
           ) : null}
           <Text style={{ fontSize: 36, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
             {item.surfaceForm}

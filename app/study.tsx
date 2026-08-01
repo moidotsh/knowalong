@@ -31,6 +31,8 @@ import {
 } from '../utils/knowalong/fixtures/learningItems';
 import { ConfettiEffect } from '../components/Celebration/ConfettiEffect';
 import { useStreakStore } from '../stores/streakStore';
+import { ConceptIcon } from '../components/knowalong/ConceptIcon';
+import { ITEM_ICONS } from '../utils/knowalong/icons';
 
 function roleColor(colors: ReturnType<typeof useAppTheme>['colors'], role: WordRole): string {
   const key = ROLE_COLOR_KEYS[role];
@@ -129,8 +131,8 @@ export default function StudyScreen() {
             <Text style={[styles.promptLabel, { color: colors.textMuted }]}>
               Build this in Russian:
             </Text>
-            {question.item.emoji ? (
-              <Text style={styles.promptEmoji}>{question.item.emoji}</Text>
+            {ITEM_ICONS[question.item.id] ? (
+              <View style={styles.promptEmojiWrap}><ConceptIcon name={ITEM_ICONS[question.item.id] ?? 'star'} size={48} color={colors.brand} /></View>
             ) : null}
             <Text style={[styles.prompt, { color: colors.text }]}>
               {question.prompt}
@@ -282,6 +284,7 @@ const styles = StyleSheet.create({
   promptLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
   prompt: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
   promptEmoji: { fontSize: 48, textAlign: 'center', marginBottom: 4 },
+  promptEmojiWrap: { alignItems: 'center', marginBottom: 4 },
   slotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 20 },
   slotFilled: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderLeftWidth: 4, minWidth: 70, alignItems: 'center' },
   slotEmpty: { width: 70, height: 56, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed' },
