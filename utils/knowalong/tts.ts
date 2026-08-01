@@ -22,6 +22,17 @@
 const PIPER_VOICE = 'ru_RU-denis-medium';
 const RU_LANG = 'ru-RU';
 
+// onnxruntime-web wasm paths. `onnxWasm` MUST match the version bundled into
+// /tts/piper.mjs (1.27.0) — the mintplex default points at cdnjs 1.18.0, which
+// 404s on the 1.27 wasm filenames (ort-wasm-simd-threaded.jsep.mjs).
+// piperData/piperWasm are the mintplex defaults (piper phonemizer).
+const PIPER_WASM_PATHS = {
+  onnxWasm: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.27.0/dist/',
+  piperData: 'https://cdn.jsdelivr.net/npm/@diffusionstudio/piper-wasm@1.0.0/build/piper_phonemize.data',
+  piperWasm: 'https://cdn.jsdelivr.net/npm/@diffusionstudio/piper-wasm@1.0.0/build/piper_phonemize.wasm',
+};
+interface PiperWasmPaths { onnxWasm: string; piperData: string; piperWasm: string; }
+
 function isWeb(): boolean {
   return typeof window !== 'undefined';
 }
@@ -91,7 +102,7 @@ interface PiperSession {
   predict: (text: string) => Promise<Blob>;
 }
 interface PiperModule {
-  TtsSession: { create: (opts: { voiceId: string }) => Promise<PiperSession> };
+  TtsSession: { create: (opts: { voiceId: string; wasmPaths?: PiperWasmPaths }) => Promise<PiperSession> };
 }
 
 // new Function hides the dynamic import from metro/babel static analysis.
@@ -109,7 +120,7 @@ function loadPiper(): Promise<PiperSession | null> {
     piperPromise = (async () => {
       try {
         const mod = await importPiper(PIPER_URL);
-        const session = await mod.TtsSession.create({ voiceId: PIPER_VOICE });
+        const session = await mod.TtsSession.create({ voiceId: PIPER_VOICE, wasmPaths: PIPER_WASM_PATHS });
         piperReady = true;
         return session;
       } catch {
