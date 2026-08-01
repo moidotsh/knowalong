@@ -202,6 +202,10 @@ export function navigateToNumbers() {
   router.push('/numbers');
 }
 
+export function navigateToSvetofor() {
+  router.push('/source/svetofor/svetofor');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }

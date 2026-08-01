@@ -35,6 +35,7 @@ export {
   navigateToType,
   navigateToAlphabet,
   navigateToNumbers,
+  navigateToSvetofor,
   navigateToSource,
   navigateToSection,
   navigateToLemma,
