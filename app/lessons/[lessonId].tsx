@@ -9,8 +9,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
-import { safeGoBack, navigateToLessons } from '../../navigation';
+import { safeGoBack, navigateToLessons, navigateToHome } from '../../navigation';
 import { SCREEN_BODY_STYLE } from '../../constants';
+import { useStreakStore } from '../../stores/streakStore';
 import { LEARNING_ITEMS, type LearningItem } from '../../utils/knowalong/fixtures/learningItems';
 import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
 import { ITEM_ICONS } from '../../utils/knowalong/icons';
@@ -64,8 +65,8 @@ export default function LessonPlayerScreen() {
           </MobileSurface>
         </ScrollView>
         <MobileActionFooter>
-          <MobilePrimaryButton variant="primary" onPress={navigateToLessons}>More lessons</MobilePrimaryButton>
-          <MobilePrimaryButton variant="secondary" onPress={() => { setStepIndex(0); }}>Review again</MobilePrimaryButton>
+          <MobilePrimaryButton variant="primary" onPress={() => { useStreakStore.getState().recordLessonComplete(); navigateToHome(); }}>Back to stream</MobilePrimaryButton>
+          <MobilePrimaryButton variant="ghost" onPress={navigateToLessons}>More lessons</MobilePrimaryButton>
         </MobileActionFooter>
       </SafeAreaView>
     );

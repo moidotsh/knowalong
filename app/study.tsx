@@ -20,7 +20,7 @@ import {
   MobileActionFooter,
 } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
-import { safeGoBack } from '../navigation';
+import { safeGoBack, navigateToHome } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
 import {
   buildQuiz,
@@ -50,6 +50,8 @@ export default function StudyScreen() {
   const [score, setScore] = useState({ correct: 0, mistakes: 0 });
   const [showConfetti, setShowConfetti] = useState(false);
   const recordStudySession = useStreakStore((s) => s.recordStudySession);
+  const recordMistake = useStreakStore((s) => s.recordMistake);
+  const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
   const wrongTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const question = questions[index];
@@ -67,10 +69,11 @@ export default function StudyScreen() {
     } else {
       setWrongId(chip.id);
       setScore((s) => ({ ...s, mistakes: s.mistakes + 1 }));
+      recordMistake(question.item.id);
       if (wrongTimer.current) clearTimeout(wrongTimer.current);
       wrongTimer.current = setTimeout(() => setWrongId(null), 600);
     }
-  }, [isSolved, placedIds, question, wrongId]);
+  }, [isSolved, placedIds, question, wrongId, recordMistake]);
 
   const handleContinue = useCallback(() => {
     setPlacedIds([]);
@@ -79,11 +82,12 @@ export default function StudyScreen() {
       if (i + 1 >= total) {
         setShowConfetti(true);
         recordStudySession();
+        addMasteredConcept();
         setTimeout(() => setShowConfetti(false), 3500);
       }
       return i + 1;
     });
-  }, [total, recordStudySession]);
+  }, [total, recordStudySession, addMasteredConcept]);
 
   const handleRestart = useCallback(() => {
     setIndex(0);
@@ -265,8 +269,11 @@ export default function StudyScreen() {
         </MobileActionFooter>
       ) : isComplete ? (
         <MobileActionFooter>
-          <MobilePrimaryButton variant="primary" onPress={handleRestart}>
-            Try again
+          <MobilePrimaryButton variant="primary" onPress={() => navigateToHome()}>
+            Back to stream
+          </MobilePrimaryButton>
+          <MobilePrimaryButton variant="ghost" onPress={handleRestart}>
+            Study again
           </MobilePrimaryButton>
         </MobileActionFooter>
       ) : null}
