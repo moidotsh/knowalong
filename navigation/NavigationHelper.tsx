@@ -186,6 +186,22 @@ export function navigateToSongs() {
   router.push('/songs');
 }
 
+export function navigateToConnections() {
+  router.push('/connections');
+}
+
+export function navigateToType() {
+  router.push('/type');
+}
+
+export function navigateToAlphabet() {
+  router.push('/alphabet');
+}
+
+export function navigateToNumbers() {
+  router.push('/numbers');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }

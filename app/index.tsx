@@ -10,6 +10,7 @@ import { useAppTheme } from '../context';
 import {
   navigateToStudy, navigateToSettings, navigateToLessons,
   navigateToProgress, navigateToSongs, navigateToConversation,
+  navigateToConnections, navigateToType, navigateToAlphabet, navigateToNumbers,
 } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
 import { LEARNER_STATS, NEXT_ACTION } from '../utils/knowalong/fixtures/learnerPath';
@@ -31,6 +32,10 @@ export default function HomeScreen() {
     { icon: 'sparkles', label: 'Conversation', onPress: navigateToConversation, color: colors.status.success },
     { icon: 'waves', label: 'Songs', onPress: navigateToSongs, color: colors.textSecondary },
     { icon: 'star', label: 'Progress', onPress: navigateToProgress, color: colors.status.warning },
+    { icon: 'brain', label: 'Map', onPress: navigateToConnections, color: colors.brand },
+    { icon: 'book', label: 'Alphabet', onPress: navigateToAlphabet, color: colors.status.success },
+    { icon: 'target', label: 'Numbers', onPress: navigateToNumbers, color: colors.status.warning },
+    { icon: 'check', label: 'Type', onPress: navigateToType, color: colors.textSecondary },
   ];
 
   return (
