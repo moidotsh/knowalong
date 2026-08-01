@@ -23,6 +23,7 @@
 // vocabulary until they can read the section's lyrics.
 
 import type { Lesson, LessonStep, SubDeck } from './decks';
+import { INTRO_LESSONS } from '../songCurriculum';
 
 type W = { form: string; gloss: string; role: 'pronoun' | 'verb' | 'noun' | 'particle' | 'adjective' | 'adverb' };
 
@@ -44,36 +45,11 @@ function lesson(id: string, title: string, subtitle: string, icon: Lesson['icon'
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// INTRO SUB-DECK — 3 lessons × ~6 cards each
-// Sets up mood vocabulary: эй, будто, полетев, фантом
+// INTRO SUB-DECK — built by the i+1 assembler (../songCurriculum.ts).
+// One arc lesson per lyric word (эй / будто / полетев / фантомом), each
+// reusing the word in known contexts, then a culminating full-line lesson.
+// Replaces the old dense "whole lyric line in one lesson" cards.
 // ═══════════════════════════════════════════════════════════════════
-
-const INTRO_L1 = lesson('sv-intro-1', 'Intro · Lesson 1', 'Warmup: interjections + comparisons', 'sparkles', [
-  card('i1-1', 'эй', 'Hey', 'A casual interjection — "hey" or "yo". Used to grab attention or set a mood.', [{ form: 'эй', gloss: 'hey', role: 'particle' }], 'Эй', 'Hey'),
-  card('i1-2', 'а', 'Ah / and', 'A particle that can mean "ah" (exclamation) or "and/but" (conjunction). Context decides.', [{ form: 'а', gloss: 'ah', role: 'particle' }], 'А, будто полетев фантомом, а', 'Ah, as if flying like a phantom, ah'),
-  card('i1-3', 'будто', 'As if', 'Introduces a comparison or metaphor. "Будто" = "as if / as though".', [{ form: 'будто', gloss: 'as if', role: 'particle' }], 'Будто полетев фантомом вглубь', 'As if flying like a phantom deep inside'),
-  card('i1-4', 'как будто', 'As if', 'Together: "как" (how/like) + "будто" (as if) = "as if" — an emphatic comparison.', [{ form: 'как', gloss: 'like', role: 'particle' }, { form: 'будто', gloss: 'as if', role: 'particle' }]),
-  card('i1-5', 'вглубь', 'Deep into', 'An adverb meaning "deep into" or "in depth". Directional — implies going further in.', [{ form: 'вглубь', gloss: 'deep into', role: 'adverb' }], 'Будто полетев фантомом вглубь', 'As if flying like a phantom deep inside'),
-  card('i1-6', 'будто вглубь', 'As if deep into', 'Combining: "as if" + "deep into". Practice the two new words together.', [{ form: 'будто', gloss: 'as if', role: 'particle' }, { form: 'вглубь', gloss: 'deep into', role: 'adverb' }]),
-]);
-
-const INTRO_L2 = lesson('sv-intro-2', 'Intro · Lesson 2', 'Flying like a phantom', 'sparkles', [
-  card('i2-1', 'летать', 'To fly', 'Infinitive: "to fly" (general/habitual). The base verb.', [{ form: 'летать', gloss: 'to fly', role: 'verb' }]),
-  card('i2-2', 'полет', 'A flight', 'A noun: "a flight" — from the same root as летать.', [{ form: 'полет', gloss: 'flight', role: 'noun' }]),
-  card('i2-3', 'полетев', 'Having flown', 'A past adverbial participle (деепричастие). A Russian form with no English equivalent — means "after flying" or "having flown".', [{ form: 'полетев', gloss: 'having flown', role: 'verb' }], 'Будто полетев фантомом', 'As if having flown like a phantom'),
-  card('i2-4', 'фантом', 'Phantom', 'A phantom/ghost. Nominative form (dictionary form).', [{ form: 'фантом', gloss: 'phantom', role: 'noun' }]),
-  card('i2-5', 'фантомом', 'Like a phantom', 'Instrumental case: фантом + ом. Means "as a phantom" or "by means of a phantom".', [{ form: 'фантомом', gloss: 'phantom (instr.)', role: 'noun' }], 'Будто полетев фантомом', 'As if having flown like a phantom'),
-  card('i2-6', 'будто полетев фантомом', 'As if having flown like a phantom', 'The full intro phrase. All three new words combined.', [{ form: 'будто', gloss: 'as if', role: 'particle' }, { form: 'полетев', gloss: 'having flown', role: 'verb' }, { form: 'фантомом', gloss: 'phantom', role: 'noun' }], 'А, будто полетев фантомом, а', 'Ah, as if flying like a phantom, ah'),
-]);
-
-const INTRO_L3 = lesson('sv-intro-3', 'Intro · Lesson 3', 'Flying verbs + full assembly', 'sparkles', [
-  card('i3-1', 'лететь', 'To fly (one-way)', 'Russian has two "fly" verbs. "Летать" = to fly in general / habitually / back-and-forth. "Лететь" = to fly in one specific direction, one trip. This is the unidirectional verb.', [{ form: 'лететь', gloss: 'to fly (one-way)', role: 'verb' }], 'Куда он летит?', 'Where is he flying (to)?'),
-  card('i3-2', 'лечу', 'I am flying', 'Present tense, first person of "лететь": "I am flying" / "I fly" (right now, one-way).', [{ form: 'лечу', gloss: 'I fly', role: 'verb' }], 'Я лечу домой', 'I am flying home'),
-  card('i3-3', 'полечу', 'I will fly', 'Future tense, first person of "лететь": "I will fly".', [{ form: 'полечу', gloss: "I'll fly", role: 'verb' }], 'Завтра я полечу', 'Tomorrow I will fly'),
-  card('i3-4', 'будто полетев', 'As if having flown', 'Review: "будто" (as if) + "полетев" (having flown — the adverbial participle from Lesson 2).', [{ form: 'будто', gloss: 'as if', role: 'particle' }, { form: 'полетев', gloss: 'having flown', role: 'verb' }], 'Будто полетев фантомом вглубь', 'As if having flown like a phantom deep inside'),
-  card('i3-5', 'будто полетев фантомом вглубь', 'As if having flown like a phantom deep into', 'The full intro image: the three new words + "вглубь" (deep into).', [{ form: 'будто', gloss: 'as if', role: 'particle' }, { form: 'полетев', gloss: 'having flown', role: 'verb' }, { form: 'фантомом', gloss: 'phantom', role: 'noun' }, { form: 'вглубь', gloss: 'deep into', role: 'adverb' }], 'Будто полетев фантомом вглубь', 'As if having flown like a phantom deep inside'),
-  card('i3-6', 'А, будто полетев фантомом, а', 'Ah, as if having flown like a phantom, ah', 'The complete intro line. "А" here is a sighing particle ("ah"), not the conjunction.', [{ form: 'а', gloss: 'ah', role: 'particle' }, { form: 'будто', gloss: 'as if', role: 'particle' }, { form: 'полетев', gloss: 'having flown', role: 'verb' }, { form: 'фантомом', gloss: 'phantom', role: 'noun' }], 'А, будто полетев фантомом, а', 'Ah, as if having flown like a phantom, ah'),
-]);
 
 // ═══════════════════════════════════════════════════════════════════
 // VERSE 1 SUB-DECK — 8 lessons × ~6-9 cards each
@@ -369,7 +345,7 @@ const OUTRO_L3 = lesson('sv-out-3', 'Outro · Lesson 3', 'Don\'t forget yourself
 // ═══════════════════════════════════════════════════════════════════
 
 export const SVETOFOR_SUBDECKS: SubDeck[] = [
-  { id: 'sv-intro', label: 'Intro', kind: 'intro', lyricSectionId: 'intro', lessons: [INTRO_L1, INTRO_L2, INTRO_L3] },
+  { id: 'sv-intro', label: 'Intro', kind: 'intro', lyricSectionId: 'intro', lessons: INTRO_LESSONS },
   { id: 'sv-verse-1', label: 'Verse 1', kind: 'verse', lyricSectionId: 'verse-1', lessons: [V1_L1, V1_L2, V1_L3, V1_L4, V1_L5, V1_L6, V1_L7, V1_L8] },
   { id: 'sv-chorus', label: 'Chorus', kind: 'chorus', lyricSectionId: 'chorus', lessons: [CH_L1, CH_L2, CH_L3, CH_L4, CH_L5, CH_L6] },
   { id: 'sv-verse-2', label: 'Verse 2', kind: 'verse', lyricSectionId: 'verse-2', lessons: [V2_L1, V2_L2, V2_L3, V2_L4, V2_L5, V2_L6] },

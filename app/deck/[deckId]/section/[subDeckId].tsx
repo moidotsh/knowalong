@@ -16,7 +16,9 @@ import { SCREEN_BODY_STYLE } from '../../../../constants';
 import { getDeck, getSubDeck, type SectionKind } from '../../../../utils/knowalong/fixtures/decks';
 import { SVETOFOR_SONG } from '../../../../utils/knowalong/fixtures/svetoforSong';
 import { sectionProgress, isLessonUnlocked } from '../../../../utils/knowalong/progress';
+import { classifyWord } from '../../../../utils/knowalong/mastery';
 import { useLessonProgressStore } from '../../../../stores/lessonProgressStore';
+import { useWordMasteryStore } from '../../../../stores/wordMasteryStore';
 import { ConceptIcon } from '../../../../components/knowalong/ConceptIcon';
 
 const SECTION_EYEBROW: Record<SectionKind, string> = {
@@ -27,10 +29,18 @@ const SECTION_EYEBROW: Record<SectionKind, string> = {
   outro: 'Outro',
 };
 
+/** Strip edge/internal non-letters + lowercase, so a lyric token (with
+ *  punctuation, capitalized) matches its `form`-keyed mastery. Case-insensitive
+ *  for display (a sentence-capitalized word is "known" if its lowercase form is). */
+function tokenKey(token: string): string {
+  return token.replace(/[^а-яА-ЯёЁa-zA-Z]/g, '').toLowerCase();
+}
+
 export default function SectionLessonsScreen() {
   const { colors } = useAppTheme();
   const { deckId, subDeckId } = useLocalSearchParams<{ deckId: string; subDeckId: string }>();
   const completed = useLessonProgressStore((s) => s.completedLessonIds);
+  const mastery = useWordMasteryStore((s) => s.mastery);
   const [showLyrics, setShowLyrics] = useState(false);
 
   const deck = getDeck(deckId ?? '');
@@ -85,7 +95,14 @@ export default function SectionLessonsScreen() {
                   <View style={{ marginTop: 10, gap: 8 }}>
                     {lyricSection.lines.map((line) => (
                       <View key={line.ordinal} style={{ paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.cardBorder }}>
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, lineHeight: 20 }}>{line.text}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '600', lineHeight: 20, flexWrap: 'wrap' }}>
+                          {line.text.split(/\s+/).filter(Boolean).map((tok, i) => {
+                            const known = classifyWord(mastery[tokenKey(tok)]) === 'graduated';
+                            return (
+                              <Text key={i} style={{ color: known ? colors.status.success : colors.textSecondary, opacity: known ? 1 : 0.45 }}>{tok} </Text>
+                            );
+                          })}
+                        </Text>
                         <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: 'italic', marginTop: 2 }}>{line.translation}</Text>
                       </View>
                     ))}
