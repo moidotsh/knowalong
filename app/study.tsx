@@ -1,11 +1,15 @@
 // app/study.tsx
-// Duolingo-style interactive learning session. Introduces compositional
-// phrases incrementally ("я" → "я вижу" → "я вижу море"), not isolated
-// infinitives. Each item: present the phrase → learner selects the meaning
-// from 4 options → immediate feedback (green/red) → continue. Alternates
-// recognize (Russian→English) + produce (English→Russian) modes.
+// KnowAlong "Build" interaction — the learner assembles Russian phrases from
+// word chips. Each chip shows BOTH the Russian word AND its English gloss +
+// is color-coded by grammatical role (pronoun=blue, verb=green, noun=orange,
+// particle=gray). The learner taps chips in the correct ORDER to build the
+// phrase — actively learning word order + decomposition (not just ordering
+// opaque tokens like Duolingo).
+//
+// Compositional gradient: "я" → "я вижу" → "я вижу море" (not isolated
+// infinitives). Each phrase BUILDS on earlier ones.
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
@@ -18,54 +22,78 @@ import {
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
-import { buildQuiz, type QuizQuestion } from '../utils/knowalong/fixtures/learningItems';
+import {
+  buildQuiz,
+  ROLE_COLOR_KEYS,
+  type BuildQuestion,
+  type WordChip,
+  type WordRole,
+} from '../utils/knowalong/fixtures/learningItems';
+
+function roleColor(colors: ReturnType<typeof useAppTheme>['colors'], role: WordRole): string {
+  const key = ROLE_COLOR_KEYS[role];
+  if (key === 'brand') return colors.brand;
+  if (key === 'textMuted') return colors.textMuted;
+  return colors.status[key as 'success' | 'warning'];
+}
 
 export default function StudyScreen() {
   const { colors } = useAppTheme();
-  const [questions] = useState<QuizQuestion[]>(() => buildQuiz());
+  const [questions] = useState<BuildQuestion[]>(() => buildQuiz());
   const [index, setIndex] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [score, setScore] = useState({ correct: 0, wrong: 0 });
+  const [placedIds, setPlacedIds] = useState<string[]>([]);
+  const [wrongId, setWrongId] = useState<string | null>(null);
+  const [score, setScore] = useState({ correct: 0, mistakes: 0 });
+  const wrongTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const question = questions[index];
   const total = questions.length;
   const isComplete = index >= total;
-  const answered = selected !== null;
-  const isCorrect = answered && selected === question?.correctIndex;
+  const isSolved = question && placedIds.length === question.slotCount;
 
-  const handleSelect = useCallback((optionIndex: number) => {
-    if (answered) return;
-    setSelected(optionIndex);
-    if (optionIndex === question!.correctIndex) {
-      setScore((s) => ({ ...s, correct: s.correct + 1 }));
+  const handleTapChip = useCallback((chip: WordChip) => {
+    if (isSolved || placedIds.includes(chip.id)) return;
+    if (chip.isCorrect && chip.correctPosition === placedIds.length) {
+      setPlacedIds((prev) => [...prev, chip.id]);
+      if (placedIds.length + 1 === question!.slotCount) {
+        setScore((s) => ({ ...s, correct: s.correct + (wrongId ? 0 : 1) }));
+      }
     } else {
-      setScore((s) => ({ ...s, wrong: s.wrong + 1 }));
+      setWrongId(chip.id);
+      setScore((s) => ({ ...s, mistakes: s.mistakes + 1 }));
+      if (wrongTimer.current) clearTimeout(wrongTimer.current);
+      wrongTimer.current = setTimeout(() => setWrongId(null), 600);
     }
-  }, [answered, question]);
+  }, [isSolved, placedIds, question, wrongId]);
 
   const handleContinue = useCallback(() => {
-    setSelected(null);
+    setPlacedIds([]);
+    setWrongId(null);
     setIndex((i) => i + 1);
   }, []);
 
   const handleRestart = useCallback(() => {
     setIndex(0);
-    setSelected(null);
-    setScore({ correct: 0, wrong: 0 });
+    setPlacedIds([]);
+    setWrongId(null);
+    setScore({ correct: 0, mistakes: 0 });
   }, []);
 
-  const progress = total > 0 ? ((index + (answered ? 1 : 0)) / total) * 100 : 0;
+  const progress = total > 0 ? ((index + (isSolved ? 1 : 0)) / total) * 100 : 0;
+  const placedChips = question ? placedIds
+    .map((id) => question.chips.find((c) => c.id === id))
+    .filter((c): c is WordChip => c !== undefined) : [];
+  const availableChips = question ? question.chips.filter((c) => !placedIds.includes(c.id)) : [];
 
   return (
     <SafeAreaView style={[styles.shell, { backgroundColor: colors.backgroundDeep }]} edges={['top', 'bottom']}>
       <MobileAtmosphere surface="training" />
       <MobileHeader
-        title={isComplete ? 'Lesson complete' : `Question ${index + 1} / ${total}`}
+        title={isComplete ? 'Lesson complete' : `Build ${index + 1} / ${total}`}
         eyebrow="Learn Russian"
         onBack={safeGoBack}
       />
 
-      {/* Progress bar */}
       {!isComplete ? (
         <View style={styles.progressTrack}>
           <View style={[styles.progressBar, { width: `${progress}%`, backgroundColor: colors.brand }]} />
@@ -76,90 +104,107 @@ export default function StudyScreen() {
         {isComplete || !question ? (
           <MobileSurface padding={24}>
             <Text style={[styles.completeTitle, { color: colors.text }]}>
-              {score.correct} / {total} correct
+              {score.correct} / {total} built correctly
             </Text>
             <Text style={[styles.completeBody, { color: colors.textSecondary }]}>
-              {score.correct === total
-                ? 'Perfect! You mastered every phrase.'
-                : `${score.wrong} to review. Try again to lock them in.`}
+              {score.mistakes === 0
+                ? 'Flawless! No mistakes — every phrase built first try.'
+                : `${score.mistakes} mistake${score.mistakes === 1 ? '' : 's'} along the way. Try again to go flawless.`}
             </Text>
           </MobileSurface>
         ) : (
           <MobileSurface padding={20}>
             {/* Prompt */}
             <Text style={[styles.promptLabel, { color: colors.textMuted }]}>
-              {question.mode === 'recognize'
-                ? 'What does this mean?'
-                : 'How do you say this in Russian?'}
+              Build this in Russian:
             </Text>
             <Text style={[styles.prompt, { color: colors.text }]}>
               {question.prompt}
             </Text>
-            {question.item.transliteration && question.mode === 'recognize' ? (
-              <Text style={[styles.promptTranslit, { color: colors.textSecondary }]}>
-                {question.item.transliteration}
-              </Text>
-            ) : null}
 
-            {/* Options */}
-            <View style={styles.optionsGrid}>
-              {question.options.map((option, i) => {
-                const showResult = answered;
-                const isThisCorrect = i === question.correctIndex;
-                const isThisSelected = i === selected;
-                let bg = colors.cardAlt;
-                let border = colors.cardBorder;
-                if (showResult && isThisCorrect) {
-                  bg = colors.status.success + '20';
-                  border = colors.status.success;
-                } else if (showResult && isThisSelected && !isThisCorrect) {
-                  bg = colors.status.error + '20';
-                  border = colors.status.error;
-                } else if (showResult) {
-                  bg = colors.cardAlt;
-                  border = colors.cardBorder;
+            {/* Answer slots */}
+            <View style={styles.slotsRow}>
+              {Array.from({ length: question.slotCount }).map((_, slotIdx) => {
+                const chip = placedChips[slotIdx];
+                if (chip) {
+                  const rc = roleColor(colors, chip.role);
+                  return (
+                    <View key={slotIdx} style={[styles.slotFilled, { borderLeftColor: rc, backgroundColor: rc + '12' }]}>
+                      <Text style={[styles.chipForm, { color: colors.text }]}>{chip.form}</Text>
+                      <Text style={[styles.chipGloss, { color: colors.textMuted }]}>{chip.gloss}</Text>
+                    </View>
+                  );
                 }
                 return (
-                  <Pressable
-                    key={i}
-                    disabled={answered}
-                    onPress={() => handleSelect(i)}
-                    style={[styles.optionBtn, { backgroundColor: bg, borderColor: border }]}
-                  >
-                    <Text style={[styles.optionText, { color: colors.text }]}>
-                      {option}
-                    </Text>
-                  </Pressable>
+                  <View key={slotIdx} style={[styles.slotEmpty, { borderColor: colors.cardBorder }]} />
                 );
               })}
             </View>
 
-            {/* Feedback after answering */}
-            {answered ? (
-              <View style={[styles.feedback, { backgroundColor: (isCorrect ? colors.status.success : colors.status.error) + '15' }]}>
-                <Text style={[styles.feedbackTitle, { color: isCorrect ? colors.status.success : colors.status.error }]}>
-                  {isCorrect ? '✓ Correct!' : '✗ Not quite'}
+            {/* Solved feedback */}
+            {isSolved ? (
+              <View style={[styles.solvedBox, { backgroundColor: colors.status.success + '15' }]}>
+                <Text style={[styles.solvedTitle, { color: colors.status.success }]}>
+                  ✓ {question.item.surfaceForm}
                 </Text>
-                {!isCorrect ? (
-                  <Text style={[styles.feedbackCorrect, { color: colors.textSecondary }]}>
-                    "{question.item.surfaceForm}" means "{question.item.meaning}".
-                  </Text>
-                ) : null}
+                <Text style={[styles.solvedTranslit, { color: colors.textSecondary }]}>
+                  {question.item.transliteration}
+                </Text>
                 {question.item.note ? (
-                  <Text style={[styles.feedbackNote, { color: colors.textSecondary }]}>
+                  <Text style={[styles.solvedNote, { color: colors.textSecondary }]}>
                     {question.item.note}
                   </Text>
                 ) : null}
+              </View>
+            ) : null}
+
+            {/* Chip bank */}
+            {!isSolved ? (
+              <View style={styles.chipBank}>
+                <View style={styles.chipBankRow}>
+                  {availableChips.map((chip) => {
+                    const rc = roleColor(colors, chip.role);
+                    const isWrong = wrongId === chip.id;
+                    return (
+                      <Pressable
+                        key={chip.id}
+                        onPress={() => handleTapChip(chip)}
+                        style={[
+                          styles.chip,
+                          {
+                            borderLeftColor: rc,
+                            backgroundColor: isWrong ? colors.status.error + '20' : colors.cardAlt,
+                            borderColor: isWrong ? colors.status.error : colors.cardBorder,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.chipForm, { color: colors.text }]}>{chip.form}</Text>
+                        <Text style={[styles.chipGloss, { color: colors.textMuted }]}>{chip.gloss}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              </View>
+            ) : null}
+
+            {/* Legend */}
+            {!isSolved ? (
+              <View style={styles.legend}>
+                {(['pronoun', 'verb', 'noun', 'particle'] as WordRole[]).map((role) => (
+                  <View key={role} style={styles.legendItem}>
+                    <View style={[styles.legendDot, { backgroundColor: roleColor(colors, role) }]} />
+                    <Text style={[styles.legendText, { color: colors.textMuted }]}>{role}</Text>
+                  </View>
+                ))}
               </View>
             ) : null}
           </MobileSurface>
         )}
       </ScrollView>
 
-      {/* Footer */}
       {!isComplete && question ? (
         <MobileActionFooter>
-          {answered ? (
+          {isSolved ? (
             <MobilePrimaryButton variant="primary" onPress={handleContinue}>
               {index + 1 >= total ? 'See results' : 'Continue'}
             </MobilePrimaryButton>
@@ -180,17 +225,25 @@ const styles = StyleSheet.create({
   shell: { flex: 1 },
   progressTrack: { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', marginHorizontal: 16 },
   progressBar: { height: '100%', borderRadius: 2 },
-  bodyContent: { padding: 16, gap: 16 },
-  promptLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
-  prompt: { fontSize: 36, fontWeight: '700', textAlign: 'center', paddingVertical: 16 },
-  promptTranslit: { fontSize: 16, textAlign: 'center', fontStyle: 'italic', marginBottom: 8 },
-  optionsGrid: { gap: 10, marginTop: 16 },
-  optionBtn: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 12, borderWidth: 2 },
-  optionText: { fontSize: 17, fontWeight: '500', textAlign: 'center' },
-  feedback: { marginTop: 16, padding: 16, borderRadius: 12, gap: 6 },
-  feedbackTitle: { fontSize: 16, fontWeight: '700' },
-  feedbackCorrect: { fontSize: 14 },
-  feedbackNote: { fontSize: 13, fontStyle: 'italic', marginTop: 4 },
+  bodyContent: { padding: 16 },
+  promptLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
+  prompt: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 20 },
+  slotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 20 },
+  slotFilled: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderLeftWidth: 4, minWidth: 70, alignItems: 'center' },
+  slotEmpty: { width: 70, height: 56, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed' },
+  chipForm: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
+  chipGloss: { fontSize: 11, textAlign: 'center', marginTop: 2 },
+  chipBank: { marginTop: 8 },
+  chipBankRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
+  chip: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderWidth: 2, borderLeftWidth: 4, minWidth: 70, alignItems: 'center' },
+  solvedBox: { marginTop: 16, padding: 16, borderRadius: 12 },
+  solvedTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  solvedTranslit: { fontSize: 14, textAlign: 'center', fontStyle: 'italic', marginTop: 4 },
+  solvedNote: { fontSize: 13, marginTop: 8, lineHeight: 18 },
+  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginTop: 16 },
+  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { fontSize: 11, textTransform: 'capitalize' },
   completeTitle: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
   completeBody: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
 });

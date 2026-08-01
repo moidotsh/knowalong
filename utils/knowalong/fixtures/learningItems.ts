@@ -4,6 +4,18 @@
 // ones: "я" (I) → "я вижу" (I see) → "я вижу море" (I see the sea). Not
 // isolated infinitives — the learner masters usable phrases from the start.
 // Ordered as a gradient: atom → first-person conjugated → + object → + negation.
+//
+// Each item decomposes into WORDS — the chip-building interaction uses these
+// to let the learner assemble the phrase from individual word chips (each
+// showing the Russian word + its English gloss + a grammatical-role color).
+
+export type WordRole = 'pronoun' | 'verb' | 'noun' | 'particle';
+
+export interface WordPart {
+  form: string;
+  gloss: string;
+  role: WordRole;
+}
 
 export interface LearningItem {
   id: string;
@@ -13,6 +25,7 @@ export interface LearningItem {
   ipa: string | null;
   note: string | null;
   buildsOn: string[];
+  words: WordPart[];
 }
 
 export const LEARNING_ITEMS: readonly LearningItem[] = [
@@ -24,6 +37,7 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja',
     note: 'The pronoun "I". Always lowercase unless sentence-initial.',
     buildsOn: [],
+    words: [{ form: 'я', gloss: 'I', role: 'pronoun' }],
   },
   {
     id: '2',
@@ -33,6 +47,10 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja ˈvʲizʊ',
     note: 'я (I) + вижу (see-1sg). Regular conjugation: видеть → вижу.',
     buildsOn: ['1'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'вижу', gloss: 'see', role: 'verb' },
+    ],
   },
   {
     id: '3',
@@ -42,6 +60,10 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja ˈznajʊ',
     note: 'я (I) + знаю (know-1sg). Regular: знать → знаю.',
     buildsOn: ['1'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'знаю', gloss: 'know', role: 'verb' },
+    ],
   },
   {
     id: '4',
@@ -51,6 +73,10 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja xɐˈt͡ʃʊ',
     note: 'я (I) + хочу (want-1sg). Irregular stem: хотеть → хочу.',
     buildsOn: ['1'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'хочу', gloss: 'want', role: 'verb' },
+    ],
   },
   {
     id: '5',
@@ -60,6 +86,10 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja ɪˈdu',
     note: 'я (I) + иду (go-1sg). идти → иду. Walking in one direction.',
     buildsOn: ['1'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'иду', gloss: 'go', role: 'verb' },
+    ],
   },
   {
     id: '6',
@@ -69,6 +99,10 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja ʐɨˈvu',
     note: 'я (I) + живу (live-1sg). жить → живу.',
     buildsOn: ['1'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'живу', gloss: 'live', role: 'verb' },
+    ],
   },
   {
     id: '7',
@@ -76,8 +110,12 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     meaning: 'I like',
     transliteration: 'mne nravitsya',
     ipa: 'mnʲe nrɐˈvʲit͡sə',
-    note: 'Special construction: "мне" (to me) + "нравится" (pleases). Literally "it pleases me" = "I like it".',
+    note: 'Special: "мне" (to me) + "нравится" (pleases). Literally "it pleases me" = "I like it".',
     buildsOn: ['1'],
+    words: [
+      { form: 'мне', gloss: 'to me', role: 'pronoun' },
+      { form: 'нравится', gloss: 'pleases', role: 'verb' },
+    ],
   },
   {
     id: '8',
@@ -87,6 +125,11 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: 'ja nʲe ˈznajʊ',
     note: 'Add "не" (not) before the verb: я + не + знаю = "I don\'t know".',
     buildsOn: ['1', '3'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'не', gloss: 'not', role: 'particle' },
+      { form: 'знаю', gloss: 'know', role: 'verb' },
+    ],
   },
   {
     id: '9',
@@ -96,6 +139,11 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: null,
     note: 'Add an object: "море" (sea). Russian has no articles — no "the".',
     buildsOn: ['1', '2'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'вижу', gloss: 'see', role: 'verb' },
+      { form: 'море', gloss: 'sea', role: 'noun' },
+    ],
   },
   {
     id: '10',
@@ -105,19 +153,23 @@ export const LEARNING_ITEMS: readonly LearningItem[] = [
     ipa: null,
     note: 'Add an object: "чай" (tea). "я хочу чай" — simple subject-verb-object.',
     buildsOn: ['1', '4'],
+    words: [
+      { form: 'я', gloss: 'I', role: 'pronoun' },
+      { form: 'хочу', gloss: 'want', role: 'verb' },
+      { form: 'чай', gloss: 'tea', role: 'noun' },
+    ],
   },
 ] as const;
 
-export interface QuizQuestion {
-  item: LearningItem;
-  /** 'recognize' = show Russian, pick English. 'produce' = show English, pick Russian. */
-  mode: 'recognize' | 'produce';
-  /** The prompt text (Russian for recognize, English for produce). */
-  prompt: string;
-  /** The 4 options (shuffled). */
-  options: string[];
-  /** Index of the correct option. */
-  correctIndex: number;
+// ── Chip-building quiz ──────────────────────────────────────────────────
+
+export interface WordChip {
+  id: string;
+  form: string;
+  gloss: string;
+  role: WordRole;
+  isCorrect: boolean;
+  correctPosition: number;
 }
 
 function shuffle<T>(arr: readonly T[]): T[] {
@@ -129,30 +181,65 @@ function shuffle<T>(arr: readonly T[]): T[] {
   return a;
 }
 
-/**
- * Build a Duolingo-style multiple-choice question for one learning item.
- * Alternates between 'recognize' (Russian → English) and 'produce'
- * (English → Russian) modes. Distractors are drawn from other items.
- */
-export function buildQuestion(item: LearningItem, allItems: readonly LearningItem[], mode: 'recognize' | 'produce'): QuizQuestion {
-  const correctAnswer = mode === 'recognize' ? item.meaning : item.surfaceForm;
-  const distractorPool = allItems
-    .filter((i) => i.id !== item.id)
-    .map((i) => (mode === 'recognize' ? i.meaning : i.surfaceForm));
-  const distractors = shuffle(distractorPool).slice(0, 3);
-  const options = shuffle([correctAnswer, ...distractors]);
+/** Collect distractor words from other items (for the chip bank). */
+function getDistractors(currentItem: LearningItem, count: number): WordPart[] {
+  const pool: WordPart[] = [];
+  for (const item of LEARNING_ITEMS) {
+    if (item.id === currentItem.id) continue;
+    for (const w of item.words) {
+      // Don't duplicate a word that's already in the target phrase.
+      if (currentItem.words.some((cw) => cw.form === w.form)) continue;
+      pool.push(w);
+    }
+  }
+  return shuffle(pool).slice(0, count);
+}
+
+export interface BuildQuestion {
+  item: LearningItem;
+  /** The English meaning the learner must build in Russian. */
+  prompt: string;
+  /** All chips (correct + distractors), shuffled. */
+  chips: WordChip[];
+  /** The number of answer slots (= item.words.length). */
+  slotCount: number;
+}
+
+export function buildQuestion(item: LearningItem): BuildQuestion {
+  const correctChips: WordChip[] = item.words.map((w, i) => ({
+    id: `correct-${i}`,
+    form: w.form,
+    gloss: w.gloss,
+    role: w.role,
+    isCorrect: true,
+    correctPosition: i,
+  }));
+  const distractorCount = Math.max(2, 5 - item.words.length);
+  const distractors = getDistractors(item, distractorCount).map((w, i) => ({
+    id: `distractor-${i}`,
+    form: w.form,
+    gloss: w.gloss,
+    role: w.role,
+    isCorrect: false,
+    correctPosition: -1,
+  }));
   return {
     item,
-    mode,
-    prompt: mode === 'recognize' ? item.surfaceForm : item.meaning,
-    options,
-    correctIndex: options.indexOf(correctAnswer),
+    prompt: item.meaning,
+    chips: shuffle([...correctChips, ...distractors]),
+    slotCount: item.words.length,
   };
 }
 
-/** Build the full quiz: one question per item, alternating modes. */
-export function buildQuiz(): QuizQuestion[] {
-  return LEARNING_ITEMS.map((item, i) =>
-    buildQuestion(item, LEARNING_ITEMS, i % 2 === 0 ? 'recognize' : 'produce'),
-  );
+export function buildQuiz(): BuildQuestion[] {
+  return LEARNING_ITEMS.map((item) => buildQuestion(item));
 }
+
+// ── Role colors (used by the study page) ────────────────────────────────
+
+export const ROLE_COLOR_KEYS: Record<WordRole, 'brand' | 'success' | 'warning' | 'textMuted'> = {
+  pronoun: 'brand',
+  verb: 'success',
+  noun: 'warning',
+  particle: 'textMuted',
+};
