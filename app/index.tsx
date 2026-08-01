@@ -28,6 +28,11 @@ import {
   navigateToConversation,
   navigateToProfile,
   navigateToGrammar,
+  navigateToListen,
+  navigateToMatch,
+  navigateToReading,
+  navigateToMistakes,
+  navigateToSongs,
 } from '../navigation';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
@@ -252,6 +257,48 @@ export default function HomeScreen() {
               <ConceptIcon name="user" size={24} color={colors.textSecondary} />
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Profile</Text>
               <Text style={{ fontSize: 16, color: colors.textMuted, marginLeft: 'auto' }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Practice hub — listening, matching, reading */}
+        <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+          <Pressable onPress={() => navigateToListen()} style={{ flex: 1, borderRadius: 14 }}>
+            <MobileSurface padding={14}>
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <ConceptIcon name="waves" size={26} color={colors.status.success} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Listen</Text>
+              </View>
+            </MobileSurface>
+          </Pressable>
+          <Pressable onPress={() => navigateToMatch()} style={{ flex: 1, borderRadius: 14 }}>
+            <MobileSurface padding={14}>
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <ConceptIcon name="target" size={26} color={colors.status.warning} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Match</Text>
+              </View>
+            </MobileSurface>
+          </Pressable>
+          <Pressable onPress={() => navigateToReading()} style={{ flex: 1, borderRadius: 14 }}>
+            <MobileSurface padding={14}>
+              <View style={{ alignItems: 'center', gap: 6 }}>
+                <ConceptIcon name="book" size={26} color={colors.brand} />
+                <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>Read</Text>
+              </View>
+            </MobileSurface>
+          </Pressable>
+        </View>
+
+        {/* Mistakes review CTA (conditional) */}
+        <Pressable onPress={() => navigateToMistakes()} style={{ marginTop: 8, borderRadius: 14 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="sparkles" size={24} color={colors.status.error} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Mistakes review</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted }}>Review concepts you struggled with</Text>
+              </View>
+              <Text style={{ fontSize: 16, color: colors.status.error }}>→</Text>
             </View>
           </MobileSurface>
         </Pressable>

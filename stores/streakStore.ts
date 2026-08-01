@@ -34,11 +34,14 @@ export interface StreakState {
   conceptsMastered: number;
   lessonsCompleted: number;
   totalSessions: number;
+  mistakeCodes: string[];
 
   // SECTION: Actions
   recordStudySession: () => void;
   addMasteredConcept: () => void;
   recordLessonComplete: () => void;
+  recordMistake: (code: string) => void;
+  clearMistakes: () => void;
 
   // SECTION: Computed
   getStreak: (target?: number) => StreakResult;
@@ -53,6 +56,7 @@ export const useStreakStore = create<StreakState>()(
       conceptsMastered: 0,
       lessonsCompleted: 0,
       totalSessions: 0,
+      mistakeCodes: [],
 
       // SECTION: Actions
       recordStudySession: () => {
@@ -63,6 +67,17 @@ export const useStreakStore = create<StreakState>()(
           studyDates: [...dates, today].sort(),
           totalSessions: get().totalSessions + 1,
         });
+      },
+
+      recordMistake: (code: string) => {
+        const existing = get().mistakeCodes;
+        if (!existing.includes(code)) {
+          set({ mistakeCodes: [...existing, code] });
+        }
+      },
+
+      clearMistakes: () => {
+        set({ mistakeCodes: [] });
       },
 
       addMasteredConcept: () => {
@@ -137,6 +152,7 @@ export const useStreakStore = create<StreakState>()(
         conceptsMastered: s.conceptsMastered,
         lessonsCompleted: s.lessonsCompleted,
         totalSessions: s.totalSessions,
+        mistakeCodes: s.mistakeCodes,
       }),
     },
   ),

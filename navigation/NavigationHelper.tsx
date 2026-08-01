@@ -166,6 +166,26 @@ export function navigateToStudySettings() {
   router.push('/settings/study');
 }
 
+export function navigateToListen() {
+  router.push('/listen');
+}
+
+export function navigateToMatch() {
+  router.push('/match');
+}
+
+export function navigateToReading() {
+  router.push('/reading');
+}
+
+export function navigateToMistakes() {
+  router.push('/mistakes');
+}
+
+export function navigateToSongs() {
+  router.push('/songs');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }
