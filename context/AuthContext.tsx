@@ -45,11 +45,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // gone provider (audit R1). Each session write mirrors into
   // authStore so the AuthGuard + safeGoBack() can read live status.
   useEffect(() => {
-    // Dev-mode auth bypass: when DEMO_MODE (no Supabase configured),
-    // skip the login flow + set a mock session so the operator can
-    // explore the app without credentials. This is the arqavellum
-    // consumer's built-in "I don't have a backend yet" path.
-    if (DEMO_MODE) {
+    // Dev-mode auth bypass: when DEMO_MODE (no Supabase configured) OR
+    // EXPO_PUBLIC_DISABLE_AUTH=1 (explicit override), skip the login flow
+    // + set a mock session so the operator can explore the app without
+    // credentials. To be backported to arqavellum as the generic dev-mode
+    // auth bypass.
+    const DISABLE_AUTH =
+      DEMO_MODE ||
+      process.env.EXPO_PUBLIC_DISABLE_AUTH === '1' ||
+      process.env.EXPO_PUBLIC_DISABLE_AUTH === 'true';
+    if (DISABLE_AUTH) {
       const mockSession: AuthSession = {
         userId: 'demo-user',
         email: 'demo@knowalong.app',
