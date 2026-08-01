@@ -1,41 +1,47 @@
 // app/index.tsx
-// KnowAlong home — the composition stream. Phrases are nodes connected by
-// composition lines. The learner's progress is how far the stream has grown.
-// Mastered nodes are solid; the next-to-learn node pulses at the bottom.
-// Everything else (practice, songs, grammar) is reached contextually.
+// KnowAlong home — the composition stream. Polished version: composition
+// dots between nodes, inline word previews, daily progress woven in,
+// enriched contextual sheet (study/listen/type/breakdown per node),
+// mistake indicators, + a generated "Practice" quick action.
 
-import React, { useState, useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Modal, TouchableWithoutFeedback } from 'react-native'; // c2-exempt: bottom sheet pattern, not centered dialog
+import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View, Modal, TouchableWithoutFeedback } from 'react-native'; // c2-exempt: bottom sheet pattern
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileAtmosphere, MobileSurface, MobilePrimaryButton } from '../components/MobilePremium';
+import { MobileAtmosphere } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
-import { navigateToStudy, navigateToSettings, navigateToConcept, navigateToLessons, navigateToSongs, navigateToConversation, navigateToProgress } from '../navigation';
+import {
+  navigateToStudy, navigateToSettings, navigateToConcept, navigateToLessons,
+  navigateToSongs, navigateToConversation, navigateToProgress, navigateToMistakes,
+} from '../navigation';
 import { LEARNING_ITEMS, type LearningItem } from '../utils/knowalong/fixtures/learningItems';
-import { ITEM_ICONS, type IconName } from '../utils/knowalong/icons';
+import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { useStreakStore } from '../stores/streakStore';
-import { ConfettiEffect } from '../components/Celebration/ConfettiEffect';
 
 type NodeState = 'mastered' | 'in-progress' | 'locked';
+const DAILY_GOAL = 10;
 
-interface StreamNode {
-  item: LearningItem;
-  state: NodeState;
-}
+interface StreamNode { item: LearningItem; state: NodeState }
 
-// Build the stream from LEARNING_ITEMS + mastery state.
-// The first 3 items are mastered, the 4th is in-progress, rest locked.
 function buildStream(masteredCount: number): StreamNode[] {
   return LEARNING_ITEMS.map((item, i) => ({
     item,
-    state: i < masteredCount ? 'mastered' : i === masteredCount ? 'in-progress' : 'locked',
+    state: i < masteredCount ? 'mastered' as NodeState : i === masteredCount ? 'in-progress' as NodeState : 'locked' as NodeState,
   }));
 }
 
-function masteryColor(colors: ReturnType<typeof useAppTheme>['colors'], state: NodeState): string {
-  if (state === 'mastered') return colors.status.success;
-  if (state === 'in-progress') return colors.brand;
-  return colors.textMuted;
+function mc(colors: ReturnType<typeof useAppTheme>['colors'], state: NodeState): string {
+  return state === 'mastered' ? colors.status.success : state === 'in-progress' ? colors.brand : colors.textMuted;
+}
+
+// Composition connector — a small dot with a line, showing parent → child.
+function Connector({ color, height = 18 }: { color: string; height?: number }) {
+  return (
+    <View style={{ alignItems: 'center', justifyContent: 'center', height }}>
+      <View style={{ width: 2, flex: 1, backgroundColor: color + '25' }} />
+      <View style={{ position: 'absolute', width: 6, height: 6, borderRadius: 3, backgroundColor: color + '50' }} />
+    </View>
+  );
 }
 
 export default function HomeScreen() {
@@ -43,98 +49,140 @@ export default function HomeScreen() {
   const conceptsMastered = useStreakStore((s) => s.conceptsMastered);
   const streakDays = useStreakStore((s) => s.getStreak(5).streak);
   const mistakeCodes = useStreakStore((s) => s.mistakeCodes);
+  const sessionsToday = useStreakStore((s) => s.totalSessions);
   const [selectedNode, setSelectedNode] = useState<StreamNode | null>(null);
+  const [expandedNodes, setExpandedNodes] = useState<Set<string>>(new Set());
+  const scrollRef = useRef<ScrollView>(null);
 
-  // Mastered count from streak store (or default to 3 for prototype warmth)
   const masteredCount = Math.max(3, conceptsMastered);
   const stream = buildStream(masteredCount);
-
-  // The "grow next" node = first in-progress or first locked whose prereqs are met
   const growNext = stream.find((n) => n.state === 'in-progress') ?? stream.find((n) => n.state === 'locked');
   const masteredNodes = stream.filter((n) => n.state === 'mastered');
-  const upcomingNodes = stream.filter((n) => n.state === 'in-progress' || n.state === 'locked').slice(0, 3);
+  const upcomingNodes = stream.filter((n) => n.state !== 'mastered').slice(0, 4);
+  const dailyProgress = Math.min(sessionsToday % DAILY_GOAL, DAILY_GOAL);
+  const dailyMet = sessionsToday > 0 && dailyProgress >= DAILY_GOAL;
 
-  const handleNodeTap = useCallback((node: StreamNode) => {
-    if (node.state === 'locked') return; // locked nodes aren't tappable
-    setSelectedNode(node);
+  // Scroll to bottom on mount (where the action is)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: false });
+    }, 100);
+    return () => clearTimeout(t);
+  }, []);
+
+  const toggleExpand = useCallback((id: string) => {
+    setExpandedNodes((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
   }, []);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundDeep }} edges={['top', 'bottom']}>
       <MobileAtmosphere surface="training" />
 
-      {/* Tiny header */}
+      {/* Header — streak + daily progress + settings */}
       <View style={styles.header}>
-        <Pressable onPress={() => navigateToProgress()}>
-          <Text style={{ fontSize: 14, fontWeight: '600', color: colors.status.warning }}>
-            {streakDays} day streak
-          </Text>
+        <Pressable onPress={() => navigateToProgress()} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+          <ConceptIcon name="flame" size={16} color={colors.status.warning} />
+          <Text style={{ fontSize: 15, fontWeight: '700', color: colors.status.warning }}>{streakDays}</Text>
         </Pressable>
+        <Text style={{ fontSize: 13, color: colors.textMuted }}>
+          {dailyMet ? 'Goal met ✓' : `${dailyProgress}/${DAILY_GOAL} today`}
+        </Text>
         <Pressable onPress={navigateToSettings} hitSlop={8}>
-          <ConceptIcon name="user" size={20} color={colors.textMuted} />
+          <ConceptIcon name="user" size={18} color={colors.textMuted} />
         </Pressable>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 }}>
+      {/* Daily progress bar — subtle, integrated */}
+      <View style={{ paddingHorizontal: 20, marginBottom: 8 }}>
+        <View style={{ height: 3, borderRadius: 1.5, backgroundColor: 'rgba(128,128,128,0.12)' }}>
+          <View style={{ height: '100%', borderRadius: 1.5, width: `${(dailyProgress / DAILY_GOAL) * 100}%`, backgroundColor: dailyMet ? colors.status.success : colors.brand }} />
+        </View>
+      </View>
 
-        {/* Mastered stream — phrases that have grown */}
+      <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 80 }}>
+
+        {/* Mastered stream */}
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
-          {masteredNodes.length} phrase{masteredNodes.length === 1 ? '' : 's'} grown
+          {masteredNodes.length} grown
         </Text>
 
         {masteredNodes.map((node, i) => {
-          const mc = masteryColor(colors, node.state);
+          const c = mc(colors, node.state);
           const isMistake = mistakeCodes.includes(node.item.id);
-          const nextNode = masteredNodes[i + 1];
+          const isExpanded = expandedNodes.has(node.item.id);
+          const nextMastered = masteredNodes[i + 1];
           return (
             <View key={node.item.id}>
-              {/* Node */}
-              <Pressable onPress={() => handleNodeTap(node)}>
-                <View style={[styles.nodeCard, { backgroundColor: mc + '0D', borderColor: mc + '30', borderLeftColor: mc, borderLeftWidth: 3 }]}>
+              <Pressable onPress={() => toggleExpand(node.item.id)} onLongPress={() => setSelectedNode(node)}>
+                <View style={[styles.nodeCard, { backgroundColor: c + '08', borderColor: c + '20' }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                    <ConceptIcon name={ITEM_ICONS[node.item.id] ?? 'star'} size={26} color={mc} />
+                    {/* Left accent bar */}
+                    <View style={{ width: 3, height: 36, borderRadius: 2, backgroundColor: c }} />
+                    <ConceptIcon name={ITEM_ICONS[node.item.id] ?? 'star'} size={22} color={c} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>{node.item.surfaceForm}</Text>
-                      <Text style={{ fontSize: 13, color: colors.textSecondary }}>{node.item.meaning}</Text>
+                      <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{node.item.surfaceForm}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textSecondary }}>{node.item.meaning}</Text>
                     </View>
                     {isMistake ? (
-                      <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.status.error }} />
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colors.status.error }} />
                     ) : null}
+                    <ConceptIcon name={isExpanded ? 'check' : 'book'} size={14} color={colors.textMuted} />
                   </View>
+
+                  {/* Expanded word breakdown */}
+                  {isExpanded ? (
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, paddingLeft: 15 }}>
+                      {node.item.words.map((w, wi) => (
+                        <View key={wi} style={{ paddingVertical: 3, paddingHorizontal: 8, borderRadius: 6, backgroundColor: colors.cardAlt }}>
+                          <Text style={{ fontSize: 13, fontWeight: '600', color: colors.text }}>{w.form}</Text>
+                          <Text style={{ fontSize: 10, color: colors.textMuted }}>{w.gloss}</Text>
+                        </View>
+                      ))}
+                      {node.item.contextSentence ? (
+                        <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: 'italic', marginTop: 4, width: '100%' }}>
+                          {node.item.contextSentence.ru}
+                        </Text>
+                      ) : null}
+                    </View>
+                  ) : null}
                 </View>
               </Pressable>
-              {/* Composition line to next node */}
-              {nextNode ? (
-                <View style={{ alignItems: 'center', paddingVertical: 2 }}>
-                  <View style={{ width: 2, height: 16, backgroundColor: mc + '30' }} />
-                </View>
-              ) : null}
+
+              {/* Composition connector */}
+              {nextMastered ? <Connector color={c} /> : null}
             </View>
           );
         })}
 
-        {/* Grow next — the pulsing action node */}
+        {/* Grow next */}
         {growNext ? (
-          <View style={{ marginTop: masteredNodes.length > 0 ? 8 : 0 }}>
-            {masteredNodes.length > 0 ? (
-              <View style={{ alignItems: 'center', paddingBottom: 4 }}>
-                <View style={{ width: 2, height: 12, backgroundColor: colors.brand + '30', borderStyle: 'dashed' }} />
-              </View>
-            ) : null}
+          <View>
+            {masteredNodes.length > 0 ? <Connector color={colors.brand} height={24} /> : null}
 
             <Pressable onPress={() => navigateToStudy()}>
-              <View style={[styles.growNextCard, { backgroundColor: colors.brand + '0D', borderColor: colors.brand + '50' }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <ConceptIcon name={ITEM_ICONS[growNext.item.id] ?? 'star'} size={32} color={colors.brand} />
+              <View style={[styles.growCard, { backgroundColor: colors.brand + '0A', borderColor: colors.brand + '40' }]}>
+                <Text style={{ fontSize: 11, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'center' }}>
+                  {growNext.state === 'in-progress' ? 'Continue growing' : 'Grow next'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 10 }}>
+                  <ConceptIcon name={ITEM_ICONS[growNext.item.id] ?? 'star'} size={36} color={colors.brand} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                      {growNext.state === 'in-progress' ? 'Continue' : 'Learn next'}
-                    </Text>
-                    <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text, marginTop: 2 }}>{growNext.item.surfaceForm}</Text>
+                    <Text style={{ fontSize: 24, fontWeight: '700', color: colors.text }}>{growNext.item.surfaceForm}</Text>
                     <Text style={{ fontSize: 14, color: colors.textSecondary }}>{growNext.item.meaning}</Text>
                   </View>
-                  <View style={{ paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, backgroundColor: colors.brand }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textOnBrand }}>Grow →</Text>
+                </View>
+                {growNext.item.buildsOn.length > 0 ? (
+                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 8 }}>
+                    Builds on: {growNext.item.buildsOn.map(b => LEARNING_ITEMS.find(i => i.id === b)?.surfaceForm).filter(Boolean).join(' · ')}
+                  </Text>
+                ) : null}
+                <View style={{ alignItems: 'center', marginTop: 12 }}>
+                  <View style={{ paddingVertical: 12, paddingHorizontal: 32, borderRadius: 24, backgroundColor: colors.brand }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.textOnBrand }}>Start</Text>
                   </View>
                 </View>
               </View>
@@ -142,42 +190,34 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {/* Upcoming preview — faint outlines */}
+        {/* Upcoming */}
         {upcomingNodes.length > 1 ? (
-          <View style={{ marginTop: 16 }}>
-            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>Upcoming</Text>
+          <View style={{ marginTop: 20 }}>
+            <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>On the way</Text>
             {upcomingNodes.slice(1).map((node) => (
-              <View key={node.item.id} style={[styles.upcomingCard, { borderColor: colors.cardBorder }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                  <ConceptIcon name={ITEM_ICONS[node.item.id] ?? 'star'} size={20} color={colors.textMuted} />
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: colors.textMuted }}>{node.item.surfaceForm}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textMuted }}>· {node.item.meaning}</Text>
-                </View>
+              <View key={node.item.id} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6, opacity: 0.5 }}>
+                <ConceptIcon name={ITEM_ICONS[node.item.id] ?? 'star'} size={16} color={colors.textMuted} />
+                <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textMuted }}>{node.item.surfaceForm}</Text>
+                <Text style={{ fontSize: 11, color: colors.textMuted }}>· {node.item.meaning}</Text>
               </View>
             ))}
           </View>
         ) : null}
 
-        {/* Contextual entry points — not tiles, just quiet text links */}
-        <View style={{ marginTop: 28, flexDirection: 'row', justifyContent: 'center', gap: 20 }}>
-          <Pressable onPress={() => navigateToLessons()}>
-            <Text style={{ fontSize: 13, color: colors.textSecondary }}>Lessons</Text>
-          </Pressable>
-          <Pressable onPress={() => navigateToSongs()}>
-            <Text style={{ fontSize: 13, color: colors.textSecondary }}>Songs</Text>
-          </Pressable>
-          <Pressable onPress={() => navigateToConversation()}>
-            <Text style={{ fontSize: 13, color: colors.textSecondary }}>Conversation</Text>
-          </Pressable>
-          <Pressable onPress={() => navigateToProgress()}>
-            <Text style={{ fontSize: 13, color: colors.textSecondary }}>Progress</Text>
-          </Pressable>
+        {/* Quiet entry points */}
+        <View style={{ marginTop: 24, flexDirection: 'row', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
+          <Pressable onPress={() => navigateToLessons()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Lessons</Text></Pressable>
+          <Pressable onPress={() => navigateToSongs()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Songs</Text></Pressable>
+          <Pressable onPress={() => navigateToConversation()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Conversation</Text></Pressable>
+          {mistakeCodes.length > 0 ? (
+            <Pressable onPress={() => navigateToMistakes()}><Text style={{ fontSize: 13, color: colors.status.error }}>Review ({mistakeCodes.length})</Text></Pressable>
+          ) : null}
         </View>
 
       </ScrollView>
 
-      {/* Contextual node sheet — // c2-exempt: bottom sheet, not centered dialog. MobileDialog is a centered modal; the stream's contextual sheet is a slide-up panel. */}
-      <Modal visible={!!selectedNode} transparent animationType="slide" onRequestClose={() => setSelectedNode(null)}> // c2-exempt: bottom sheet pattern
+      {/* Enriched contextual bottom sheet */}
+      <Modal visible={!!selectedNode} transparent animationType="slide" onRequestClose={() => setSelectedNode(null)}>
         <TouchableWithoutFeedback onPress={() => setSelectedNode(null)}>
           <View style={styles.sheetOverlay}>
             <TouchableWithoutFeedback>
@@ -188,21 +228,27 @@ export default function HomeScreen() {
                       <ConceptIcon name={ITEM_ICONS[selectedNode.item.id] ?? 'star'} size={40} color={colors.brand} />
                       <Text style={{ fontSize: 28, fontWeight: '700', color: colors.text, marginTop: 8 }}>{selectedNode.item.surfaceForm}</Text>
                       <Text style={{ fontSize: 15, color: colors.textSecondary }}>{selectedNode.item.meaning}</Text>
+                      <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: 'italic', marginTop: 4 }}>{selectedNode.item.transliteration}</Text>
                     </View>
 
-                    <Pressable onPress={() => { setSelectedNode(null); navigateToStudy(); }} style={styles.sheetAction}>
-                      <ConceptIcon name="brain" size={20} color={colors.brand} />
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 12 }}>Study this phrase</Text>
-                    </Pressable>
-
-                    <Pressable onPress={() => { setSelectedNode(null); navigateToConcept(selectedNode.item.id); }} style={styles.sheetAction}>
-                      <ConceptIcon name="book" size={20} color={colors.textSecondary} />
-                      <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text, marginLeft: 12 }}>See breakdown</Text>
-                    </Pressable>
+                    {[
+                      { icon: 'brain' as const, label: 'Study (chip builder)', action: () => navigateToStudy() },
+                      { icon: 'waves' as const, label: 'Listen', action: () => navigateToStudy() },
+                      { icon: 'check' as const, label: 'Type (spelling)', action: () => navigateToStudy() },
+                      { icon: 'book' as const, label: 'Breakdown', action: () => navigateToConcept(selectedNode.item.id) },
+                    ].map((act, i, arr) => (
+                      <Pressable
+                        key={i}
+                        onPress={() => { setSelectedNode(null); act.action(); }}
+                        style={[styles.sheetAction, i === arr.length - 1 ? { borderBottomWidth: 0 } : null]}
+                      >
+                        <ConceptIcon name={act.icon} size={20} color={i === 0 ? colors.brand : colors.textSecondary} />
+                        <Text style={{ fontSize: 15, fontWeight: i === 0 ? '600' : '500', color: i === 0 ? colors.text : colors.textSecondary, marginLeft: 12 }}>{act.label}</Text>
+                      </Pressable>
+                    ))}
 
                     <Pressable onPress={() => setSelectedNode(null)} style={[styles.sheetAction, { borderBottomWidth: 0 }]}>
-                      <ConceptIcon name="check" size={20} color={colors.textMuted} />
-                      <Text style={{ fontSize: 15, color: colors.textSecondary, marginLeft: 12 }}>Close</Text>
+                      <Text style={{ fontSize: 14, color: colors.textMuted, marginLeft: 32 }}>Close</Text>
                     </Pressable>
                   </>
                 ) : null}
@@ -219,30 +265,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 4,
+    paddingHorizontal: 20, paddingTop: 8, paddingBottom: 6,
   },
   sectionLabel: {
     fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5,
-    marginBottom: 10, marginTop: 4,
+    marginBottom: 8,
   },
   nodeCard: {
-    paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12,
+    paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12,
     borderWidth: 1.5,
   },
-  growNextCard: {
-    paddingVertical: 20, paddingHorizontal: 18, borderRadius: 16,
+  growCard: {
+    paddingVertical: 20, paddingHorizontal: 20, borderRadius: 18,
     borderWidth: 2,
   },
-  upcomingCard: {
-    paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10,
-    borderWidth: 1, borderStyle: 'dashed', marginBottom: 6,
-  },
-  sheetOverlay: {
-    flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  sheet: {
-    borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32,
-  },
+  sheetOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.4)' },
+  sheet: { borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingBottom: 32 },
   sheetAction: {
     flexDirection: 'row', alignItems: 'center', paddingVertical: 16, paddingHorizontal: 24,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(128,128,128,0.2)',
