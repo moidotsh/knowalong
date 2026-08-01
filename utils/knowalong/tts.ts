@@ -1,10 +1,10 @@
 // utils/knowalong/tts.ts
 //
-// Text-to-speech — hybrid, fully client-side, commercial-clean (Piper is MIT).
+// Text-to-speech — fully client-side, commercial-clean (Piper is MIT).
 //
-//  - Chips / isolated words → Web Speech API (correct pronunciation, male
-//    Russian voice when available, commercial-safe, instant).
-//  - Full sentences → Piper neural TTS (VITS, ONNX/WASM), natural delivery.
+//  - All speech (chips + sentences) → Piper neural TTS (VITS, ONNX/WASM, male
+//    Russian voice) — one consistent voice everywhere.
+//  - Web Speech is the FALLBACK only while Piper is loading (or if it fails).
 //
 // Piper is loaded from a SELF-HOSTED browser bundle at /tts/piper.js (built
 // from @mintplex-labs/piper-tts-web via scripts/build-tts-bundle.mjs, which
@@ -262,16 +262,12 @@ export function isSpeechAvailable(): boolean {
   return isWeb() && (piperReady || getSynth() !== null);
 }
 
-/** Vocalize `text` in Russian. Hybrid routing: isolated words (no space) →
- *  Web Speech (correct, male); multi-word sentences → Piper (natural) with a
- *  Web Speech fallback while it warms. No-op off-web or on empty input. */
+/** Vocalize `text` in Russian via Piper (chips + sentences, one male voice).
+ *  Web Speech covers the first taps while Piper loads and any failure. No-op
+ *  off-web or on empty input. Never throws. */
 export function speak(text: string, opts: { lang?: string; rate?: number } = {}): void {
   const trimmed = text?.trim();
   if (!trimmed || !isWeb()) return;
-  if (!trimmed.includes(' ')) {
-    speakWebSpeech(trimmed, opts);
-    return;
-  }
   if (piperReady) {
     void speakPiper(trimmed).then((ok) => {
       if (!ok) speakWebSpeech(trimmed, opts);
