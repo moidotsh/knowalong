@@ -100,6 +100,11 @@ let synthPromise: Promise<Synth | null> | null = null;
 /** Flips true once the neural pipeline has finished initializing. */
 let neuralReady = false;
 
+/** Synthesized-audio cache: replays of the same string skip inference and
+ *  play instantly. Bounded by the finite corpus (~hundreds of strings), so it
+ *  never grows without limit. */
+const audioCache = new Map<string, { audio: Float32Array; sampleRate: number }>();
+
 function loadSynth(): Promise<Synth | null> {
   if (!isWeb()) return Promise.resolve(null);
   if (!synthPromise) {
@@ -125,6 +130,11 @@ function loadSynth(): Promise<Synth | null> {
 
 let audioCtx: AudioContext | null = null;
 let currentSource: AudioBufferSourceNode | null = null;
+type QueuedClip = { audio: Float32Array; sampleRate: number };
+/** Sequential playback queue — rapid taps enqueue instead of cutting the
+ *  in-flight clip, so each word is heard in full (no clipping, no overlap). */
+let clipQueue: QueuedClip[] = [];
+let draining = false;
 
 function getAudioContext(): AudioContext | null {
   if (!isWeb()) return null;
@@ -140,30 +150,57 @@ function getAudioContext(): AudioContext | null {
   return audioCtx;
 }
 
-function playPcm(audio: Float32Array, sampleRate: number): boolean {
-  const ctx = getAudioContext();
-  if (!ctx) return false;
+function playClipOnce(ctx: AudioContext, audio: Float32Array, sampleRate: number): Promise<void> {
+  return new Promise((resolve) => {
+    try {
+      const buffer = ctx.createBuffer(1, audio.length, sampleRate);
+      buffer.getChannelData(0).set(audio);
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.connect(ctx.destination);
+      currentSource = source;
+      source.onended = () => {
+        if (currentSource === source) currentSource = null;
+        resolve();
+      };
+      source.start();
+    } catch {
+      // S10
+      resolve();
+    }
+  });
+}
+
+/** Drain the clip queue sequentially. Only one drain runs at a time; new
+ *  playPcm() calls just push and let the running drain pick them up. */
+async function drainClips(): Promise<void> {
+  if (draining) return;
+  draining = true;
   try {
-    stopAudio();
-    const buffer = ctx.createBuffer(1, audio.length, sampleRate);
-    buffer.getChannelData(0).set(audio);
-    const source = ctx.createBufferSource();
-    source.buffer = buffer;
-    source.connect(ctx.destination);
-    currentSource = source;
-    source.onended = () => {
-      if (currentSource === source) currentSource = null;
-    };
-    if (ctx.state === 'suspended') void ctx.resume(); // autoplay policy
-    source.start();
-    return true;
-  } catch {
-    // S10
-    return false;
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === 'suspended') {
+      try { await ctx.resume(); } catch { /* S10 — autoplay policy */ }
+    }
+    while (clipQueue.length > 0) {
+      const clip = clipQueue.shift() as QueuedClip;
+      await playClipOnce(ctx, clip.audio, clip.sampleRate);
+    }
+  } finally {
+    draining = false;
   }
 }
 
+function playPcm(audio: Float32Array, sampleRate: number): boolean {
+  const ctx = getAudioContext();
+  if (!ctx) return false;
+  clipQueue.push({ audio, sampleRate });
+  void drainClips();
+  return true;
+}
+
 function stopAudio(): void {
+  clipQueue = [];
   if (currentSource) {
     try { currentSource.stop(); } catch { /* S10 */ }
     currentSource = null;
@@ -171,15 +208,35 @@ function stopAudio(): void {
 }
 
 async function speakNeural(text: string): Promise<boolean> {
+  const cached = audioCache.get(text);
+  if (cached) return playPcm(cached.audio, cached.sampleRate);
   const synth = await loadSynth();
   if (!synth) return false;
   try {
     const out = await synth(text);
     const o = Array.isArray(out) ? out[0] : out;
     if (!o?.audio?.length) return false;
+    audioCache.set(text, { audio: o.audio, sampleRate: o.sampling_rate });
     return playPcm(o.audio, o.sampling_rate);
   } catch {
     return false;
+  }
+}
+
+// Warm the neural pipeline after the learner's FIRST interaction anywhere on
+// the page — the model + wasm download in the background and the inference
+// session spins up, so by the time they tap a chip the synth is hot (no
+// on-press fetch). Lives in module scope, NOT wired into a component, so it
+// doesn't trip the Tamagui extractor; no-op off-web and during static render.
+if (isWeb()) {
+  const warm = () => {
+    try { window.removeEventListener('pointerdown', warm); } catch { /* S10 */ }
+    void loadSynth();
+  };
+  try {
+    window.addEventListener('pointerdown', warm);
+  } catch {
+    // S10
   }
 }
 
