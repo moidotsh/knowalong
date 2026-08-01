@@ -9,7 +9,7 @@
 // to let the learner assemble the phrase from individual word chips (each
 // showing the Russian word + its English gloss + a grammatical-role color).
 
-export type WordRole = 'pronoun' | 'verb' | 'noun' | 'particle';
+export type WordRole = 'pronoun' | 'verb' | 'noun' | 'particle' | 'adjective' | 'adverb';
 
 export interface WordPart {
   form: string;
@@ -295,4 +295,6 @@ export const ROLE_COLOR_KEYS: Record<WordRole, 'brand' | 'success' | 'warning' |
   verb: 'success',
   noun: 'warning',
   particle: 'textMuted',
+  adjective: 'warning',
+  adverb: 'textMuted',
 };
