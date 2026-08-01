@@ -11,6 +11,7 @@
 
 import { LEARNING_ITEMS, type LearningItem, type WordChip, type WordRole, ROLE_COLOR_KEYS } from './learningItems';
 import { SVETOFOR_SONG } from './svetoforSong';
+import { SVETOFOR_LESSONS } from './svetoforDecks';
 
 export interface LessonStep {
   itemId: string;
@@ -99,48 +100,13 @@ const EXPRESSIONS: Deck = {
   ],
 };
 
-// ── Светофор Deck: Song-based lessons ────────────────────────────────
-// Each section of the song becomes a lesson. The lesson's steps are
-// derived from the song section's lines — each line becomes a step where
-// the learner builds the key phrase.
-function lessonFromSongSection(sectionId: string): Lesson {
-  const section = SVETOFOR_SONG.sections.find((s) => s.id === sectionId);
-  if (!section) throw new Error(`Section ${sectionId} not found`);
-
-  // Each line becomes a step. For prototype, we use the line's first
-  // known/new word pair as the "build" target (simplified — a real
-  // implementation would map each line to a proper chip-builder round).
-  const steps: LessonStep[] = section.lines.map((line) => ({
-    itemId: `${sectionId}-${line.ordinal}`,
-    surfaceForm: line.text.split(' ').slice(0, 3).join(' ') + (line.text.split(' ').length > 3 ? '…' : ''),
-    meaning: line.translation,
-    words: line.words.slice(0, 4).map((w) => ({
-      form: w.form,
-      gloss: w.gloss,
-      role: w.role as WordRole,
-    })),
-    note: line.difficulty === 'hard'
-      ? `Full line: ${line.text}`
-      : line.translation,
-    contextSentence: { ru: line.text, en: line.translation },
-  }));
-
-  return {
-    id: `svetofor-${sectionId}`,
-    title: section.label,
-    subtitle: `${section.newWords.length} new words · ${section.lines.length} lines`,
-    icon: 'waves',
-    steps,
-    stepCount: steps.length,
-  };
-}
-
+// ── Светофор Deck: hand-authored chip-builder lessons per section ───
 const SVETOFOR_DECK: Deck = {
   id: 'svetofor',
   title: 'Светофор',
   subtitle: 'Mnogoznaal — learn Russian through a real song',
   icon: 'waves',
-  lessons: SVETOFOR_SONG.sections.map((s) => lessonFromSongSection(s.id)),
+  lessons: SVETOFOR_LESSONS,
 };
 
 // ── Exports ───────────────────────────────────────────────────────────
