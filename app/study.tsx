@@ -1,9 +1,9 @@
 // app/study.tsx
-// CLCC flashcard study session. Renders concept_realizations from the
-// prototype fixture as flip cards: front = surface_form + transliteration
-// + ipa; back = gloss + examples + grammatical note. Again/Hard/Good/Easy
-// ratings (provisional — no scheduler yet, just session tracking).
-// Ordered by tier + frequency (the gradient: basal concepts first).
+// Duolingo-style interactive learning session. Introduces compositional
+// phrases incrementally ("я" → "я вижу" → "я вижу море"), not isolated
+// infinitives. Each item: present the phrase → learner selects the meaning
+// from 4 options → immediate feedback (green/red) → continue. Alternates
+// recognize (Russian→English) + produce (English→Russian) modes.
 
 import React, { useState, useCallback } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -18,123 +18,136 @@ import {
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
-import { getStudyQueue, type ClccRealization } from '../utils/knowalong/fixtures/clccRealizations';
-
-type Rating = 'again' | 'hard' | 'good' | 'easy';
-
-const RATINGS: { label: string; value: Rating; colorKey: 'error' | 'warning' | 'brand' | 'success' }[] = [
-  { label: 'Again', value: 'again', colorKey: 'error' },
-  { label: 'Hard', value: 'hard', colorKey: 'warning' },
-  { label: 'Good', value: 'good', colorKey: 'brand' },
-  { label: 'Easy', value: 'easy', colorKey: 'success' },
-];
-
-function ratingColor(colors: ReturnType<typeof useAppTheme>['colors'], key: 'error' | 'warning' | 'brand' | 'success'): string {
-  if (key === 'brand') return colors.brand;
-  return colors.status[key];
-}
+import { buildQuiz, type QuizQuestion } from '../utils/knowalong/fixtures/learningItems';
 
 export default function StudyScreen() {
   const { colors } = useAppTheme();
-  const queue = useState(() => getStudyQueue())[0];
+  const [questions] = useState<QuizQuestion[]>(() => buildQuiz());
   const [index, setIndex] = useState(0);
-  const [revealed, setRevealed] = useState(false);
-  const [ratings, setRatings] = useState<Rating[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [score, setScore] = useState({ correct: 0, wrong: 0 });
 
-  const card: ClccRealization | undefined = queue[index];
-  const total = queue.length;
+  const question = questions[index];
+  const total = questions.length;
   const isComplete = index >= total;
+  const answered = selected !== null;
+  const isCorrect = answered && selected === question?.correctIndex;
 
-  const handleRate = useCallback((rating: Rating) => {
-    setRatings((r) => [...r, rating]);
-    setRevealed(false);
+  const handleSelect = useCallback((optionIndex: number) => {
+    if (answered) return;
+    setSelected(optionIndex);
+    if (optionIndex === question!.correctIndex) {
+      setScore((s) => ({ ...s, correct: s.correct + 1 }));
+    } else {
+      setScore((s) => ({ ...s, wrong: s.wrong + 1 }));
+    }
+  }, [answered, question]);
+
+  const handleContinue = useCallback(() => {
+    setSelected(null);
     setIndex((i) => i + 1);
   }, []);
 
-  const againCount = ratings.filter((r) => r === 'again').length;
+  const handleRestart = useCallback(() => {
+    setIndex(0);
+    setSelected(null);
+    setScore({ correct: 0, wrong: 0 });
+  }, []);
+
+  const progress = total > 0 ? ((index + (answered ? 1 : 0)) / total) * 100 : 0;
 
   return (
     <SafeAreaView style={[styles.shell, { backgroundColor: colors.backgroundDeep }]} edges={['top', 'bottom']}>
       <MobileAtmosphere surface="training" />
       <MobileHeader
-        title={isComplete ? 'Session complete' : `Study ${index + 1} / ${total}`}
-        eyebrow="CLCC Flashcards"
+        title={isComplete ? 'Lesson complete' : `Question ${index + 1} / ${total}`}
+        eyebrow="Learn Russian"
         onBack={safeGoBack}
       />
+
+      {/* Progress bar */}
+      {!isComplete ? (
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressBar, { width: `${progress}%`, backgroundColor: colors.brand }]} />
+        </View>
+      ) : null}
+
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={styles.bodyContent}>
-        {isComplete || !card ? (
+        {isComplete || !question ? (
           <MobileSurface padding={24}>
-            <Text style={[styles.completeTitle, { color: colors.text }]}>Session complete</Text>
-            <Text style={[styles.completeBody, { color: colors.textSecondary }]}>
-              Studied {total} concept{total === 1 ? '' : 's'}. {againCount} marked "again".
+            <Text style={[styles.completeTitle, { color: colors.text }]}>
+              {score.correct} / {total} correct
             </Text>
-            <View style={{ height: 16 }} />
-            <MobilePrimaryButton
-              variant="secondary"
-              onPress={() => { setIndex(0); setRevealed(false); setRatings([]); }}
-            >
-              Study again
-            </MobilePrimaryButton>
+            <Text style={[styles.completeBody, { color: colors.textSecondary }]}>
+              {score.correct === total
+                ? 'Perfect! You mastered every phrase.'
+                : `${score.wrong} to review. Try again to lock them in.`}
+            </Text>
           </MobileSurface>
         ) : (
           <MobileSurface padding={20}>
-            {/* Card meta */}
-            <View style={styles.cardMetaRow}>
-              <Text style={[styles.cardKind, { color: colors.textMuted }]}>
-                Tier {card.tier} · {card.functionalCluster}
+            {/* Prompt */}
+            <Text style={[styles.promptLabel, { color: colors.textMuted }]}>
+              {question.mode === 'recognize'
+                ? 'What does this mean?'
+                : 'How do you say this in Russian?'}
+            </Text>
+            <Text style={[styles.prompt, { color: colors.text }]}>
+              {question.prompt}
+            </Text>
+            {question.item.transliteration && question.mode === 'recognize' ? (
+              <Text style={[styles.promptTranslit, { color: colors.textSecondary }]}>
+                {question.item.transliteration}
               </Text>
-              <Text style={[styles.cardCode, { color: colors.textMuted }]}>
-                {card.coreConceptCode}
-              </Text>
+            ) : null}
+
+            {/* Options */}
+            <View style={styles.optionsGrid}>
+              {question.options.map((option, i) => {
+                const showResult = answered;
+                const isThisCorrect = i === question.correctIndex;
+                const isThisSelected = i === selected;
+                let bg = colors.cardAlt;
+                let border = colors.cardBorder;
+                if (showResult && isThisCorrect) {
+                  bg = colors.status.success + '20';
+                  border = colors.status.success;
+                } else if (showResult && isThisSelected && !isThisCorrect) {
+                  bg = colors.status.error + '20';
+                  border = colors.status.error;
+                } else if (showResult) {
+                  bg = colors.cardAlt;
+                  border = colors.cardBorder;
+                }
+                return (
+                  <Pressable
+                    key={i}
+                    disabled={answered}
+                    onPress={() => handleSelect(i)}
+                    style={[styles.optionBtn, { backgroundColor: bg, borderColor: border }]}
+                  >
+                    <Text style={[styles.optionText, { color: colors.text }]}>
+                      {option}
+                    </Text>
+                  </Pressable>
+                );
+              })}
             </View>
 
-            {/* Front: surface form */}
-            <View style={styles.cardFront}>
-              <Text style={[styles.surfaceForm, { color: colors.text }]}>
-                {card.surfaceForm}
-              </Text>
-              {card.transliteration ? (
-                <Text style={[styles.translit, { color: colors.textSecondary }]}>
-                  {card.transliteration}
+            {/* Feedback after answering */}
+            {answered ? (
+              <View style={[styles.feedback, { backgroundColor: (isCorrect ? colors.status.success : colors.status.error) + '15' }]}>
+                <Text style={[styles.feedbackTitle, { color: isCorrect ? colors.status.success : colors.status.error }]}>
+                  {isCorrect ? '✓ Correct!' : '✗ Not quite'}
                 </Text>
-              ) : null}
-              {card.ipa ? (
-                <Text style={[styles.ipa, { color: colors.textMuted }]}>
-                  /{card.ipa}/
-                </Text>
-              ) : null}
-            </View>
-
-            {/* Back: gloss + examples (revealed) */}
-            {revealed ? (
-              <View style={styles.cardBack}>
-                {card.gloss ? (
-                  <Text style={[styles.gloss, { color: colors.text }]}>
-                    {card.gloss}
+                {!isCorrect ? (
+                  <Text style={[styles.feedbackCorrect, { color: colors.textSecondary }]}>
+                    "{question.item.surfaceForm}" means "{question.item.meaning}".
                   </Text>
                 ) : null}
-                {card.grammaticalNote ? (
-                  <Text style={[styles.grammarNote, { color: colors.textSecondary }]}>
-                    {card.grammaticalNote}
-                  </Text>
-                ) : null}
-                {card.examples && card.examples.length > 0 ? (
-                  <View style={styles.examples}>
-                    {card.examples.map((ex, i) => (
-                      <View key={i} style={styles.exampleItem}>
-                        <Text style={[styles.exampleSource, { color: colors.text }]}>
-                          {ex.sourceText}
-                        </Text>
-                        <Text style={[styles.exampleTrans, { color: colors.textSecondary }]}>
-                          {ex.translation}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-                {card.prerequisites.length > 0 ? (
-                  <Text style={[styles.deps, { color: colors.textMuted }]}>
-                    Prerequisites: {card.prerequisites.join(', ')}
+                {question.item.note ? (
+                  <Text style={[styles.feedbackNote, { color: colors.textSecondary }]}>
+                    {question.item.note}
                   </Text>
                 ) : null}
               </View>
@@ -143,31 +156,20 @@ export default function StudyScreen() {
         )}
       </ScrollView>
 
-      {!isComplete && card ? (
+      {/* Footer */}
+      {!isComplete && question ? (
         <MobileActionFooter>
-          {!revealed ? (
-            <MobilePrimaryButton
-              variant="primary"
-              onPress={() => setRevealed(true)}
-            >
-              Show answer
+          {answered ? (
+            <MobilePrimaryButton variant="primary" onPress={handleContinue}>
+              {index + 1 >= total ? 'See results' : 'Continue'}
             </MobilePrimaryButton>
-          ) : (
-            <View style={styles.ratingRow}>
-              {RATINGS.map((r) => {
-                const c = ratingColor(colors, r.colorKey);
-                return (
-                  <Pressable
-                    key={r.value}
-                    style={[styles.ratingBtn, { backgroundColor: c }]}
-                    onPress={() => handleRate(r.value)}
-                  >
-                    <Text style={[styles.ratingLabel, { color: colors.textOnBrand }]}>{r.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
+          ) : null}
+        </MobileActionFooter>
+      ) : isComplete ? (
+        <MobileActionFooter>
+          <MobilePrimaryButton variant="primary" onPress={handleRestart}>
+            Try again
+          </MobilePrimaryButton>
         </MobileActionFooter>
       ) : null}
     </SafeAreaView>
@@ -176,25 +178,19 @@ export default function StudyScreen() {
 
 const styles = StyleSheet.create({
   shell: { flex: 1 },
+  progressTrack: { height: 4, backgroundColor: 'rgba(128,128,128,0.15)', marginHorizontal: 16 },
+  progressBar: { height: '100%', borderRadius: 2 },
   bodyContent: { padding: 16, gap: 16 },
-  cardMetaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 12 },
-  cardKind: { fontSize: 12, textTransform: 'uppercase', letterSpacing: 0.5 },
-  cardCode: { fontSize: 11, fontFamily: 'monospace' },
-  cardFront: { alignItems: 'center', paddingVertical: 32 },
-  surfaceForm: { fontSize: 42, fontWeight: '700', textAlign: 'center' },
-  translit: { fontSize: 18, marginTop: 8, fontStyle: 'italic' },
-  ipa: { fontSize: 14, marginTop: 4, fontFamily: 'monospace' },
-  cardBack: { paddingTop: 16, borderTopWidth: 1, borderTopColor: 'rgba(128,128,128,0.2)', gap: 12 },
-  gloss: { fontSize: 20, fontWeight: '600', textAlign: 'center' },
-  grammarNote: { fontSize: 13, textAlign: 'center', fontStyle: 'italic' },
-  examples: { gap: 8, marginTop: 4 },
-  exampleItem: { paddingLeft: 12, borderLeftWidth: 2, borderLeftColor: 'rgba(128,128,128,0.3)' },
-  exampleSource: { fontSize: 15, fontWeight: '500' },
-  exampleTrans: { fontSize: 13, marginTop: 2 },
-  deps: { fontSize: 11, marginTop: 4 },
-  completeTitle: { fontSize: 24, fontWeight: '700', marginBottom: 8 },
-  completeBody: { fontSize: 15, lineHeight: 22 },
-  ratingRow: { flexDirection: 'row', gap: 8, justifyContent: 'center' },
-  ratingBtn: { paddingVertical: 14, paddingHorizontal: 20, borderRadius: 12, flex: 1, alignItems: 'center' },
-  ratingLabel: { fontSize: 14, fontWeight: '600' },
+  promptLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  prompt: { fontSize: 36, fontWeight: '700', textAlign: 'center', paddingVertical: 16 },
+  promptTranslit: { fontSize: 16, textAlign: 'center', fontStyle: 'italic', marginBottom: 8 },
+  optionsGrid: { gap: 10, marginTop: 16 },
+  optionBtn: { paddingVertical: 16, paddingHorizontal: 20, borderRadius: 12, borderWidth: 2 },
+  optionText: { fontSize: 17, fontWeight: '500', textAlign: 'center' },
+  feedback: { marginTop: 16, padding: 16, borderRadius: 12, gap: 6 },
+  feedbackTitle: { fontSize: 16, fontWeight: '700' },
+  feedbackCorrect: { fontSize: 14 },
+  feedbackNote: { fontSize: 13, fontStyle: 'italic', marginTop: 4 },
+  completeTitle: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
+  completeBody: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
 });
