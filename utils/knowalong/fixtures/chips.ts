@@ -18,9 +18,8 @@
 // caller via shouldShowGloss(mastery[form]) — mastery is global by RU `form`.
 
 import type { LessonStep } from './decks';
-import { LEARNING_ITEMS, type WordRole } from './learningItems';
-import { ALL_SVETOFOR_LESSONS } from './svetoforFullDeck';
-import { ALL_CLCC_STEPS } from './clccDeck';
+import type { WordRole } from './learningItems';
+import { getSpine } from '../spine';
 
 export interface Chip {
   id: string;
@@ -60,9 +59,12 @@ export function getWordPool(): PoolWord[] {
     const k = w.form.trim();
     if (k && !map.has(k)) map.set(k, { form: k, gloss: w.gloss, role: w.role });
   };
-  for (const item of LEARNING_ITEMS) for (const w of item.words) add({ form: w.form, gloss: w.gloss, role: w.role });
-  for (const step of ALL_CLCC_STEPS) for (const w of step.words) add({ form: w.form, gloss: w.gloss, role: w.role });
-  for (const lesson of ALL_SVETOFOR_LESSONS) for (const step of lesson.steps) for (const w of step.words) add({ form: w.form, gloss: w.gloss, role: w.role });
+  // Same three layers, same order (gradient → CLCC → lyrics), now sourced via
+  // the spine seam (../spine.ts) so the data source swaps in one place.
+  const spine = getSpine();
+  for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps(), ...spine.lyricSteps()]) {
+    for (const w of step.words) add({ form: w.form, gloss: w.gloss, role: w.role });
+  }
   POOL_CACHE = [...map.values()];
   return POOL_CACHE;
 }

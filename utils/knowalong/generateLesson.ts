@@ -6,9 +6,11 @@
 //   warmup (known) → drill (issue words) → introduce (1 new word, i+1) →
 //   consolidate (fill with the next-most-learnable phrases)
 //
-// The corpus is the full phrase set: the LEARNING_ITEMS gradient + every
-// Svetofor lyric-phrase step (those steps already decompose lyric phrases
-// into words with glosses — they ARE the "CLCC + lyrics" content). Pure +
+// The corpus is the full phrase set, sourced through the SpineProvider seam
+// (./spine.ts): the foundational gradient + the CLCC ladder + every Svetofor
+// lyric-phrase step (those steps already decompose lyric phrases into words
+// with glosses — they ARE the "CLCC + lyrics" content). The seam isolates the
+// data source (mock fixtures today; Supabase/Studio in Phase 6). Pure +
 // deterministic (stable corpus-order tie-breaks; no Math.random) so it is
 // fully testable. Never throws — falls back to the gradient.
 
@@ -20,9 +22,7 @@ import {
   type MasteryMap,
 } from './mastery';
 import type { LessonStep, StepMode } from './fixtures/decks';
-import { LEARNING_ITEMS, type LearningItem } from './fixtures/learningItems';
-import { ALL_SVETOFOR_LESSONS } from './fixtures/svetoforFullDeck';
-import { ALL_CLCC_STEPS } from './fixtures/clccDeck';
+import { getSpine } from './spine';
 
 // ── Tuning constants ────────────────────────────────────────────────────
 /** Phrases per generated lesson. */
@@ -47,36 +47,22 @@ export interface GenerateOptions {
 }
 
 // ── Corpus ──────────────────────────────────────────────────────────────
-
-/** Map a LearningItem to the unified LessonStep shape (mirrors decks.ts
- *  lessonFromItems, but per-step rather than per-lesson). */
-export function stepFromLearningItem(item: LearningItem): LessonStep {
-  return {
-    itemId: item.id,
-    surfaceForm: item.surfaceForm,
-    meaning: item.meaning,
-    transliteration: item.transliteration,
-    emoji: item.emoji,
-    words: item.words,
-    construction: item.construction,
-    contextSentence: item.contextSentence,
-    note: item.note,
-  };
-}
+// All three layers are sourced through the SpineProvider seam (./spine.ts) so
+// the data source swaps in one place (Phase 6), not across this generator.
 
 /** The foundational gradient as steps. */
 export function baseSteps(): LessonStep[] {
-  return LEARNING_ITEMS.map(stepFromLearningItem);
+  return [...getSpine().foundationalSteps()];
 }
 
 /** Every Svetofor lyric-phrase step, flattened across all sub-decks. */
 export function svetoforSteps(): LessonStep[] {
-  return ALL_SVETOFOR_LESSONS.flatMap((l) => l.steps);
+  return [...getSpine().lyricSteps()];
 }
 
 /** Every CLCC concept step, flattened across the tier sub-decks. */
 export function clccSteps(): LessonStep[] {
-  return [...ALL_CLCC_STEPS];
+  return [...getSpine().conceptSteps()];
 }
 
 /** Choose a play mode for a generated step at `position` in the lesson.

@@ -7,7 +7,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildCorpus,
-  stepFromLearningItem,
   generateAdaptiveLesson,
   pickMode,
   TARGET_LESSON_SIZE,
@@ -28,15 +27,6 @@ describe('buildCorpus', () => {
     expect(corpus.some((s) => s.surfaceForm === 'я')).toBe(true);   // gradient atom
     expect(corpus.some((s) => s.surfaceForm === 'эй')).toBe(true);  // Svetofor intro word
     expect(corpus.some((s) => s.surfaceForm === 'быть')).toBe(true); // CLCC headword
-  });
-});
-
-describe('stepFromLearningItem', () => {
-  it('carries transliteration + words through', () => {
-    const item = LEARNING_ITEMS[1]; // 'я вижу'
-    const step = stepFromLearningItem(item);
-    expect(step.transliteration).toBe(item.transliteration);
-    expect(step.words.length).toBe(item.words.length);
   });
 });
 
