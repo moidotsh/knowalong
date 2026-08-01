@@ -6,7 +6,7 @@ module.exports = [
   ...expo,
   prettier,
   {
-    ignores: ['dist/*', 'node_modules/*'],
+    ignores: ['dist/*', 'node_modules/*', 'public/tts/**'],
   },
   {
     rules: {

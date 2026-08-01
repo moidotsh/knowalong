@@ -37,6 +37,8 @@ module.exports = [
       'node_modules/*',
       'supabase/**',
       'scripts/**',
+      // Generated Piper TTS browser bundle (esbuild output, not source).
+      'public/tts/**',
       // Companion is a separate Bun-only runtime (not subject to PWA structural rules);
       // typechecked by root `tsc --noEmit` and tested by `bun test tools/local-companion`.
       'tools/**',
