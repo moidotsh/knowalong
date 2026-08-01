@@ -154,6 +154,18 @@ export function navigateToProfile() {
   router.push('/profile');
 }
 
+export function navigateToGrammar() {
+  router.push('/grammar');
+}
+
+export function navigateToConcept(code: string) {
+  router.push(`/concept/${code}`);
+}
+
+export function navigateToStudySettings() {
+  router.push('/settings/study');
+}
+
 export function navigateToSource(sourceId: string) {
   router.push(`/source/${sourceId}`);
 }

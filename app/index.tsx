@@ -27,6 +27,7 @@ import {
   navigateToDaily,
   navigateToConversation,
   navigateToProfile,
+  navigateToGrammar,
 } from '../navigation';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
@@ -251,6 +252,22 @@ export default function HomeScreen() {
               <ConceptIcon name="user" size={24} color={colors.textSecondary} />
               <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Profile</Text>
               <Text style={{ fontSize: 16, color: colors.textMuted, marginLeft: 'auto' }}>→</Text>
+            </View>
+          </MobileSurface>
+        </Pressable>
+
+        {/* Grammar reference CTA */}
+        <Pressable onPress={() => navigateToGrammar()} style={{ marginTop: 8 }}>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <ConceptIcon name="brain" size={28} color={colors.textSecondary} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>Grammar reference</Text>
+                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                  Cases, conjugations, patterns — look it up
+                </Text>
+              </View>
+              <Text style={{ fontSize: 18, color: colors.textSecondary }}>→</Text>
             </View>
           </MobileSurface>
         </Pressable>
