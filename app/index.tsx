@@ -5,19 +5,21 @@
 // mistake indicators, + a generated "Practice" quick action.
 
 import React, { useState, useCallback, useRef, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, Modal, TouchableWithoutFeedback } from 'react-native'; // c2-exempt: bottom sheet pattern
+// c2-exempt: bottom sheet pattern — raw RN Modal drives the contextual sheet below.
+import { Pressable, ScrollView, StyleSheet, Text, View, Modal, TouchableWithoutFeedback } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import {
   navigateToStudy, navigateToSettings, navigateToConcept, navigateToLessons,
   navigateToSongs, navigateToConversation, navigateToProgress, navigateToMistakes,
-  navigateToLesson,
+  navigateToDeck,
 } from '../navigation';
 import { LEARNING_ITEMS, type LearningItem } from '../utils/knowalong/fixtures/learningItems';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { useStreakStore } from '../stores/streakStore';
+import { SCREEN_BODY_STYLE } from '../constants';
 
 type NodeState = 'mastered' | 'in-progress' | 'locked';
 const DAILY_GOAL = 10;
@@ -104,7 +106,7 @@ export default function HomeScreen() {
         </View>
       </View>
 
-      <ScrollView ref={scrollRef} style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 80 }}>
+      <ScrollView ref={scrollRef} style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 80 }}>
 
         {/* Mastered stream */}
         <Text style={[styles.sectionLabel, { color: colors.textMuted }]}>
@@ -208,7 +210,7 @@ export default function HomeScreen() {
         {/* Quiet entry points */}
         <View style={{ marginTop: 24, flexDirection: 'row', justifyContent: 'center', gap: 16, flexWrap: 'wrap' }}>
           <Pressable onPress={() => navigateToLessons()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Lessons</Text></Pressable>
-          <Pressable onPress={() => navigateToLesson('svetofor-intro')}><Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Светофор</Text></Pressable>
+          <Pressable onPress={() => navigateToDeck('svetofor')}><Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand }}>Светофор</Text></Pressable>
           <Pressable onPress={() => navigateToSongs()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Songs</Text></Pressable>
           <Pressable onPress={() => navigateToConversation()}><Text style={{ fontSize: 13, color: colors.textSecondary }}>Conversation</Text></Pressable>
           {mistakeCodes.length > 0 ? (
@@ -218,7 +220,7 @@ export default function HomeScreen() {
 
       </ScrollView>
 
-      {/* Enriched contextual bottom sheet */}
+      {/* c2-exempt: bottom sheet pattern — enriched contextual sheet (raw RN Modal) */}
       <Modal visible={!!selectedNode} transparent animationType="slide" onRequestClose={() => setSelectedNode(null)}>
         <TouchableWithoutFeedback onPress={() => setSelectedNode(null)}>
           <View style={styles.sheetOverlay}>
@@ -258,6 +260,7 @@ export default function HomeScreen() {
             </TouchableWithoutFeedback>
           </View>
         </TouchableWithoutFeedback>
+        {/* c2-exempt: bottom sheet pattern (closing tag) */}
       </Modal>
 
     </SafeAreaView>

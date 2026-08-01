@@ -10,14 +10,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
-import { safeGoBack, navigateToLessons, navigateToHome } from '../../navigation';
+import { safeGoBack, navigateToLessons, navigateToLesson, navigateToDeck, navigateToSubDeck } from '../../navigation';
 import { SCREEN_BODY_STYLE } from '../../constants';
-import { getLesson, getLessonDeck, type LessonStep } from '../../utils/knowalong/fixtures/decks';
+import { getLesson, getLessonDeck, getLessonSubDeck, type LessonStep } from '../../utils/knowalong/fixtures/decks';
 import { LEARNING_ITEMS } from '../../utils/knowalong/fixtures/learningItems';
 import { ITEM_ICONS } from '../../utils/knowalong/icons';
 import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
 import { ConfettiEffect } from '../../components/Celebration/ConfettiEffect';
 import { useStreakStore } from '../../stores/streakStore';
+import { useLessonProgressStore } from '../../stores/lessonProgressStore';
 
 function shuffle<T>(arr: readonly T[]): T[] {
   const a = [...arr];
@@ -80,6 +81,7 @@ export default function LessonPlayerScreen() {
 
   const recordMistake = useStreakStore((s) => s.recordMistake);
   const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
+  const markLessonComplete = useLessonProgressStore((s) => s.markLessonComplete);
 
   if (!lesson || !deck) {
     return (
@@ -88,6 +90,15 @@ export default function LessonPlayerScreen() {
       </SafeAreaView>
     );
   }
+
+  // Context for the completion footer: which section this lesson sits in,
+  // and the next lesson to offer (song decks only — flat decks go back to
+  // the deck overview).
+  const subDeck = getLessonSubDeck(lessonId ?? '');
+  const subIndex = subDeck ? subDeck.lessons.findIndex((l) => l.id === lesson.id) : -1;
+  const nextLesson = subDeck && subIndex >= 0 && subIndex + 1 < subDeck.lessons.length
+    ? subDeck.lessons[subIndex + 1]
+    : null;
 
   const step = lesson.steps[stepIndex];
   const isComplete = stepIndex >= lesson.steps.length;
@@ -115,11 +126,12 @@ export default function LessonPlayerScreen() {
       if (i + 1 >= lesson.steps.length) {
         setShowConfetti(true);
         addMasteredConcept();
+        markLessonComplete(lesson.id);
         setTimeout(() => setShowConfetti(false), 3500);
       }
       return i + 1;
     });
-  }, [lesson, addMasteredConcept]);
+  }, [lesson, addMasteredConcept, markLessonComplete]);
 
   if (isComplete) {
     return (
@@ -143,8 +155,25 @@ export default function LessonPlayerScreen() {
         </ScrollView>
         <ConfettiEffect visible={showConfetti} intensity="intense" />
         <MobileActionFooter>
-          <MobilePrimaryButton variant="primary" onPress={() => navigateToHome()}>Back to stream</MobilePrimaryButton>
-          <MobilePrimaryButton variant="ghost" onPress={() => navigateToLessons()}>More lessons</MobilePrimaryButton>
+          {subDeck ? (
+            <>
+              {nextLesson ? (
+                <MobilePrimaryButton variant="primary" onPress={() => navigateToLesson(nextLesson.id)}>
+                  Next: {nextLesson.title}
+                </MobilePrimaryButton>
+              ) : null}
+              <MobilePrimaryButton variant="ghost" onPress={() => navigateToSubDeck(deck.id, subDeck.id)}>
+                Back to {subDeck.label}
+              </MobilePrimaryButton>
+            </>
+          ) : (
+            <>
+              <MobilePrimaryButton variant="primary" onPress={() => navigateToDeck(deck.id)}>
+                Back to {deck.title}
+              </MobilePrimaryButton>
+              <MobilePrimaryButton variant="ghost" onPress={() => navigateToLessons()}>More lessons</MobilePrimaryButton>
+            </>
+          )}
         </MobileActionFooter>
       </SafeAreaView>
     );

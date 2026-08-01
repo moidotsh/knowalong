@@ -38,6 +38,8 @@ export enum NavigationPath {
   IMPORT = 'import',
   SOURCE_DETAIL = 'source',
   SECTION_DETAIL = 'section',
+  DECK_DETAIL = 'deck',
+  SUBDECK_DETAIL = 'subdeck',
   VOCABULARY_DETAIL = 'vocabulary',
   REVIEW = 'review',
   DEV_KNOWALONG = 'dev/knowalong',
@@ -67,6 +69,8 @@ export const navigationHierarchy: Record<string, NavigationPath> = {
   [NavigationPath.IMPORT]: NavigationPath.HOME,
   [NavigationPath.SOURCE_DETAIL]: NavigationPath.HOME,
   [NavigationPath.SECTION_DETAIL]: NavigationPath.SOURCE_DETAIL,
+  [NavigationPath.DECK_DETAIL]: NavigationPath.HOME,
+  [NavigationPath.SUBDECK_DETAIL]: NavigationPath.DECK_DETAIL,
   [NavigationPath.VOCABULARY_DETAIL]: NavigationPath.SOURCE_DETAIL,
   [NavigationPath.REVIEW]: NavigationPath.HOME,
   [NavigationPath.DEV_KNOWALONG]: NavigationPath.HOME,
@@ -124,6 +128,17 @@ export function navigateToLessons() {
 
 export function navigateToLesson(lessonId: string) {
   router.push(`/lessons/${lessonId}`);
+}
+
+// Drill into a deck overview (song = deck). For song decks this lists the
+// sub-decks (sections); for flat decks it lists lessons directly.
+export function navigateToDeck(deckId: string) {
+  router.push(`/deck/${deckId}`);
+}
+
+// Drill into a section (sub-deck) within a song deck — the locked lesson list.
+export function navigateToSubDeck(deckId: string, subDeckId: string) {
+  router.push(`/deck/${deckId}/section/${subDeckId}`);
 }
 
 export function navigateToProgress() {

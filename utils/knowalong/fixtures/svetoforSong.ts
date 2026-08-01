@@ -31,7 +31,7 @@ export interface LyricLine {
 
 export interface SongSection {
   id: string;
-  kind: 'intro' | 'verse' | 'chorus' | 'outro';
+  kind: 'intro' | 'verse' | 'chorus' | 'bridge' | 'outro';
   label: string;
   lines: LyricLine[];
   newWords: string[];       // words first introduced in this section

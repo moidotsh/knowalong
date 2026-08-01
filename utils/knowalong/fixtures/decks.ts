@@ -9,9 +9,8 @@
 // the learner builds via the chip-builder. Song sections become lessons
 // within a song deck. Progress is tracked per-lesson via the streak store.
 
-import { LEARNING_ITEMS, type LearningItem, type WordChip, type WordRole, ROLE_COLOR_KEYS } from './learningItems';
-import { SVETOFOR_SONG } from './svetoforSong';
-import { SVETOFOR_LESSONS } from './svetoforDecks';
+import { LEARNING_ITEMS, type LearningItem } from './learningItems';
+import { ALL_SVETOFOR_LESSONS, SVETOFOR_SUBDECKS } from './svetoforFullDeck';
 
 export interface LessonStep {
   itemId: string;
@@ -39,12 +38,31 @@ export interface Deck {
   subtitle: string;
   icon: 'book' | 'brain' | 'waves' | 'sparkles';
   lessons: Lesson[];
+  // Optional grouping for song decks: sections (intro / verse N / chorus /
+  // bridge / outro) each holding its own ordered lessons. Absent on flat
+  // decks (Foundations, Daily Life, …), in which case the deck overview
+  // lists `lessons` directly. Songs ARE decks — this is the sub-deck layer.
+  subDecks?: SubDeck[];
+}
+
+// A song section treated as a sub-deck. `lyricSectionId` joins this sub-deck
+// to the raw-lyrics section in svetoforSong.ts so the section screen can
+// preview the lines the lessons build toward.
+export type SectionKind = 'intro' | 'verse' | 'chorus' | 'bridge' | 'outro';
+
+export interface SubDeck {
+  id: string;
+  label: string;
+  kind: SectionKind;
+  lessons: Lesson[];
+  lyricSectionId?: string;
 }
 
 // Build a lesson from a subset of LEARNING_ITEMS by IDs.
 function lessonFromItems(id: string, title: string, subtitle: string, icon: Lesson['icon'], itemIds: string[]): Lesson {
   const steps: LessonStep[] = itemIds.map((iid) => {
     const item = LEARNING_ITEMS.find((i) => i.id === iid);
+    // s10-exempt: internal fixture-build invariant — a missing item id is a programmer error in deck data, not a runtime surface.
     if (!item) throw new Error(`Item ${iid} not found`);
     return {
       itemId: item.id,
@@ -106,7 +124,8 @@ const SVETOFOR_DECK: Deck = {
   title: 'Светофор',
   subtitle: 'Mnogoznaal — learn Russian through a real song',
   icon: 'waves',
-  lessons: SVETOFOR_LESSONS,
+  lessons: ALL_SVETOFOR_LESSONS,
+  subDecks: SVETOFOR_SUBDECKS,
 };
 
 // ── Exports ───────────────────────────────────────────────────────────
@@ -132,4 +151,19 @@ export function getLesson(lessonId: string): Lesson | null {
 
 export function getLessonDeck(lessonId: string): Deck | null {
   return ALL_DECKS.find((d) => d.lessons.some((l) => l.id === lessonId)) ?? null;
+}
+
+// Resolve the sub-deck (section) that owns a lesson — used by the lesson
+// player to render a context-aware "next lesson / back to section" footer.
+export function getLessonSubDeck(lessonId: string): SubDeck | null {
+  for (const deck of ALL_DECKS) {
+    const sd = deck.subDecks?.find((s) => s.lessons.some((l) => l.id === lessonId));
+    if (sd) return sd;
+  }
+  return null;
+}
+
+export function getSubDeck(deckId: string, subDeckId: string): SubDeck | null {
+  const deck = getDeck(deckId);
+  return deck?.subDecks?.find((sd) => sd.id === subDeckId) ?? null;
 }

@@ -9,13 +9,17 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
-import { safeGoBack, navigateToImport } from '../navigation';
+import { safeGoBack, navigateToImport, navigateToDeck } from '../navigation';
 import { SCREEN_BODY_STYLE } from '../constants';
 import { SAMPLE_SONG } from '../utils/knowalong/fixtures/sampleSong';
+import { getDeck } from '../utils/knowalong/fixtures/decks';
+import { SVETOFOR_SUBDECKS } from '../utils/knowalong/fixtures/svetoforFullDeck';
+import { SVETOFOR_SONG } from '../utils/knowalong/fixtures/svetoforSong';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 
 export default function SongsScreen() {
   const { colors } = useAppTheme();
+  const svetofor = getDeck('svetofor');
   const totalConcepts = new Set(SAMPLE_SONG.sections.flatMap((s) => s.allConcepts)).size;
   const knownConcepts = new Set(SAMPLE_SONG.sections.flatMap((s) => s.knownConcepts)).size;
 
@@ -24,6 +28,30 @@ export default function SongsScreen() {
       <MobileAtmosphere surface="analytics" />
       <MobileHeader title="Songs" eyebrow="Learn from lyrics" onBack={safeGoBack} />
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 80 }}>
+
+        {/* Светофор — real, playable song deck */}
+        {svetofor ? (
+          <Pressable onPress={() => navigateToDeck('svetofor')} style={{ borderRadius: 14, marginBottom: 12 }}>
+            <MobileSurface padding={18}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
+                <ConceptIcon name={svetofor.icon} size={36} color={colors.brand} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: colors.text }}>{svetofor.title}</Text>
+                  <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>{SVETOFOR_SONG.artist}</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, backgroundColor: colors.brandSoft }}>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: colors.brand }}>{SVETOFOR_SUBDECKS.length} sections</Text>
+                    </View>
+                    <Text style={{ fontSize: 11, color: colors.textMuted, alignSelf: 'center' }}>
+                      {svetofor.lessons.length} lessons
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 18, color: colors.brand }}>→</Text>
+              </View>
+            </MobileSurface>
+          </Pressable>
+        ) : null}
 
         {/* Demo song */}
         <Pressable onPress={() => safeGoBack()} style={{ borderRadius: 14 }}>

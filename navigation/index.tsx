@@ -16,6 +16,8 @@ export {
   navigateToStudy,
   navigateToLessons,
   navigateToLesson,
+  navigateToDeck,
+  navigateToSubDeck,
   navigateToProgress,
   navigateToAchievements,
   navigateToVocabulary,
