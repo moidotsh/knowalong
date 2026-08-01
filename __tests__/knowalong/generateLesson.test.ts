@@ -9,6 +9,7 @@ import {
   buildCorpus,
   stepFromLearningItem,
   generateAdaptiveLesson,
+  pickMode,
   TARGET_LESSON_SIZE,
 } from '../../utils/knowalong/generateLesson';
 import { WORD_FADE_THRESHOLD, type MasteryMap, type WordMastery } from '../../utils/knowalong/mastery';
@@ -26,6 +27,7 @@ describe('buildCorpus', () => {
     expect(corpus.length).toBeGreaterThan(0);
     expect(corpus.some((s) => s.surfaceForm === 'я')).toBe(true);   // gradient atom
     expect(corpus.some((s) => s.surfaceForm === 'эй')).toBe(true);  // Svetofor intro word
+    expect(corpus.some((s) => s.surfaceForm === 'быть')).toBe(true); // CLCC headword
   });
 });
 
@@ -78,5 +80,27 @@ describe('generateAdaptiveLesson', () => {
   it('never throws and never returns empty', () => {
     expect(() => generateAdaptiveLesson({})).not.toThrow();
     expect(generateAdaptiveLesson({ '??': graduated() }).length).toBeGreaterThan(0);
+  });
+});
+
+describe('pickMode', () => {
+  const single = { words: [{ form: 'я', gloss: 'I', role: 'pronoun' as const }] };
+  const multi = { words: [{ form: 'я', gloss: 'I', role: 'pronoun' as const }, { form: 'вижу', gloss: 'see', role: 'verb' as const }] };
+
+  it('keeps a declared mode', () => {
+    expect(pickMode({ ...single, mode: 'cloze' } as any, 0)).toBe('cloze');
+  });
+
+  it('returns cloze when the step carries cloze data', () => {
+    expect(pickMode({ ...single, clozePrompt: '___' } as any, 0)).toBe('cloze');
+  });
+
+  it('returns reverse for multi-word steps at the rotated position, else build', () => {
+    expect(pickMode({ ...multi } as any, 3)).toBe('reverse');
+    expect(pickMode({ ...multi } as any, 0)).toBe('build');
+  });
+
+  it('returns build for single-word steps at any position', () => {
+    expect(pickMode({ ...single } as any, 3)).toBe('build');
   });
 });

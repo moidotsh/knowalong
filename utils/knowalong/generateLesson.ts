@@ -19,9 +19,10 @@ import {
   wordKey,
   type MasteryMap,
 } from './mastery';
-import type { LessonStep } from './fixtures/decks';
+import type { LessonStep, StepMode } from './fixtures/decks';
 import { LEARNING_ITEMS, type LearningItem } from './fixtures/learningItems';
 import { ALL_SVETOFOR_LESSONS } from './fixtures/svetoforFullDeck';
+import { ALL_CLCC_STEPS } from './fixtures/clccDeck';
 
 // ── Tuning constants ────────────────────────────────────────────────────
 /** Phrases per generated lesson. */
@@ -73,6 +74,22 @@ export function svetoforSteps(): LessonStep[] {
   return ALL_SVETOFOR_LESSONS.flatMap((l) => l.steps);
 }
 
+/** Every CLCC concept step, flattened across the tier sub-decks. */
+export function clccSteps(): LessonStep[] {
+  return [...ALL_CLCC_STEPS];
+}
+
+/** Choose a play mode for a generated step at `position` in the lesson.
+ *  Declared modes (authored CLCC steps) win; otherwise cloze when the step
+ *  carries cloze data, reverse occasionally for multi-word phrases, else
+ *  build. Deterministic (no Math.random) so tests stay stable. */
+export function pickMode(step: LessonStep, position: number): StepMode {
+  if (step.mode) return step.mode;
+  if (step.clozePrompt) return 'cloze';
+  if (step.words.length >= 2 && position % 4 === 3) return 'reverse';
+  return 'build';
+}
+
 /** Dedupe a step list by surfaceForm (first occurrence wins — the gradient
  *  is authored before the denser lyric phrases). Pure. */
 function dedupeBySurface(steps: LessonStep[]): LessonStep[] {
@@ -86,10 +103,10 @@ function dedupeBySurface(steps: LessonStep[]): LessonStep[] {
   return out;
 }
 
-/** The full phrase corpus (gradient + lyrics), deduped. Exported for the
- *  mastery summary + tests. */
+/** The full phrase corpus (gradient + CLCC + lyrics), deduped. Exported for
+ *  the mastery summary + tests. */
 export function buildCorpus(): LessonStep[] {
-  return dedupeBySurface([...baseSteps(), ...svetoforSteps()]);
+  return dedupeBySurface([...baseSteps(), ...clccSteps(), ...svetoforSteps()]);
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -225,5 +242,8 @@ export function generateAdaptiveLesson(mastery: MasteryMap, opts: GenerateOption
   }
 
   // Ultimate fallback (corpus is never empty, but never return [] / never throw).
-  return assembled.length > 0 ? assembled : corpus.slice(0, target);
+  const chosen = assembled.length > 0 ? assembled : corpus.slice(0, target);
+  // Assign play modes (declared CLCC modes win; others via pickMode). Shallow
+  // copies so shared corpus step objects are never mutated.
+  return chosen.map((s, i) => ({ ...s, mode: pickMode(s, i) }));
 }

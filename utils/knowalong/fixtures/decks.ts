@@ -11,6 +11,13 @@
 
 import { LEARNING_ITEMS, type LearningItem } from './learningItems';
 import { ALL_SVETOFOR_LESSONS, SVETOFOR_SUBDECKS } from './svetoforFullDeck';
+import { CLCC_DECK } from './clccDeck';
+
+/** How a step is played. Defaults to 'build' (the original EN→RU chip order).
+ *  'reverse' flips direction (RU prompt → EN chips); 'cloze' is a single-tap
+ *  fill-in-the-blank. See utils/knowalong/fixtures/chips.ts for the chip
+ *  builder that branches on this. */
+export type StepMode = 'build' | 'reverse' | 'cloze';
 
 export interface LessonStep {
   itemId: string;
@@ -22,6 +29,13 @@ export interface LessonStep {
   construction?: LearningItem['construction'];
   contextSentence?: LearningItem['contextSentence'];
   note?: string | null;
+  /** Play mode for this step. Absent ≡ 'build' (backward-compat). */
+  mode?: StepMode;
+  /** Cloze fields — present iff mode === 'cloze'. `clozePrompt` carries the
+   *  gap as `___`; the learner taps the single `clozeAnswer` chip. */
+  clozePrompt?: string;
+  clozeAnswer?: string;
+  clozeMeaning?: string;
 }
 
 export interface Lesson {
@@ -137,6 +151,7 @@ export const ALL_DECKS: readonly Deck[] = [
   DAILY_LIFE,
   EXPRESSIONS,
   SVETOFOR_DECK,
+  CLCC_DECK,
 ];
 
 export function getDeck(deckId: string): Deck | null {
