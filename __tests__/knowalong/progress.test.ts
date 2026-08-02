@@ -6,14 +6,19 @@ import { ALL_DECKS } from '../../utils/knowalong/fixtures/decks';
 import { deckLessonsInOrder, nextLessonAudioTexts } from '../../utils/knowalong/progress';
 
 describe('deckLessonsInOrder', () => {
-  it('flattens a sub-deck deck (songs/CLCC) in order', () => {
-    const svetofor = ALL_DECKS.find((d) => d.id === 'svetofor');
-    expect(svetofor).toBeTruthy();
-    const lessons = deckLessonsInOrder(svetofor!);
+  it('flattens a sub-deck deck (CLCC) in order', () => {
+    const clcc = ALL_DECKS.find((d) => d.id === 'clcc-deck');
+    expect(clcc).toBeTruthy();
+    const lessons = deckLessonsInOrder(clcc!);
     expect(lessons.length).toBeGreaterThan(0);
     // equals the union of its sub-decks' lessons
-    const viaSubs = svetofor!.subDecks!.flatMap((sd) => sd.lessons);
+    const viaSubs = clcc!.subDecks!.flatMap((sd) => sd.lessons);
     expect(lessons.map((l) => l.id)).toEqual(viaSubs.map((l) => l.id));
+  });
+
+  it('the song deck carries no static lessons — they are generated dynamically (Phase 4)', () => {
+    const svetofor = ALL_DECKS.find((d) => d.id === 'svetofor')!;
+    expect(deckLessonsInOrder(svetofor)).toEqual([]);
   });
 
   it('uses deck.lessons for a flat deck', () => {

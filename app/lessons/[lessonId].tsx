@@ -18,6 +18,8 @@ import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToLessons, navigateToLesson, navigateToDeck, navigateToSubDeck } from '../../navigation';
 import { SCREEN_BODY_STYLE } from '../../constants';
 import { getLesson, getLessonDeck, getLessonSubDeck } from '../../utils/knowalong/fixtures/decks';
+import { isDynamicSongLessonId, resolveDynamicSongLesson, nextDynamicSongLesson } from '../../utils/knowalong/songDeck';
+import { getSpine } from '../../utils/knowalong/spine';
 import { prefetchAudio } from '../../utils/knowalong/tts';
 import { LessonRound } from '../../components/knowalong/LessonRound';
 import { LoadingSpinner } from '../../components/primitives';
@@ -29,8 +31,14 @@ import { useWordMasteryStore } from '../../stores/wordMasteryStore';
 export default function LessonPlayerScreen() {
   const { colors } = useAppTheme();
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
-  const lesson = getLesson(lessonId ?? '');
-  const deck = lesson ? getLessonDeck(lessonId ?? '') : null;
+  const mastery = useWordMasteryStore((s) => s.mastery);
+  // Song sections are dynamic (Phase 4): resolve `sdyn-` ids by regenerating the
+  // owning section against current mastery; static decks fall back to the
+  // ALL_DECKS lookup. A graduated target whose arc shrank resolves to null → the
+  // "Lesson not found" guard sends the learner back to the section.
+  const dynamic = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine()) : null;
+  const lesson = dynamic?.lesson ?? getLesson(lessonId ?? '');
+  const deck = dynamic?.deck ?? (lesson ? getLessonDeck(lessonId ?? '') : null);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [solved, setSolved] = useState(false);
@@ -62,7 +70,6 @@ export default function LessonPlayerScreen() {
   const recordMistake = useStreakStore((s) => s.recordMistake);
   const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
   const markLessonComplete = useLessonProgressStore((s) => s.markLessonComplete);
-  const mastery = useWordMasteryStore((s) => s.mastery);
   const recordExposure = useWordMasteryStore((s) => s.recordExposure);
   const recordWordCorrect = useWordMasteryStore((s) => s.recordCorrect);
   const recordWordMistake = useWordMasteryStore((s) => s.recordMistake);
@@ -99,11 +106,13 @@ export default function LessonPlayerScreen() {
     );
   }
 
-  const subDeck = getLessonSubDeck(lessonId ?? '');
-  const subIndex = subDeck ? subDeck.lessons.findIndex((l) => l.id === lesson.id) : -1;
-  const nextLesson = subDeck && subIndex >= 0 && subIndex + 1 < subDeck.lessons.length
-    ? subDeck.lessons[subIndex + 1]
-    : null;
+  const subDeck = dynamic?.subDeck ?? getLessonSubDeck(lessonId ?? '');
+  const nextLesson = dynamic
+    ? nextDynamicSongLesson(dynamic, lesson.id)
+    : (() => {
+        const subIndex = subDeck ? subDeck.lessons.findIndex((l) => l.id === lesson.id) : -1;
+        return subDeck && subIndex >= 0 && subIndex + 1 < subDeck.lessons.length ? subDeck.lessons[subIndex + 1] : null;
+      })();
 
   const step = lesson.steps[stepIndex];
   const isComplete = stepIndex >= lesson.steps.length;

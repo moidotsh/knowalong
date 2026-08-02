@@ -143,6 +143,7 @@ const SVETOFOR_DECK: Deck = {
   lessons: ALL_SVETOFOR_LESSONS,
   subDecks: SVETOFOR_SUBDECKS,
 };
+export { SVETOFOR_DECK };
 
 // ── Exports ───────────────────────────────────────────────────────────
 

@@ -20,6 +20,10 @@ import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 export default function SongsScreen() {
   const { colors } = useAppTheme();
   const svetofor = getDeck('svetofor');
+  // Song lessons are generated dynamically (Phase 4), so the deck carries no
+  // static lesson count. Surface the lyric vocabulary size instead — a stable,
+  // meaningful measure of what there is to learn.
+  const songWords = new Set(SVETOFOR_SONG.sections.flatMap((s) => s.lines.flatMap((l) => l.words.map((w) => w.form)))).size;
   const totalConcepts = new Set(SAMPLE_SONG.sections.flatMap((s) => s.allConcepts)).size;
   const knownConcepts = new Set(SAMPLE_SONG.sections.flatMap((s) => s.knownConcepts)).size;
 
@@ -43,7 +47,7 @@ export default function SongsScreen() {
                       <Text style={{ fontSize: 11, fontWeight: '600', color: colors.brand }}>{SVETOFOR_SUBDECKS.length} sections</Text>
                     </View>
                     <Text style={{ fontSize: 11, color: colors.textMuted, alignSelf: 'center' }}>
-                      {svetofor.lessons.length} lessons
+                      {songWords} words
                     </Text>
                   </View>
                 </View>
