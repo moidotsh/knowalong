@@ -218,7 +218,7 @@ export const SVETOFOR_SONG: {
             { form: 'что', gloss: 'that', role: 'pronoun', isNew: true },
             { form: 'выглядит', gloss: 'looks', role: 'verb', isNew: true },
             { form: 'будто', gloss: 'as if', role: 'particle', isKnown: true },
-            { form: 'бы', gloss: 'would (particle)', role: 'particle', isNew: true },
+            { form: 'бы', gloss: 'would', role: 'particle', isNew: true },
             { form: 'обычный', gloss: 'ordinary', role: 'adjective', isNew: true },
             { form: 'светофор', gloss: 'traffic light', role: 'noun', isNew: true },
           ],
