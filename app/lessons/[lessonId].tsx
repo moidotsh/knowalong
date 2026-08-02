@@ -19,6 +19,7 @@ import { safeGoBack, navigateToLessons, navigateToLesson, navigateToDeck, naviga
 import { SCREEN_BODY_STYLE } from '../../constants';
 import { getLesson, getLessonDeck, getLessonSubDeck } from '../../utils/knowalong/fixtures/decks';
 import { isDynamicSongLessonId, resolveDynamicSongLesson, nextDynamicSongLesson } from '../../utils/knowalong/songDeck';
+import { isCulminatingLineLessonId, resolveCulminatingLineLesson, nextCulminatingLine } from '../../utils/knowalong/culminatingLines';
 import { getSpine } from '../../utils/knowalong/spine';
 import { getContext } from '../../utils/knowalong/contextProvider';
 import { prefetchAudio } from '../../utils/knowalong/tts';
@@ -33,13 +34,15 @@ export default function LessonPlayerScreen() {
   const { colors } = useAppTheme();
   const { lessonId } = useLocalSearchParams<{ lessonId: string }>();
   const mastery = useWordMasteryStore((s) => s.mastery);
-  // Song sections are dynamic (Phase 4): resolve `sdyn-` ids by regenerating the
-  // owning section against current mastery; static decks fall back to the
-  // ALL_DECKS lookup. A graduated target whose arc shrank resolves to null → the
-  // "Lesson not found" guard sends the learner back to the section.
-  const dynamic = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine(), getContext()) : null;
-  const lesson = dynamic?.lesson ?? getLesson(lessonId ?? '');
-  const deck = dynamic?.deck ?? (lesson ? getLessonDeck(lessonId ?? '') : null);
+  // Song lessons are dynamic. `sdyn-` ids resolve two ways (Phase 4 + Phase 5):
+  // per-word arcs (resolveDynamicSongLesson) and culminating full-line lessons
+  // (resolveCulminatingLineLesson — mastery-gated; null when the line is locked).
+  // Static decks fall back to the ALL_DECKS lookup. A null resolve → the "Lesson
+  // not found" guard sends the learner back to the section.
+  const arcResolved = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine(), getContext()) : null;
+  const culmResolved = !arcResolved && isCulminatingLineLessonId(lessonId) ? resolveCulminatingLineLesson(lessonId ?? '', mastery) : null;
+  const lesson = arcResolved?.lesson ?? culmResolved?.lesson ?? getLesson(lessonId ?? '');
+  const deck = arcResolved?.deck ?? culmResolved?.deck ?? (lesson ? getLessonDeck(lessonId ?? '') : null);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [solved, setSolved] = useState(false);
@@ -107,9 +110,11 @@ export default function LessonPlayerScreen() {
     );
   }
 
-  const subDeck = dynamic?.subDeck ?? getLessonSubDeck(lessonId ?? '');
-  const nextLesson = dynamic
-    ? nextDynamicSongLesson(dynamic, lesson.id)
+  const subDeck = arcResolved?.subDeck ?? culmResolved?.subDeck ?? getLessonSubDeck(lessonId ?? '');
+  const nextLesson = arcResolved
+    ? nextDynamicSongLesson(arcResolved, lesson.id)
+    : culmResolved
+    ? nextCulminatingLine(culmResolved, lesson.id)
     : (() => {
         const subIndex = subDeck ? subDeck.lessons.findIndex((l) => l.id === lesson.id) : -1;
         return subDeck && subIndex >= 0 && subIndex + 1 < subDeck.lessons.length ? subDeck.lessons[subIndex + 1] : null;

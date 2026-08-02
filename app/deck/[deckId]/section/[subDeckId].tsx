@@ -16,6 +16,7 @@ import { SCREEN_BODY_STYLE } from '../../../../constants';
 import { getDeck, getSubDeck, type SectionKind } from '../../../../utils/knowalong/fixtures/decks';
 import { SVETOFOR_SONG } from '../../../../utils/knowalong/fixtures/svetoforSong';
 import { buildSongSectionLessons } from '../../../../utils/knowalong/songDeck';
+import { buildCulminatingLines } from '../../../../utils/knowalong/culminatingLines';
 import { getSpine } from '../../../../utils/knowalong/spine';
 import { getContext } from '../../../../utils/knowalong/contextProvider';
 import { sectionProgress, isLessonUnlocked } from '../../../../utils/knowalong/progress';
@@ -62,6 +63,9 @@ export default function SectionLessonsScreen() {
   // one arc per lyric target. Static decks use their authored lessons unchanged.
   const lessons = deckId === 'svetofor' ? buildSongSectionLessons(subDeck, mastery, getSpine(), getContext()) : subDeck.lessons;
   const progress = sectionProgress(lessons, completed);
+  // Culminating full-line lessons (Phase 5): mastery-gated — a line unlocks when
+  // every word in it is graduated. Song deck only.
+  const culminating = deckId === 'svetofor' ? buildCulminatingLines(subDeck, mastery) : [];
   const lyricSection = subDeck.lyricSectionId
     ? SVETOFOR_SONG.sections.find((s) => s.id === subDeck.lyricSectionId)
     : undefined;
@@ -160,6 +164,52 @@ export default function SectionLessonsScreen() {
           })}
         </View>
 
+        {/* Culminating full-line lessons (Phase 5) — mastery-gated */}
+        {culminating.length > 0 ? (
+          <View style={{ marginTop: 18 }}>
+            <Text style={[styles.linesHeader, { color: colors.textSecondary }]}>Culminating lines</Text>
+            <Text style={[styles.linesHint, { color: colors.textMuted }]}>
+              Build the full line once you know every word in it.
+            </Text>
+            {culminating.map((c) => {
+              const done = c.lesson ? completed.includes(c.lesson.id) : false;
+              return (
+                <Pressable
+                  key={c.ordinal}
+                  disabled={!c.unlocked}
+                  onPress={() => (c.lesson ? navigateToLesson(c.lesson.id) : undefined)}
+                  style={({ pressed }) => ({ opacity: !c.unlocked ? 0.6 : pressed ? 0.6 : 1, marginBottom: 8, marginTop: 8 })}
+                >
+                  <MobileSurface padding={14}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <View style={[styles.badge, {
+                        backgroundColor: done ? colors.status.success + '15' : colors.cardAlt,
+                        borderColor: done ? colors.status.success : c.unlocked ? colors.brand : colors.cardBorder,
+                      }]}>
+                        {done ? (
+                          <ConceptIcon name="check" size={16} color={colors.status.success} />
+                        ) : c.unlocked ? (
+                          <ConceptIcon name="waves" size={16} color={colors.brand} />
+                        ) : (
+                          <ConceptIcon name="lock" size={15} color={colors.textMuted} />
+                        )}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.lessonTitle, { color: colors.text }]}>{c.text}</Text>
+                        <Text style={[styles.lessonSub, { color: colors.textMuted }]}>{c.translation}</Text>
+                        <Text style={[styles.lessonMeta, { color: colors.textMuted }]}>
+                          {c.unlocked ? 'Ready — build the line' : `${c.missingCount} word${c.missingCount === 1 ? '' : 's'} to go`}
+                        </Text>
+                      </View>
+                      {c.unlocked ? <Text style={{ fontSize: 16, color: colors.brand }}>→</Text> : null}
+                    </View>
+                  </MobileSurface>
+                </Pressable>
+              );
+            })}
+          </View>
+        ) : null}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -171,6 +221,8 @@ const styles = StyleSheet.create({
   heroTitle: { fontSize: 22, fontWeight: '700' },
   heroSub: { fontSize: 12, marginTop: 4 },
   progressPct: { fontSize: 14, fontWeight: '700' },
+  linesHeader: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
+  linesHint: { fontSize: 12, marginTop: 3, marginBottom: 2 },
   lyricToggle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
   badge: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
   lessonTitle: { fontSize: 15, fontWeight: '600' },
