@@ -22,6 +22,16 @@ describe('mock ContextProvider — contextPhrasesFor', () => {
     }
   });
 
+  it('a window meaning is composed from its OWN words, not the full line translation', () => {
+    // «будто полетев» is "as if having flown" — NOT the whole line ("Ah, as if
+    // flying like a phantom, ah"), so the build prompt matches the chips shown.
+    const phrases = context.contextPhrasesFor({ form: 'полетев', gloss: 'having flown', role: 'verb' });
+    const budtoPolet = phrases.find((p) => p.surfaceForm === 'будто полетев');
+    expect(budtoPolet).toBeTruthy();
+    expect(budtoPolet!.meaning).toBe('as if having flown');
+    expect(budtoPolet!.meaning).not.toContain('phantom'); // not the full-line translation
+  });
+
   it('a particle in a 1-word lyric line still gets multi-word external context', () => {
     // эй's only lyric line is the 1-word "Эй" → no window, but particle pairing
     // yields «эй я вижу»-style clauses (morphology-safe).

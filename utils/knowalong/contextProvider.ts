@@ -59,12 +59,21 @@ type LyricLine = (typeof SVETOFOR_SONG)['sections'][number]['lines'][number];
  *  sizes lets the generator pick a READY one (whose non-target words are already
  *  known) and avoid scaffolding a line-mate as a bare single-word "victim". Each
  *  window is a real lyric slice (morphologically correct by construction) and
- *  ≤3 words (the full line is Phase 5's culminating lesson). */
+ *  ≤3 words (the full line is Phase 5's culminating lesson).
+ *
+ *  The window's `meaning` is composed from its OWN word glosses — NOT the full
+ *  line translation. A 2-word window like «будто полетев» is "as if having
+ *  flown", not the whole line ("Ah, as if flying like a phantom, ah"), so the
+ *  build prompt matches the chips actually on screen. */
 function lineWindows(line: LyricLine, targetIdx: number): ContextPhrase[] {
   const words = line.words;
   const make = (start: number, end: number): ContextPhrase => {
     const slice = words.slice(start, end).map((w) => ({ form: w.form, gloss: w.gloss, role: w.role }));
-    return { surfaceForm: slice.map((w) => w.form).join(' '), meaning: line.translation, words: slice };
+    return {
+      surfaceForm: slice.map((w) => w.form).join(' '),
+      meaning: slice.map((w) => w.gloss).join(' '),
+      words: slice,
+    };
   };
   const out: ContextPhrase[] = [];
   if (targetIdx > 0) out.push(make(targetIdx - 1, targetIdx + 1)); // [prev, target]
