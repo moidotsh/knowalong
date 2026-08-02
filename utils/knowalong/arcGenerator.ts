@@ -281,13 +281,16 @@ function buildContextWrappingArc(target: ArcTarget, phrases: readonly ContextPhr
   const use = (ready.length > 0 ? ready : [...wrappable].sort((a, b) => unknownNonTarget(a).length - unknownNonTarget(b).length)).slice(0, MAX_READY_CONTEXT_PHRASES);
 
   // Scaffold the chosen phrases' unknown spine words (deduped) — always-funded.
+  // Each scaffold card gets a UNIQUE id (per word): the lesson player keys
+  // LessonRound by step.itemId, so duplicate ids would leak placement state
+  // across consecutive cards (a card mounting pre-filled / unsolvable).
   const scaffolded = new Set<string>();
   for (const p of use) {
     for (const w of unknownNonTarget(p)) {
       const k = wordKey(w.form);
       if (scaffolded.has(k)) continue;
       scaffolded.add(k);
-      cards.push(singleWordStep(w, `${opts.idPrefix}-ctx`));
+      cards.push(singleWordStep(w, `${opts.idPrefix}-ctx-${k}`));
       evolved[k] = GRADUATED_RECORD;
     }
   }

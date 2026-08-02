@@ -105,6 +105,17 @@ describe('buildSongSectionLessons — Intro (the worked section)', () => {
       JSON.stringify(b.map((l) => ({ id: l.id, forms: l.steps.map((s) => s.surfaceForm) }))),
     );
   });
+
+  it('every card itemId is unique within a section (no LessonRound key collisions)', () => {
+    // The lesson player keys LessonRound by step.itemId; a duplicate id leaks
+    // placement state across consecutive cards (a card mounting pre-filled /
+    // unsolvable). Empty mastery exercises the multi-scaffold path (эй → я/вижу/…).
+    for (const masteryCase of [{}, { я: graduated, вижу: graduated }] as MasteryMap[]) {
+      const lessons = buildSongSectionLessons(intro, masteryCase, spine, context);
+      const ids = lessons.flatMap((l) => l.steps.map((s) => s.itemId));
+      expect(new Set(ids).size).toBe(ids.length);
+    }
+  });
 });
 
 describe('resolveDynamicSongLesson', () => {
