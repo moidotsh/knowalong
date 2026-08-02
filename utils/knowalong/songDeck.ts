@@ -44,16 +44,6 @@ const SECTION_ICON: Record<SectionKind, Lesson['icon']> = {
   outro: 'waves',
 };
 
-/** Cap on scaffolding words the WHOLE section pre-teaches (shared across targets,
- *  first-come-first-served) — not a per-target budget. Without this each novel
- *  target would drag in its own 6 fresh spine words (CLCC grows deep), bloating a
- *  section to ~4×3 redundant lessons. With it, the first target that needs
- *  scaffolding consumes the budget (teaching the gradient once); later targets,
- *  their prerequisites already graduated by cross-target evolution, reveal in a
- *  single card (or via a Mode-A lyric host). Matches ARC_COMPANION_COUNT by
- *  intent but is a distinct (section-scoped) concept. */
-const SECTION_SCAFFOLDING_BUDGET = 6;
-
 /** A graduated record overlaid on taught words during cross-target evolution
  *  (matches the mastery module's graduated classification: streak ≥ threshold). */
 const TAUGHT: WordMastery = {
@@ -103,32 +93,26 @@ function graduateTaught(lessons: Lesson[], evolved: MasteryMap): void {
 }
 
 /** Generate a song section's lessons from current mastery: one arc per lyric
- *  target (narrative order), with a SHARED scaffolding budget (the first target
- *  that needs prerequisites consumes it) and cross-target mastery evolution (each
- *  arc's words graduate before the next target, so scaffolding is reused, not
- *  re-taught). Graduated targets contribute no lessons. Pure + deterministic. */
+ *  target (narrative order), with cross-target mastery evolution (each arc's words
+ *  graduate before the next target, so context is reused, not re-taught). A target
+ *  that is already graduated OR that defers (no teachable context phrase yet)
+ *  contributes no lesson — it is acquired via exposure in the culminating line
+ *  (Phase 5). Pure + deterministic. */
 export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider): Lesson[] {
   const evolved: MasteryMap = { ...mastery };
   const icon = SECTION_ICON[subDeck.kind] ?? 'sparkles';
   const lessons: Lesson[] = [];
-  let remaining = SECTION_SCAFFOLDING_BUDGET;
   sectionTargets(subDeck).forEach((target, i) => {
     const opts: BuildArcOptions = {
       idPrefix: `${DYNAMIC_SONG_PREFIX}${subDeck.id}-${i + 1}`,
       title: `${subDeck.label} · ${target.form}`,
       subtitle: target.gloss,
       icon,
-      companionCount: remaining,
     };
     const arc = buildArcForTarget(target, evolved, spine, context, opts);
-    if (arc.length === 0) return; // target already graduated → skip
+    if (arc.length === 0) return; // already graduated OR deferred → no lesson for this target
     lessons.push(...arc);
     graduateTaught(arc, evolved); // next target reuses this arc's words as known context
-    // Each arc reveals exactly one target card; the rest are scaffolding, drawn
-    // from the shared section budget.
-    const arcCards = arc.reduce((n, l) => n + l.steps.length, 0);
-    remaining -= Math.max(0, arcCards - 1);
-    if (remaining < 0) remaining = 0;
   });
   return lessons;
 }
