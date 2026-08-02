@@ -20,6 +20,7 @@ import { SCREEN_BODY_STYLE } from '../../constants';
 import { getLesson, getLessonDeck, getLessonSubDeck } from '../../utils/knowalong/fixtures/decks';
 import { isDynamicSongLessonId, resolveDynamicSongLesson, nextDynamicSongLesson } from '../../utils/knowalong/songDeck';
 import { getSpine } from '../../utils/knowalong/spine';
+import { getContext } from '../../utils/knowalong/contextProvider';
 import { prefetchAudio } from '../../utils/knowalong/tts';
 import { LessonRound } from '../../components/knowalong/LessonRound';
 import { LoadingSpinner } from '../../components/primitives';
@@ -36,7 +37,7 @@ export default function LessonPlayerScreen() {
   // owning section against current mastery; static decks fall back to the
   // ALL_DECKS lookup. A graduated target whose arc shrank resolves to null → the
   // "Lesson not found" guard sends the learner back to the section.
-  const dynamic = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine()) : null;
+  const dynamic = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine(), getContext()) : null;
   const lesson = dynamic?.lesson ?? getLesson(lessonId ?? '');
   const deck = dynamic?.deck ?? (lesson ? getLessonDeck(lessonId ?? '') : null);
 

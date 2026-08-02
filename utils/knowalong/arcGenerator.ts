@@ -50,6 +50,7 @@ import type { WordPart } from './fixtures/learningItems';
 import { WORD_FADE_THRESHOLD, classifyWord, phraseReadiness, wordKey, type MasteryMap, type WordMastery } from './mastery';
 import { assertLessonWithinCap, MAX_NEW_CONCEPTS_PER_CARD, MAX_NEW_CONCEPTS_PER_LESSON, newConceptKeys } from './concept';
 import type { SpineProvider } from './spine';
+import type { ContextPhrase, ContextProvider } from './contextProvider';
 
 /** A target concept the arc graduates. Structurally a word part (form/gloss/role). */
 export type ArcTarget = WordPart;
@@ -235,13 +236,76 @@ function buildCompositionalArc(target: ArcTarget, mastery: MasteryMap, spine: Sp
   return chunkCardsIntoLessons(cards, mastery, opts);
 }
 
+// ── Mode B (Phase 4.1): context wrapping — never a single-word lesson ───
+
+/** Max ready context phrases a target is revealed in (encoding variability). */
+const MAX_READY_CONTEXT_PHRASES = 2;
+
+/** A ContextPhrase → LessonStep (the chip builder consumes steps). */
+function contextPhraseToStep(p: ContextPhrase, itemId: string): LessonStep {
+  return {
+    itemId,
+    surfaceForm: p.surfaceForm,
+    meaning: p.meaning,
+    words: p.words.map((w) => ({ form: w.form, gloss: w.gloss, role: w.role })),
+  };
+}
+
+/** Mode B body (Phase 4.1). Wrap `target` in a context phrase so it is taught
+ *  inside a real multi-word phrase, never as an isolated single word.
+ *
+ *  A phrase is wrappable when its unknown NON-target words are all SPINE words
+ *  (gradient/CLCC atoms) — those are legitimate to scaffold (they are useful
+ *  vocabulary and end up in their own multi-word gradient phrases). It never
+ *  scaffolds a NOVEL lyric line-mate, because that would teach a complex word as
+ *  a bare single-word "victim" — the exact anti-pattern this phase removes.
+ *
+ *  Among wrappable phrases it prefers READY ones (zero unknowns), then the one
+ *  needing the fewest scaffolds. Returns null if no phrase is wrappable, so the
+ *  caller falls back to the compositional gradient arc. The target may surface in
+ *  up to MAX_READY_CONTEXT_PHRASES phrases (encoding variability). */
+function buildContextWrappingArc(target: ArcTarget, phrases: readonly ContextPhrase[], mastery: MasteryMap, spine: SpineProvider, opts: BuildArcOptions): Lesson[] | null {
+  const tKey = wordKey(target.form);
+  const spineWords = new Set<string>();
+  for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps()]) for (const w of step.words) spineWords.add(wordKey(w.form));
+
+  const evolved: MasteryMap = { ...mastery };
+  const unknownNonTarget = (p: ContextPhrase): WordPart[] =>
+    p.words.filter((w) => wordKey(w.form) !== tKey && !isGraduated(w.form, evolved));
+  // Wrappable: every unknown non-target word is a scaffoldable spine atom.
+  const wrappable = phrases.filter((p) => unknownNonTarget(p).every((w) => spineWords.has(wordKey(w.form))));
+  if (wrappable.length === 0) return null;
+
+  const ready = wrappable.filter((p) => unknownNonTarget(p).length === 0);
+  const cards: LessonStep[] = [];
+  const use = (ready.length > 0 ? ready : [...wrappable].sort((a, b) => unknownNonTarget(a).length - unknownNonTarget(b).length)).slice(0, MAX_READY_CONTEXT_PHRASES);
+
+  // Scaffold the chosen phrases' unknown spine words (deduped) — always-funded.
+  const scaffolded = new Set<string>();
+  for (const p of use) {
+    for (const w of unknownNonTarget(p)) {
+      const k = wordKey(w.form);
+      if (scaffolded.has(k)) continue;
+      scaffolded.add(k);
+      cards.push(singleWordStep(w, `${opts.idPrefix}-ctx`));
+      evolved[k] = GRADUATED_RECORD;
+    }
+  }
+  let phraseIdx = 0;
+  for (const p of use) cards.push(contextPhraseToStep(p, `${opts.idPrefix}-p${(phraseIdx += 1)}`));
+
+  return chunkCardsIntoLessons(cards, mastery, opts);
+}
+
 // ── Public API ──────────────────────────────────────────────────────────
 
 /** Build the mastery-sized arc that graduates `target`. Returns [] if the target
- *  is already graduated. Mode A (a minimal, contextualizing corpus phrase) when
- *  one is ready; mode B (compositional scaffolding, then the target) otherwise.
- *  Pure, deterministic; every lesson is hard-gated on the concept cap. */
-export function buildArcForTarget(target: ArcTarget, mastery: MasteryMap, spine: SpineProvider, opts: BuildArcOptions): Lesson[] {
+ *  is already graduated. Resolution order: Mode A (a ready contextualizing corpus
+ *  /lyric phrase); else Mode B context-wrapping (the target inside its context
+ *  phrases — never a single-word lesson); else the foundational compositional
+ *  fallback (gradient scaffolding, for a target with no context at all). Pure,
+ *  deterministic; every lesson is hard-gated on the concept cap. */
+export function buildArcForTarget(target: ArcTarget, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider, opts: BuildArcOptions): Lesson[] {
   if (isGraduated(target.form, mastery)) return []; // nothing to teach
 
   // Mode A: a multi-word corpus phrase already contextualizes the target
@@ -260,6 +324,18 @@ export function buildArcForTarget(target: ArcTarget, mastery: MasteryMap, spine:
     return [lesson];
   }
 
-  // Mode B: compositional scaffolding, then the target (ADR §3 step 3).
+  // Mode B (Phase 4.1): wrap the target in a READY context phrase (its non-target
+  // words already known) — the target inside a real multi-word phrase, never an
+  // isolated single word. Ready-only (no line-mate scaffolding → no single-word
+  // victims). Falls through to the foundational compositional arc when no phrase
+  // is ready yet.
+  const phrases = context.contextPhrasesFor(target);
+  if (phrases.length > 0) {
+    const wrapped = buildContextWrappingArc(target, phrases, mastery, spine, opts);
+    if (wrapped) return wrapped;
+  }
+
+  // Foundational fallback (Phase 3.1): gradient scaffolding + the target, for a
+  // target with no ready context phrase. Governed by the shared companion budget.
   return buildCompositionalArc(target, mastery, spine, opts);
 }

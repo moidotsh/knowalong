@@ -17,6 +17,7 @@ import { getDeck, getSubDeck, type SectionKind } from '../../../../utils/knowalo
 import { SVETOFOR_SONG } from '../../../../utils/knowalong/fixtures/svetoforSong';
 import { buildSongSectionLessons } from '../../../../utils/knowalong/songDeck';
 import { getSpine } from '../../../../utils/knowalong/spine';
+import { getContext } from '../../../../utils/knowalong/contextProvider';
 import { sectionProgress, isLessonUnlocked } from '../../../../utils/knowalong/progress';
 import { classifyWord } from '../../../../utils/knowalong/mastery';
 import { useLessonProgressStore } from '../../../../stores/lessonProgressStore';
@@ -59,7 +60,7 @@ export default function SectionLessonsScreen() {
 
   // Song sections are dynamic (Phase 4): lessons generated from current mastery,
   // one arc per lyric target. Static decks use their authored lessons unchanged.
-  const lessons = deckId === 'svetofor' ? buildSongSectionLessons(subDeck, mastery, getSpine()) : subDeck.lessons;
+  const lessons = deckId === 'svetofor' ? buildSongSectionLessons(subDeck, mastery, getSpine(), getContext()) : subDeck.lessons;
   const progress = sectionProgress(lessons, completed);
   const lyricSection = subDeck.lyricSectionId
     ? SVETOFOR_SONG.sections.find((s) => s.id === subDeck.lyricSectionId)

@@ -28,6 +28,7 @@ import { SVETOFOR_DECK } from './fixtures/decks';
 import { WORD_FADE_THRESHOLD, classifyWord, wordKey, type MasteryMap, type WordMastery } from './mastery';
 import { buildArcForTarget, type BuildArcOptions } from './arcGenerator';
 import type { SpineProvider } from './spine';
+import type { ContextProvider } from './contextProvider';
 
 /** Prefix on every dynamically-generated song lesson id, so the lesson player
  *  can route `sdyn-` ids to the resolver and leave static ids to getLesson. */
@@ -106,7 +107,7 @@ function graduateTaught(lessons: Lesson[], evolved: MasteryMap): void {
  *  that needs prerequisites consumes it) and cross-target mastery evolution (each
  *  arc's words graduate before the next target, so scaffolding is reused, not
  *  re-taught). Graduated targets contribute no lessons. Pure + deterministic. */
-export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, spine: SpineProvider): Lesson[] {
+export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider): Lesson[] {
   const evolved: MasteryMap = { ...mastery };
   const icon = SECTION_ICON[subDeck.kind] ?? 'sparkles';
   const lessons: Lesson[] = [];
@@ -119,7 +120,7 @@ export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, s
       icon,
       companionCount: remaining,
     };
-    const arc = buildArcForTarget(target, evolved, spine, opts);
+    const arc = buildArcForTarget(target, evolved, spine, context, opts);
     if (arc.length === 0) return; // target already graduated → skip
     lessons.push(...arc);
     graduateTaught(arc, evolved); // next target reuses this arc's words as known context
@@ -143,9 +144,9 @@ export interface ResolvedSongLesson {
 /** Resolve a `sdyn-` lesson id by regenerating each song section against current
  *  mastery and finding the id. Returns null if the id is gone (its target
  *  graduated and the arc shrank) — the caller falls back to the section. */
-export function resolveDynamicSongLesson(lessonId: string, mastery: MasteryMap, spine: SpineProvider): ResolvedSongLesson | null {
+export function resolveDynamicSongLesson(lessonId: string, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider): ResolvedSongLesson | null {
   for (const subDeck of SVETOFOR_SUBDECKS) {
-    const lessons = buildSongSectionLessons(subDeck, mastery, spine);
+    const lessons = buildSongSectionLessons(subDeck, mastery, spine, context);
     const lesson = lessons.find((l) => l.id === lessonId);
     if (lesson) return { lesson, deck: SVETOFOR_DECK, subDeck, lessons };
   }

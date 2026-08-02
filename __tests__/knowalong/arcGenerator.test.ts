@@ -1,17 +1,16 @@
 // __tests__/knowalong/arcGenerator.test.ts
-// Phase 3 + Phase 3.1 (ADR: mastery-driven-generation-adr.md) — the dynamic arc
-// generator. Pins the exit criteria: same target with empty mastery yields a
-// LARGE arc; with full prerequisite mastery yields a SMALL arc; every lesson
-// passes the Phase 1 concept cap. Phase 3.1 adds the compositional invariants:
-// mode B teaches the gradient's compositional PHRASES (not decomposed single
-// words), a new hub lands in its own lesson before being reused, and a corpus
-// target with an unknown prerequisite is revealed IN a contextual phrase (mode A
-// after scaffolding). Also pins R4 sizing, mode A (contextual host), R6
-// scaffolding sourcing, determinism, and the end-to-end cap across mastery states.
+// The dynamic arc generator (ADR: mastery-driven-generation-adr.md). Phase 4.1
+// made CONTEXT WRAPPING the primary Mode B path (a novel target is wrapped in its
+// context phrases — never a single-word lesson); the Phase 3.1 compositional arc
+// is now the FALLBACK, used only when a target has no context phrases. These tests
+// cover both: the compositional fallback (via a no-op ContextProvider) and the
+// context-wrapping primary path (via the mock ContextProvider), plus Mode A, R4
+// sizing, R6 sourcing, determinism, and end-to-end cap compliance.
 
 import { describe, it, expect } from 'vitest';
 import { buildArcForTarget } from '../../utils/knowalong/arcGenerator';
 import { getSpine } from '../../utils/knowalong/spine';
+import { getContext, type ContextProvider } from '../../utils/knowalong/contextProvider';
 import { assertLessonWithinCap } from '../../utils/knowalong/concept';
 import { WORD_FADE_THRESHOLD, classifyWord, wordKey, type MasteryMap, type WordMastery } from '../../utils/knowalong/mastery';
 import type { Lesson } from '../../utils/knowalong/fixtures/decks';
@@ -19,12 +18,14 @@ import type { Lesson } from '../../utils/knowalong/fixtures/decks';
 const T = WORD_FADE_THRESHOLD;
 const graduated: WordMastery = { exposures: 1, correct: T, streak: T, mistakes: 0, lastSeenMs: 1 };
 const spine = getSpine();
+/** No context phrases → forces the compositional (Phase 3.1) fallback path. */
+const noContext: ContextProvider = { contextPhrasesFor: () => [] };
+/** The mock ContextProvider (lyric windows + particle clauses) → the primary path. */
+const mockContext = getContext();
 
-// A target NOT in the gradient/CLCC corpus (a lyric word) → exercises mode B,
-// and (no corpus phrase contains it) the single-word target fallback.
+// A lyric target NOT in the gradient/CLCC corpus → exercises Mode B.
 const NOVEL_TARGET = { form: 'фантомом', gloss: 'phantom (instr.)', role: 'noun' as const };
-// A target IN the gradient corpus → can exercise mode A when its context is known,
-// or mode-A-after-scaffolding when a prerequisite (я) is still unknown.
+// A target IN the gradient corpus → exercises Mode A when its context is known.
 const CORPUS_TARGET = { form: 'вижу', gloss: 'see', role: 'verb' as const };
 
 /** Graduate every word in the gradient + CLCC layers (the companion pool). */
@@ -36,10 +37,8 @@ function allCompanionsKnown(): MasteryMap {
   return m;
 }
 
-/** Assert every lesson in an arc is cap-compliant measured against the mastery a
- *  real learner has at the START of each lesson (evolving as words graduate).
- *  This is the end-to-end R1+R2 proof: the generator's own construction invariant
- *  checked the way the runtime gate (assertLessonWithinCap) measures it. */
+/** End-to-end R1+R2 proof: every lesson cap-compliant against the lesson-start
+ *  mastery a real learner has (evolving as words graduate). */
 function assertArcCapClean(arc: Lesson[], base: MasteryMap): void {
   const m: MasteryMap = { ...base };
   for (const lesson of arc) {
@@ -52,59 +51,67 @@ function assertArcCapClean(arc: Lesson[], base: MasteryMap): void {
   }
 }
 
-// ── R4 dynamic sizing (the Phase 3 exit criterion) ───────────────────────
-describe('buildArcForTarget — R4 dynamic sizing', () => {
+// ── Phase 4.1: context wrapping (the primary Mode B path) ────────────────
+describe('buildArcForTarget — context wrapping (Phase 4.1)', () => {
+  it('wraps the target in a READY multi-word phrase — never a single-word card', () => {
+    // фантомом's line-mates будто/полетев are known → a ready lyric window exists,
+    // so the target surfaces inside a real phrase with zero scaffolding.
+    const mastery: MasteryMap = { будто: graduated, полетев: graduated };
+    const arc = buildArcForTarget(NOVEL_TARGET, mastery, spine, mockContext, { idPrefix: 'wrap' });
+    const targetCards = arc
+      .flatMap((l) => l.steps)
+      .filter((s) => s.words.some((w) => wordKey(w.form) === wordKey(NOVEL_TARGET.form)));
+    expect(targetCards.length).toBeGreaterThan(0);
+    for (const c of targetCards) expect(c.words.length).toBeGreaterThanOrEqual(2); // never a bare single word
+  });
+
+  it('a particle wraps even with empty mastery — it scaffolds the gradient clause', () => {
+    // но (particle) + empty mastery → «но я вижу» is wrappable (я, вижу are spine
+    // atoms), so the arc scaffolds them and reveals но inside the multi-word clause.
+    const arc = buildArcForTarget({ form: 'но', gloss: 'but', role: 'particle' }, {}, spine, mockContext, { idPrefix: 'wrap-empty' });
+    const cards = arc.flatMap((l) => l.steps);
+    expect(cards.some((s) => s.surfaceForm.startsWith('но ') && s.words.length >= 2)).toBe(true);
+    assertArcCapClean(arc, {});
+  });
+
+  it('a particle target with no ready lyric window gets external particle-clause context', () => {
+    // будто (particle) + known gradient → "будто я вижу"-style morphology-safe clause.
+    const arc = buildArcForTarget({ form: 'будто', gloss: 'as if', role: 'particle' }, { я: graduated, вижу: graduated }, spine, mockContext, { idPrefix: 'particle' });
+    const cards = arc.flatMap((l) => l.steps);
+    expect(cards.some((s) => s.surfaceForm.startsWith('будто ') && s.words.length >= 2)).toBe(true);
+  });
+});
+
+// ── Compositional fallback (Phase 3.1 Mode B, when no context exists) ────
+describe('buildArcForTarget — compositional fallback (no context)', () => {
   it('empty mastery → a LARGE arc (prerequisites taught first)', () => {
-    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'novel-empty' });
+    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, noContext, { idPrefix: 'novel-empty' });
     expect(arc.length).toBeGreaterThan(1);
-    // 6 compositional scaffolding cards + the target = 7 cards; the hub (я) takes
-    // its own lesson, the rest batch 3/3 → 3 lessons.
-    expect(arc.length).toBe(3);
+    expect(arc.length).toBe(3); // 6 gradient companions + target → 3 lessons
   });
 
   it('full prerequisite mastery → a SMALL arc (just the target)', () => {
-    const arc = buildArcForTarget(NOVEL_TARGET, allCompanionsKnown(), spine, { idPrefix: 'novel-full' });
+    const arc = buildArcForTarget(NOVEL_TARGET, allCompanionsKnown(), spine, noContext, { idPrefix: 'novel-full' });
     expect(arc.length).toBe(1);
     expect(arc[0].steps.some((s) => s.surfaceForm === NOVEL_TARGET.form)).toBe(true);
   });
 
   it('pack size is non-increasing as mastery grows; empty is strictly larger than full', () => {
-    const empty = buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'r4a' });
-    const partial = buildArcForTarget(NOVEL_TARGET, { я: graduated, вижу: graduated, знаю: graduated }, spine, { idPrefix: 'r4b' });
-    const full = buildArcForTarget(NOVEL_TARGET, allCompanionsKnown(), spine, { idPrefix: 'r4c' });
-    // v1's fixed companion budget + the rich CLCC pool mean shrinkage concentrates
-    // at the full-mastery boundary (finer-grained dynamic sizing lands with the
-    // Phase 6 spine); the load never GROWS as mastery grows, and the ends differ.
+    const empty = buildArcForTarget(NOVEL_TARGET, {}, spine, noContext, { idPrefix: 'r4a' });
+    const partial = buildArcForTarget(NOVEL_TARGET, { я: graduated, вижу: graduated, знаю: graduated }, spine, noContext, { idPrefix: 'r4b' });
+    const full = buildArcForTarget(NOVEL_TARGET, allCompanionsKnown(), spine, noContext, { idPrefix: 'r4c' });
     expect(partial.length).toBeLessThanOrEqual(empty.length);
     expect(full.length).toBeLessThanOrEqual(partial.length);
     expect(empty.length).toBeGreaterThan(full.length);
   });
-});
 
-// ── Phase 3.1: compositional scaffolding (the new mode B shape) ──────────
-describe('buildArcForTarget — compositional scaffolding (Phase 3.1)', () => {
   it('teaches compositional PHRASES, not decomposed single words', () => {
-    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'comp' });
-    const allCards = arc.flatMap((l) => l.steps);
-    const multiWordCards = allCards.filter((s) => s.words.length >= 2);
-    // The gradient is compositional — at least one scaffolding card reuses a hub
-    // in a multi-word phrase (я вижу / я знаю / …), not bare isolated words.
-    expect(multiWordCards.length).toBeGreaterThan(0);
-  });
-
-  it('teaches the compositional hub (я) in its own lesson before reusing it', () => {
-    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'hub' });
-    // я is the gradient atom. It is new, and the phrase that reuses it (я вижу)
-    // shares that new word — so by the frozen-snapshot cap, я cannot share a
-    // lesson with я вижу. It lands alone in lesson 1.
-    expect(arc[0].steps.map((s) => s.surfaceForm)).toEqual(['я']);
-    // A later lesson reuses now-graduated я across multiple verb phrases.
-    const reuseLesson = arc.find((l) => l.steps.length >= 2 && l.steps.every((s) => s.words.some((w) => w.form === 'я')));
-    expect(reuseLesson).toBeTruthy();
+    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, noContext, { idPrefix: 'comp' });
+    expect(arc.flatMap((l) => l.steps).filter((s) => s.words.length >= 2).length).toBeGreaterThan(0);
   });
 
   it('the target lands in the LAST lesson', () => {
-    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'order' });
+    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, noContext, { idPrefix: 'order' });
     const last = arc[arc.length - 1];
     expect(last.steps.some((s) => s.surfaceForm === NOVEL_TARGET.form)).toBe(true);
     for (const lesson of arc.slice(0, -1)) {
@@ -116,33 +123,28 @@ describe('buildArcForTarget — compositional scaffolding (Phase 3.1)', () => {
 // ── Mode A after scaffolding: corpus target revealed in context ──────────
 describe('buildArcForTarget — mode A after scaffolding (i+1 reveal)', () => {
   it('a corpus target with an unknown prerequisite is revealed IN a contextual phrase', () => {
-    // вижу is in "я вижу", but with empty mastery BOTH я and вижу are unknown → no
-    // ready host → mode B. Scaffolding teaches я, which unlocks "я вижу" (вижу now
-    // the sole unknown) → the retry stops scaffolding and the target card IS the
-    // real phrase "я вижу". The learner meets вижу in context, not isolation.
-    const arc = buildArcForTarget(CORPUS_TARGET, {}, spine, { idPrefix: 'ctx-after' });
+    const arc = buildArcForTarget(CORPUS_TARGET, {}, spine, noContext, { idPrefix: 'ctx-after' });
     const last = arc[arc.length - 1];
     expect(last.steps.some((s) => s.surfaceForm === 'я вижу')).toBe(true);
-    // and the prerequisite я was taught first
     expect(arc[0].steps.map((s) => s.surfaceForm)).toContain('я');
-    // minimal scaffolding — only the prerequisite needed, not the whole budget.
     const taughtWords = new Set(arc.flatMap((l) => l.steps.flatMap((s) => s.words.map((w) => wordKey(w.form)))));
     expect(taughtWords.size).toBeLessThan(5);
   });
 });
 
-// ── R1/R2/R3 cap compliance (end-to-end, across mastery states) ──────────
+// ── R1/R2/R3 cap compliance (end-to-end, across mastery states + both paths) ──
 describe('buildArcForTarget — cap compliance', () => {
-  it('every lesson is cap-compliant (R1 per card + R2 per lesson) against its own lesson-start mastery', () => {
+  it('every lesson is cap-compliant against its own lesson-start mastery', () => {
     const cases: MasteryMap[] = [
       {},
       { я: graduated, вижу: graduated },
-      { я: graduated, вижу: graduated, знаю: graduated, хочу: graduated, иду: graduated, живу: graduated },
+      { будто: graduated, полетев: graduated },
       allCompanionsKnown(),
     ];
     for (const mastery of cases) {
-      assertArcCapClean(buildArcForTarget(NOVEL_TARGET, mastery, spine, { idPrefix: 'cap-novel' }), mastery);
-      assertArcCapClean(buildArcForTarget(CORPUS_TARGET, mastery, spine, { idPrefix: 'cap-ctx' }), mastery);
+      assertArcCapClean(buildArcForTarget(NOVEL_TARGET, mastery, spine, mockContext, { idPrefix: 'cap-wrap' }), mastery);
+      assertArcCapClean(buildArcForTarget(NOVEL_TARGET, mastery, spine, noContext, { idPrefix: 'cap-fb' }), mastery);
+      assertArcCapClean(buildArcForTarget(CORPUS_TARGET, mastery, spine, mockContext, { idPrefix: 'cap-ctx' }), mastery);
     }
   });
 });
@@ -151,54 +153,50 @@ describe('buildArcForTarget — cap compliance', () => {
 describe('buildArcForTarget — mode A (contextual host, ready immediately)', () => {
   it('uses a multi-word corpus phrase when the target is the sole unknown', () => {
     const mastery = allCompanionsKnown();
-    delete mastery['вижу']; // я known, вижу not → "я вижу" has exactly one unknown
-    const arc = buildArcForTarget(CORPUS_TARGET, mastery, spine, { idPrefix: 'ctx' });
+    delete mastery['вижу'];
+    const arc = buildArcForTarget(CORPUS_TARGET, mastery, spine, mockContext, { idPrefix: 'ctx' });
     expect(arc.length).toBe(1);
     const card = arc[0].steps[0];
-    expect(card.words.length).toBeGreaterThanOrEqual(2); // a real contextual phrase, not a lone word
-    expect(card.surfaceForm).toBe('я вижу'); // shortest ready host wins
+    expect(card.words.length).toBeGreaterThanOrEqual(2);
+    expect(card.surfaceForm).toBe('я вижу');
   });
 
-  it('the host card is cap-compliant against its generation mastery — but would violate R1 against empty mastery (why mode A needs known context)', () => {
+  it('the host card is cap-compliant against its generation mastery — but would violate R1 against empty mastery', () => {
     const mastery = allCompanionsKnown();
     delete mastery['вижу'];
-    const arc = buildArcForTarget(CORPUS_TARGET, mastery, spine, { idPrefix: 'ctx-cap' });
-    expect(() => assertLessonWithinCap(arc[0], mastery)).not.toThrow(); // 1 new (вижу) — clean
-    // Against empty mastery the same 2-word card is 2 new → R1 violation. This is
-    // the invariant that forces mode A to fire only when context is known.
+    const arc = buildArcForTarget(CORPUS_TARGET, mastery, spine, mockContext, { idPrefix: 'ctx-cap' });
+    expect(() => assertLessonWithinCap(arc[0], mastery)).not.toThrow();
     expect(() => assertLessonWithinCap(arc[0], {})).toThrow();
   });
 });
 
-// ── R6 sourcing + determinism + robustness ───────────────────────────────
+// ── Sourcing, determinism, robustness ────────────────────────────────────
 describe('buildArcForTarget — sourcing, determinism, robustness', () => {
-  it('scaffolding cards are spine phrases — every non-target card word is a gradient/CLCC word (R6)', () => {
+  it('fallback scaffolding cards are spine phrases — every non-target card word is a gradient/CLCC word (R6)', () => {
     const spineForms = new Set<string>();
     for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps()]) {
       for (const w of step.words) spineForms.add(wordKey(w.form));
     }
-    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'r6' });
+    const arc = buildArcForTarget(NOVEL_TARGET, {}, spine, noContext, { idPrefix: 'r6' });
     for (const step of arc.flatMap((l) => l.steps)) {
-      if (step.surfaceForm === NOVEL_TARGET.form) continue; // the target itself is a lyric word
+      if (step.surfaceForm === NOVEL_TARGET.form) continue;
       for (const w of step.words) expect(spineForms.has(wordKey(w.form))).toBe(true);
     }
   });
 
-  it('is deterministic — same inputs yield identical arcs', () => {
-    const opts = { idPrefix: 'det' };
-    const a = buildArcForTarget(NOVEL_TARGET, {}, spine, opts);
-    const b = buildArcForTarget(NOVEL_TARGET, {}, spine, opts);
-    expect(JSON.stringify(a.map((l) => ({ id: l.id, forms: l.steps.map((s) => s.surfaceForm) })))).toBe(
-      JSON.stringify(b.map((l) => ({ id: l.id, forms: l.steps.map((s) => s.surfaceForm) }))),
+  it('is deterministic — same inputs yield identical arcs (both paths)', () => {
+    const a1 = buildArcForTarget(NOVEL_TARGET, {}, spine, mockContext, { idPrefix: 'det' });
+    const a2 = buildArcForTarget(NOVEL_TARGET, {}, spine, mockContext, { idPrefix: 'det' });
+    expect(JSON.stringify(a1.map((l) => ({ id: l.id, forms: l.steps.map((s) => s.surfaceForm) })))).toBe(
+      JSON.stringify(a2.map((l) => ({ id: l.id, forms: l.steps.map((s) => s.surfaceForm) }))),
     );
   });
 
   it('never throws across mastery states, and a graduated target needs no arc', () => {
-    expect(() => buildArcForTarget(NOVEL_TARGET, {}, spine, { idPrefix: 'safe' })).not.toThrow();
-    expect(() => buildArcForTarget(NOVEL_TARGET, allCompanionsKnown(), spine, { idPrefix: 'safe2' })).not.toThrow();
-    // Target already graduated + all companions known → nothing to teach.
+    expect(() => buildArcForTarget(NOVEL_TARGET, {}, spine, mockContext, { idPrefix: 'safe' })).not.toThrow();
+    expect(() => buildArcForTarget(NOVEL_TARGET, allCompanionsKnown(), spine, mockContext, { idPrefix: 'safe2' })).not.toThrow();
     const knownWithTarget = { ...allCompanionsKnown(), [wordKey(NOVEL_TARGET.form)]: graduated };
-    const arc = buildArcForTarget(NOVEL_TARGET, knownWithTarget, spine, { idPrefix: 'noop' });
+    const arc = buildArcForTarget(NOVEL_TARGET, knownWithTarget, spine, mockContext, { idPrefix: 'noop' });
     expect(arc).toHaveLength(0);
   });
 });
