@@ -155,6 +155,36 @@ export interface ConceptRealization extends Timestamps {
   prerequisites: string[];
   /** Dependency graph reverse edge — codes this one unlocks. */
   enables: string[];
+  /**
+   * The Construction Frame (migration 0013 / Studio 2026-08 redesign):
+   * valency slots with morphological marking, case government, the
+   * contrast set, L1-interference notes. Null for rows predating
+   * frames. Opaque blob the consumer narrows (canonical schema owned
+   * by Studio lib/frames/types.ts) — same posture as grammarJson.
+   */
+  frameJson?: ConceptRealizationFrame | null;
+}
+
+/**
+ * The construction frame blob on a realization (Studio-owned shape;
+ * mirrored here for consumer-side narrowing of the fields the PWA
+ * reads directly).
+ */
+export interface ConceptRealizationFrame {
+  slots?: Array<{
+    role: string;
+    features?: string[];
+    obligatory?: boolean;
+    fillerHint?: string;
+  }>;
+  government?: Array<{ features?: string[]; adposition?: string }>;
+  contrastSet?: {
+    axis: string;
+    variants: Array<{ surfaceForm: string; label: string }>;
+    statement: string;
+  };
+  interferenceNotes?: Array<{ l1: string; note: string }>;
+  pattern?: string;
 }
 
 /**

@@ -9,6 +9,7 @@ import type {
   ConceptRealization,
   LearnerConceptProgress,
   RealizationType,
+  ConceptRealizationFrame,
 } from '../../../shared/types/knowalong';
 import type { RepositoryResult } from './types';
 import { ok, handleRepositoryError, unauthorized } from './types';
@@ -44,6 +45,7 @@ interface ConceptRealizationRow {
   transliteration: string | null;
   prerequisites: unknown | null;
   enables: unknown | null;
+  frame_json: unknown | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,6 +93,7 @@ function toConceptRealization(row: ConceptRealizationRow): ConceptRealization {
     // Defensive array coercion: jsonb column, older rows carry null.
     prerequisites: Array.isArray(row.prerequisites) ? (row.prerequisites as string[]) : [],
     enables: Array.isArray(row.enables) ? (row.enables as string[]) : [],
+    frameJson: (row.frame_json ?? null) as ConceptRealization['frameJson'],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
