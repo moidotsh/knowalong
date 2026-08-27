@@ -141,6 +141,20 @@ export interface ConceptRealization extends Timestamps {
    * locked at publish time. Nullable — older rows have no examples.
    */
   examplesJson: ConceptRealizationExample[] | null;
+  /** IPA pronunciation shipped from Studio (migration 0011 / Phase E1).
+   * Null when Studio had no reference IPA for the entry. */
+  ipa: string | null;
+  /** Corpus frequency rank, 1 = most frequent (migration 0011). The
+   * basal/difficulty ordering signal; null when Studio had no pack. */
+  frequencyRank: number | null;
+  /** Romanization for non-Latin-script languages (migration 0011). */
+  transliteration: string | null;
+  /** CLCC dependency graph — concept codes the learner should know
+   * BEFORE this one (migration 0011 / Studio Phase 2). Empty array
+   * when no graph is authored. */
+  prerequisites: string[];
+  /** Dependency graph reverse edge — codes this one unlocks. */
+  enables: string[];
 }
 
 /**

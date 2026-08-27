@@ -8,6 +8,7 @@ import type {
   CoreConcept,
   ConceptRealization,
   LearnerConceptProgress,
+  RealizationType,
 } from '../../../shared/types/knowalong';
 import type { RepositoryResult } from './types';
 import { ok, handleRepositoryError, unauthorized } from './types';
@@ -37,6 +38,12 @@ interface ConceptRealizationRow {
   lemma_id: string | null;
   grammar_json: unknown | null;
   examples_json: unknown | null;
+  /** Migration 0011 (Studio Phase E1 + Phase 2). Older rows: null. */
+  ipa: string | null;
+  frequency_rank: number | null;
+  transliteration: string | null;
+  prerequisites: unknown | null;
+  enables: unknown | null;
   created_at: string;
   updated_at: string;
 }
@@ -78,6 +85,12 @@ function toConceptRealization(row: ConceptRealizationRow): ConceptRealization {
     lemmaId: row.lemma_id,
     grammarJson: (row.grammar_json ?? null) as ConceptRealization['grammarJson'],
     examplesJson: (row.examples_json ?? null) as ConceptRealization['examplesJson'],
+    ipa: row.ipa ?? null,
+    frequencyRank: row.frequency_rank ?? null,
+    transliteration: row.transliteration ?? null,
+    // Defensive array coercion: jsonb column, older rows carry null.
+    prerequisites: Array.isArray(row.prerequisites) ? (row.prerequisites as string[]) : [],
+    enables: Array.isArray(row.enables) ? (row.enables as string[]) : [],
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -133,6 +146,86 @@ async function findRealizations(conceptId: string, languageCode: string, userId:
   }
 }
 
+/**
+ * Every curated-global (user_id IS NULL) realization for a language —
+ * the Studio-published pack. The Supabase SpineProvider consumes this
+ * to build conceptSteps(); demo mode returns [] (the mock spine serves
+ * fixtures instead). No user filter: published rows are world-readable
+ * per the base RLS policy.
+ */
+async function findPublishedByLanguage(languageCode: string): Promise<RepositoryResult<ConceptRealization[]>> {
+  if (DEMO_MODE) return ok([]);
+  if (!languageCode) return unauthorized('Missing language code');
+  try {
+    const { data, error } = await supabase
+      .from('concept_realizations')
+      .select('*')
+      .eq('language_code', languageCode)
+      .is('user_id', null)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return ok((data as ConceptRealizationRow[]).map(toConceptRealization));
+  } catch (e) {
+    return handleRepositoryError('coreConcept.findPublishedByLanguage', e);
+  }
+}
+
+/** Input for {@link createUserRealization}. Mirrors the analysis-run
+ * realization proposal payload; only the columns the learner path owns
+ * are writable (global published rows are Studio's). `sourceRunId` is
+ * provenance metadata — recorded by the caller in the proposal's
+ * acceptance trail, not a column on this table (M11 keeps run linkage
+ * on the proposal side). */
+export interface CreateUserRealizationInput {
+  coreConceptId: string;
+  userId: string;
+  languageCode: string;
+  realizationType: RealizationType;
+  surfaceForm: string;
+  gloss: string | null;
+  grammaticalNote: string | null;
+  lemmaId: string | null;
+  sourceRunId?: string | null;
+}
+
+/**
+ * Promote an accepted realization proposal into a user-owned
+ * `concept_realizations` row (CLCC promotion — the M8 deferral is
+ * lifted for the PWA-side user-owned path; global published rows
+ * remain Studio's exclusive write target). Returns the new row id so
+ * `study_cards.target_realization_id` can point at it.
+ */
+async function createUserRealization(input: CreateUserRealizationInput): Promise<RepositoryResult<string>> {
+  if (DEMO_MODE) {
+    // Demo has no seeded realization rows; mint a stable pseudo-id so
+    // the caller's FK wiring is exercisable without Supabase.
+    return ok(`demo-realization-${input.coreConceptId}-${input.languageCode}`);
+  }
+  if (!input.coreConceptId || !input.userId || !input.languageCode) {
+    return unauthorized('Missing concept id, user id, or language code');
+  }
+  try {
+    const { data, error } = await supabase
+      .from('concept_realizations')
+      .insert({
+        core_concept_id: input.coreConceptId,
+        user_id: input.userId,
+        language_code: input.languageCode,
+        realization_type: input.realizationType,
+        surface_form: input.surfaceForm,
+        gloss: input.gloss,
+        grammatical_note: input.grammaticalNote,
+        lemma_id: input.lemmaId,
+      })
+      .select('id')
+      .single();
+    if (error) throw error;
+    return ok((data as { id: string }).id);
+  } catch (e) {
+    return handleRepositoryError('coreConcept.createUserRealization', e);
+  }
+}
+
 /** Learner progress for all concepts in a language (owner-only). */
 async function findLearnerProgress(userId: string, languageCode: string): Promise<RepositoryResult<LearnerConceptProgress[]>> {
   if (DEMO_MODE) return demoAdapter.coreConcept.findLearnerProgress(userId, languageCode);
@@ -177,6 +270,8 @@ async function findByCode(code: string): Promise<string | undefined> {
 export const coreConceptRepository = {
   findAll,
   findRealizations,
+  findPublishedByLanguage,
+  createUserRealization,
   findLearnerProgress,
   findByCode,
 };

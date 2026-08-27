@@ -433,9 +433,38 @@ async function resolveLemmaOrdinal(runId: string, userId: string, ordinal: numbe
   return null;
 }
 
-async function resolveRealizationOrdinal(_runId: string, _userId: string, _ordinal: number): Promise<string | null> {
-  // CLCC promotion is deferred in this checkpoint — no realization id resolvable.
-  return null;
+async function resolveRealizationOrdinal(runId: string, userId: string, ordinal: number): Promise<string | null> {
+  // CLCC promotion (un-deferred 2026-08): find the accepted realization
+  // proposal at this ordinal, promote it into a user-owned
+  // concept_realizations row, and return the new row id for
+  // study_cards.target_realization_id. Global published rows remain
+  // Studio's exclusive write target; this is the learner-owned path.
+  const lookup = await analysisProposalRepository.findByRunAndKind(runId, userId, 'realization');
+  if (!lookup.success) return null;
+  const match = lookup.data.find((p) => p.ordinal === ordinal && p.reviewStatus === 'accepted');
+  if (!match) return null;
+  const payload = (match.editedPayload ?? match.payload) as unknown as {
+    coreConceptCode: string;
+    languageCode: string;
+    realizationType: import('../shared/types/knowalong').RealizationType;
+    surfaceForm: string;
+    gloss: string | null;
+    grammaticalNote: string | null;
+  };
+  const conceptId = await coreConceptRepository.findByCode?.(payload.coreConceptCode);
+  if (!conceptId) return null;
+  const created = await coreConceptRepository.createUserRealization({
+    coreConceptId: conceptId,
+    userId,
+    languageCode: payload.languageCode,
+    realizationType: payload.realizationType,
+    surfaceForm: payload.surfaceForm,
+    gloss: payload.gloss,
+    grammaticalNote: payload.grammaticalNote,
+    lemmaId: null,
+    sourceRunId: runId,
+  });
+  return created.success ? created.data : null;
 }
 
 async function resolveGrammarOrdinal(runId: string, userId: string, ordinal: number): Promise<string | null> {
