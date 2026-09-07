@@ -10,19 +10,29 @@
 //     in the `header` slot. The home header is covered while the drawer
 //     is open. Use when the home header is small or doesn't carry critical
 //     context.
-//   • 'cutout': panel + scrim start below the home header so the brand
-//     and hamburger (which the consumer swaps to X) stay visible at the
-//     same position. The `header` prop is ignored. The consumer's home
-//     header must render at the same x/y position so the brand persists
-//     visually as the drawer slides.
+//   • 'cutout': panel leaves a transparent cutout at its top so the home
+//     header's brand + hamburger (which the consumer swaps to X via
+//     HamburgerButton) show through at the same position. The scrim starts
+//     at the panel's right edge and runs to the window edge at ALL heights
+//     — the brand band over the panel stays fully bright, and the consumer
+//     renders MobileNavDrawerGlassCap (via MobileHomeHeader's
+//     drawerGlassCap slot) over the cutout so it reads as one continuous
+//     glass surface. The `header` prop is ignored in this mode.
 //
 // Premium signals:
 //   • Slides in from the left with an iOS-sheet curve
-//     (cubic-bezier(0.32, 0.72, 0, 1)). The scrim behind crossfades.
+//     (cubic-bezier(0.32, 0.72, 0, 1)). The frosted-glass scrim behind
+//     crossfades (web backdrop-blur; Android Chrome swaps to a milder blur
+//     at higher opacity because it renders saturate() poorly).
+//   • The panel carries a right-edge depth shadow (web) so the content
+//     beneath reads as receding. The shadow lives on the panel, not the
+//     scrim, so its upward bleed lands off-screen above the viewport
+//     instead of darkening the brand cutout.
 //   • Drawer body uses MobileAtmosphere so consumers pick the palette.
 //   • Active row gets a 3px brand strip on the left edge + brand-tinted
 //     background + bolder label. Inactive rows render the icon at 55%
-//     opacity so the active item pops without a color shift.
+//     opacity so the active item pops without a color shift, and pick up
+//     a hover background on pointer devices.
 //   • prefers-reduced-motion collapses the slide to instant and the
 //     scrim to a short fade — the drawer still works, just without motion.
 //   • Tapping the scrim or any item calls onClose() after the press
@@ -40,7 +50,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../context';
-import { useReducedMotion } from '../../hooks';
+import { useAndroidChromeBlurFix, useReducedMotion } from '../../hooks';
 import { isWeb } from '../../utils';
 import { usePressedStyle } from '../premium/shared';
 import { MobileAtmosphere, type MobileAtmosphereSurface } from './MobileAtmosphere';
@@ -79,21 +89,22 @@ export interface MobileNavDrawerProps {
   header?: React.ReactNode;
   /** Optional element rendered at the bottom (sign-out slot, etc.). */
   footer?: React.ReactNode;
-  /** Atmosphere surface for the drawer body (default: 'primary'). */
+  /** Atmosphere surface for the drawer body (default: 'analytics'). */
   atmosphere?: MobileAtmosphereSurface;
   /**
    * How the brand area is handled when the drawer is open.
    * - 'slideout' (default): panel covers full screen height; brand lives
    *   in the `header` slot.
-   * - 'cutout': panel + scrim start below the home header; brand shows
-   *   through the transparent gap at the top.
+   * - 'cutout': panel leaves a transparent cutout at its top so the home
+   *   header's brand + hamburger stay visible; pair with
+   *   MobileNavDrawerGlassCap for the continuous-glass read.
    * See file header for the full pattern comparison.
    */
   brandPersistence?: NavDrawerBrandPersistence;
   /**
    * Override the transparent cutout height at the top of the panel
-   * (cutout mode only). Defaults to insets.top + 76 to match
-   * MobileHomeHeader with subtitle. Size to match your home header if
+   * (cutout mode only). Defaults to insets.top + 44 to match
+   * MobileHomeHeader's brand row. Size to match your home header if
    * it diverges.
    */
   cutoutHeight?: number;
@@ -118,7 +129,9 @@ export interface MobileNavDrawerProps {
   testID?: string;
 }
 
-const DRAWER_WIDTH = 304;
+/** Panel width — exported so MobileNavDrawerGlassCap can match it. */
+export const NAV_DRAWER_WIDTH = 304;
+const DRAWER_WIDTH = NAV_DRAWER_WIDTH;
 
 // Overlay base. On web the overlay uses `position: fixed` so the drawer
 // escapes any centered-column constraint applied to its parent (e.g. the
@@ -143,8 +156,8 @@ const overlayBase: ViewStyle = isWeb
   : { ...StyleSheet.absoluteFillObject };
 
 /**
- * Mobile navigation drawer. Slides in from the left with a glass scrim.
- * Shell-level mechanism only — branding, items, and footer are all
+ * Mobile navigation drawer. Slides in from the left behind a frosted-glass
+ * scrim. Shell-level mechanism only — branding, items, and footer are all
  * consumer-supplied.
  */
 export function MobileNavDrawer({
@@ -164,7 +177,7 @@ export function MobileNavDrawer({
   const { colors } = useAppTheme();
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
-  const pressedStyle = usePressedStyle();
+  const { isAndroidChrome } = useAndroidChromeBlurFix();
   const { width: windowWidth } = useWindowDimensions();
 
   // In 'column' mode the panel's resting (open) position is the left
@@ -174,7 +187,7 @@ export function MobileNavDrawer({
   const columnLeft = Math.max(0, (windowWidth - columnWidth) / 2);
   const anchorOffset = anchor === 'column' ? columnLeft : 0;
 
-  // In cutout mode the panel + scrim start below the home header so the
+  // In cutout mode the panel leaves a transparent band at its top so the
   // brand shows through. Default height matches MobileHomeHeader's brand
   // row only (safe-area top + 8 padding + 36 brand row = insets.top + 44).
   // The subtitle sits below the cutout and is covered by the opaque panel
@@ -244,19 +257,30 @@ export function MobileNavDrawer({
 
   return (
     <View style={styles.overlay} testID={testID} pointerEvents="box-none">
-      {/* Glass scrim — taps dismiss the drawer. In cutout mode the scrim
-          starts below the home header so the brand stays fully bright. */}
+      {/* Frosted-glass scrim — taps dismiss the drawer. In cutout mode the
+          scrim starts at the panel's right edge (at the panel's resting x)
+          and runs to the window edge at ALL heights: the brand band over
+          the panel stays fully bright (the glass cap covers it), while
+          everything right of the panel dims top-to-bottom. Android Chrome
+          swaps to the milder blur token at higher opacity because it
+          renders saturate() poorly. */}
       <Pressable
         onPress={onClose}
         style={[
           styles.scrim,
           {
-            backgroundColor: `${colors.backgroundDeep}cc`,
+            backgroundColor: `${colors.backgroundDeep}${isAndroidChrome ? 'f2' : 'cc'}`,
             opacity: animatedIn ? 1 : 0,
-            ...(isCutout ? { top: effectiveCutoutHeight } : null),
+            ...(isCutout ? { top: 0, left: anchorOffset + DRAWER_WIDTH } : null),
             ...(isWeb
               ? {
                   transition: `opacity ${scrimDuration}ms ease`,
+                  backdropFilter: isAndroidChrome
+                    ? colors.mobilePremium.androidChromeSurfaceBlur
+                    : colors.mobilePremium.navScrimBackdropBlur,
+                  WebkitBackdropFilter: isAndroidChrome
+                    ? colors.mobilePremium.androidChromeSurfaceBlur
+                    : colors.mobilePremium.navScrimBackdropBlur,
                 }
               : null),
           },
@@ -269,7 +293,10 @@ export function MobileNavDrawer({
           surface starts below the cutout so the subtitle (which lives
           below the brand row on the home header) is covered while the
           brand + hamburger stay visible. In slideout mode the panel is
-          opaque everywhere and the brand lives in the header slot. */}
+          opaque everywhere and the brand lives in the header slot. The
+          right-edge depth shadow lives HERE (not on the scrim) so its
+          upward bleed lands off-screen above the viewport instead of
+          darkening the brand cutout. */}
       <Animated.View
         pointerEvents={isCutout ? 'box-none' : 'auto'}
         style={[
@@ -285,18 +312,20 @@ export function MobileNavDrawer({
             ...(isWeb
               ? {
                   transition: `transform ${slideDuration}ms ${slideEasing}`,
+                  boxShadow: colors.mobilePremium.navPanelShadow,
                 }
               : null),
           },
         ]}
       >
         {isCutout ? (
-          // Cutout cap — empty frame at the top of the panel. No fill, no
-          // borders of its own; the home header brand shows through and
+          // Cutout frame — empty band at the top of the panel. No fill,
+          // no borders of its own; the home header brand shows through and
           // the panel's own borderRight (below) runs the full height for
           // visual continuity between cap and body. Slides with the panel
           // because it's a child of it. pointerEvents: none so taps reach
-          // the hamburger behind it.
+          // the hamburger behind it. The consumer renders
+          // MobileNavDrawerGlassCap over this region for the glass fill.
           <View
             pointerEvents="none"
             style={[styles.cutoutCap, { width: DRAWER_WIDTH, height: effectiveCutoutHeight }]}
@@ -334,70 +363,106 @@ export function MobileNavDrawer({
           )}
 
           <View style={styles.items}>
-            {items.map((item) => {
-              const active = isActive(item.id);
-              const showBadge = item.badge != null && item.badge > 0;
-              return (
-                <View key={item.id} style={styles.itemWrap}>
-                  {/* Left accent strip — visible only on the active item. */}
-                  <View
-                    style={[
-                      styles.activeStrip,
-                      { backgroundColor: accent, opacity: active ? 1 : 0 },
-                    ]}
-                    pointerEvents="none"
-                  />
-                  <Pressable
-                    onPress={() => {
-                      item.onPress();
-                      onClose();
-                    }}
-                    hitSlop={4}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: active }}
-                    accessibilityLabel={item.label}
-                    style={({ pressed }) => [
-                      styles.item,
-                      { backgroundColor: active ? `${accent}1a` : 'transparent' },
-                      pressed ? pressedStyle : null,
-                    ]}
-                  >
-                    {item.icon ? (
-                      <View style={[styles.itemIcon, { opacity: active ? 1 : 0.55 }]}>
-                        {item.icon}
-                      </View>
-                    ) : null}
-                    <Text
-                      style={[
-                        styles.itemLabel,
-                        {
-                          color: active ? accent : colors.text,
-                          fontWeight: active ? '600' : '400',
-                          opacity: active ? 1 : 0.85,
-                        },
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                    {showBadge ? (
-                      <View
-                        style={[styles.badge, { backgroundColor: accent }]}
-                        pointerEvents="none"
-                      >
-                        <Text style={[styles.badgeText, { color: colors.textOnBrand }]}>
-                          {item.badge! > 99 ? '99+' : item.badge}
-                        </Text>
-                      </View>
-                    ) : null}
-                  </Pressable>
-                </View>
-              );
-            })}
+            {items.map((item) => (
+              <DrawerItem
+                key={item.id}
+                item={item}
+                active={isActive(item.id)}
+                accent={accent}
+                onClose={onClose}
+              />
+            ))}
           </View>
 
           {footer ? <View style={styles.footer}>{footer}</View> : null}
         </View>
       </Animated.View>
+    </View>
+  );
+}
+
+/**
+ * One nav row. Owns the hover state so pointer devices get a background
+ * on inactive rows (matching the active row's tint treatment) without
+ * affecting touch devices.
+ */
+function DrawerItem({
+  item,
+  active,
+  accent,
+  onClose,
+}: {
+  item: MobileNavDrawerItem;
+  active: boolean;
+  accent: string;
+  onClose: () => void;
+}) {
+  const { colors } = useAppTheme();
+  const pressedStyle = usePressedStyle();
+  const [hovered, setHovered] = useState(false);
+  const showBadge = item.badge != null && item.badge > 0;
+
+  const backgroundColor = active
+    ? `${accent}1a`
+    : hovered && isWeb
+      ? colors.mobilePremium.hairlineBorder
+      : 'transparent';
+
+  return (
+    <View style={styles.itemWrap}>
+      {/* Left accent strip — visible only on the active item. */}
+      <View
+        style={[
+          styles.activeStrip,
+          { backgroundColor: accent, opacity: active ? 1 : 0 },
+        ]}
+        pointerEvents="none"
+      />
+      <Pressable
+        onPress={() => {
+          item.onPress();
+          onClose();
+        }}
+        hitSlop={4}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active }}
+        accessibilityLabel={item.label}
+        onHoverIn={isWeb ? () => setHovered(true) : undefined}
+        onHoverOut={isWeb ? () => setHovered(false) : undefined}
+        style={({ pressed }) => [
+          styles.item,
+          { backgroundColor },
+          pressed ? pressedStyle : null,
+        ]}
+      >
+        {item.icon ? (
+          <View style={[styles.itemIcon, { opacity: active ? 1 : 0.55 }]}>
+            {item.icon}
+          </View>
+        ) : null}
+        <Text
+          style={[
+            styles.itemLabel,
+            {
+              color: active ? accent : colors.text,
+              fontWeight: active ? '600' : '400',
+              opacity: active ? 1 : 0.85,
+            },
+          ]}
+        >
+          {item.label}
+        </Text>
+        {showBadge ? (
+          <View
+            style={[styles.badge, { backgroundColor: accent }]}
+            pointerEvents="none"
+          >
+            <Text style={[styles.badgeText, { color: colors.textOnBrand }]}>
+              {item.badge! > 99 ? '99+' : item.badge}
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
     </View>
   );
 }

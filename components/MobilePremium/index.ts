@@ -111,10 +111,19 @@ export { MobileDialog } from './MobileDialog';
 export type { MobileDialogProps } from './MobileDialog';
 
 export { MobileNavDrawer } from './MobileNavDrawer';
+export { NAV_DRAWER_WIDTH } from './MobileNavDrawer';
 export type {
   MobileNavDrawerProps,
   MobileNavDrawerItem,
+  NavDrawerAnchor,
+  NavDrawerBrandPersistence,
 } from './MobileNavDrawer';
+
+export { MobileNavDrawerGlassCap } from './MobileNavDrawerGlassCap';
+export type { MobileNavDrawerGlassCapProps } from './MobileNavDrawerGlassCap';
+
+export { HamburgerButton } from './HamburgerButton';
+export type { HamburgerButtonProps } from './HamburgerButton';
 
 export { SkeletonBlock } from './SkeletonBlock';
 export type { SkeletonBlockProps } from './SkeletonBlock';

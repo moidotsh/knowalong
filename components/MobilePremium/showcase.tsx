@@ -15,7 +15,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sun, Moon, Monitor, Mail, Lock, Eye, EyeOff, Settings, Bell, Info, ChevronRight, Home, Package, TrendingUp, Menu, Search } from '@tamagui/lucide-icons-2';
+import { Sun, Moon, Monitor, Mail, Lock, Eye, EyeOff, Settings, Bell, Info, ChevronRight, Home, Package, TrendingUp, Search } from '@tamagui/lucide-icons-2';
 import { theme, APP_LAYOUT, SCREEN_BODY_STYLE } from '../../constants';
 import { useAppTheme, useToast, type ColorSchemePreference } from '../../context';
 import {
@@ -51,6 +51,8 @@ import { MobileDialog } from './MobileDialog';
 import { MobileSelect } from './MobileSelect';
 import { MobileNavDrawer } from './MobileNavDrawer';
 import type { MobileNavDrawerItem } from './MobileNavDrawer';
+import { MobileNavDrawerGlassCap } from './MobileNavDrawerGlassCap';
+import { HamburgerButton } from './HamburgerButton';
 import { SkeletonBlock } from './SkeletonBlock';
 import { SegmentedControl } from './SegmentedControl';
 import { FilterChip } from './FilterChip';
@@ -459,23 +461,19 @@ export function Showcase() {
 
         <View style={styles.section}>
           <MobileSectionEyebrow>Home Header (brand + subtitle row)</MobileSectionEyebrow>
+          {/* Live cutout-drawer demo: the HamburgerButton swaps to X, the
+              glass cap slides over the brand cutout, and the drawer below
+              opens in APP_LAYOUT's configured mode. */}
           <MobileHomeHeader
             brand="Showcase"
             subtitle="Welcome back, visitor"
             menuButton={
-              <Pressable
-                onPress={() => {}}
-                hitSlop={12}
-                accessibilityRole="button"
-                accessibilityLabel="Open menu"
-                style={({ pressed }) => [
-                  styles.homeMenuButton,
-                  pressed ? { opacity: 0.6 } : null,
-                ]}
-              >
-                <Menu size={22} color={colors.text} />
-              </Pressable>
+              <HamburgerButton
+                isOpen={drawerOpen}
+                onPress={() => setDrawerOpen((prev) => !prev)}
+              />
             }
+            drawerGlassCap={<MobileNavDrawerGlassCap open={drawerOpen} />}
           />
         </View>
 
@@ -1394,13 +1392,6 @@ const styles = StyleSheet.create({
   },
   skeletonAvatarMeta: {
     flex: 1,
-  },
-  homeMenuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   bodyText: {
     fontSize: 14,

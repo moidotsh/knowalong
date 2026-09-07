@@ -10,7 +10,9 @@
 //
 // The shell owns layout + typography. The hamburger trigger and any right
 // action stay consumer-supplied via the menuButton / rightAction React
-// slots — the primitive carries no domain code.
+// slots — the primitive carries no domain code. The optional
+// drawerGlassCap slot hosts a MobileNavDrawerGlassCap so the cutout nav
+// pattern composes without the consumer hand-positioning anything.
 
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
@@ -27,6 +29,13 @@ export interface MobileHomeHeaderProps {
   menuButton?: React.ReactNode;
   /** Optional right-side slot (avatar, notifications). */
   rightAction?: React.ReactNode;
+  /**
+   * Optional glass-cap layer rendered behind the brand row at the top of
+   * the header — pass `<MobileNavDrawerGlassCap open={drawerOpen} />` to
+   * complete the cutout drawer pattern. Absolutely positioned; the brand
+   * row stacks above it via DOM order.
+   */
+  drawerGlassCap?: React.ReactNode;
   /** Test ID. */
   testID?: string;
   /** Outer style pass-through. */
@@ -43,6 +52,7 @@ export function MobileHomeHeader({
   subtitle,
   menuButton,
   rightAction,
+  drawerGlassCap,
   testID,
   style,
 }: MobileHomeHeaderProps) {
@@ -54,6 +64,7 @@ export function MobileHomeHeader({
       testID={testID}
       style={[styles.container, { paddingTop: insets.top + 8 }, style]}
     >
+      {drawerGlassCap ? drawerGlassCap : null}
       <View style={styles.row}>
         {menuButton ? <View style={styles.slot}>{menuButton}</View> : null}
         <Text
@@ -83,6 +94,9 @@ export function MobileHomeHeader({
 const styles = StyleSheet.create({
   container: {
     ...MOBILE_CONTENT_WIDTH_STYLE,
+    // Relative so the drawerGlassCap slot's absolute positioning anchors
+    // to the header column, not the page.
+    position: 'relative',
     paddingHorizontal: 20,
     paddingBottom: 8,
   },

@@ -170,6 +170,14 @@ export const theme = {
         androidChromeSurfaceBackground: 'rgba(255, 255, 255, 0.88)',
         androidChromeSurfaceBlur: 'blur(12px)',
 
+        // Nav drawer — the page scrim uses a milder blur than the surface
+        // glass (it covers the whole page; a heavy blur smears everything)
+        // and the panel carries a right-edge depth shadow. The shadow lives
+        // on the panel, not the scrim, so its upward bleed lands off-screen
+        // above the viewport instead of darkening the brand cutout.
+        navScrimBackdropBlur: 'blur(8px)',
+        navPanelShadow: '4px 0 32px rgba(0, 0, 0, 0.36), 0 2px 8px rgba(0, 0, 0, 0.2)',
+
         // Faint vignette to settle the atmosphere into the edges (web).
         // Much softer than the dark kit's vignette — a whisper of depth,
         // not a visible darkening.
@@ -300,6 +308,12 @@ export const theme = {
 
         androidChromeSurfaceBackground: 'rgba(22, 30, 46, 0.88)',
         androidChromeSurfaceBlur: 'blur(12px)',
+
+        // Nav drawer — same treatment as the light kit (blur strength and
+        // shadow depth are mode-independent; the scrim alpha comes from
+        // backgroundDeep at the call site).
+        navScrimBackdropBlur: 'blur(8px)',
+        navPanelShadow: '4px 0 32px rgba(0, 0, 0, 0.36), 0 2px 8px rgba(0, 0, 0, 0.2)',
 
         atmosphereVignette: 'inset 0 0 160px 60px rgba(0, 0, 0, 0.30)',
 
