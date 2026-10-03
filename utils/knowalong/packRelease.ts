@@ -170,6 +170,12 @@ export class PackReleaseError extends Error {
  * identical to Studio's lib/release/packContract.ts canonicalContent().
  * The content hash is computed over THIS form on both sides — that is
  * the cross-repo checksum contract.
+ *
+ * `lockedAt` is projected to null inside each entry's evidence — the
+ * same Phase 8.1 canon fix as Studio (lock wall-clock time is not
+ * interpretation-bearing content; evidence kind stays hashed). The two
+ * repos MUST move together here: a one-sided change breaks every
+ * checksum.
  */
 export function canonicalContentMirror(release: FrozenPackRelease): string {
   return JSON.stringify({
@@ -179,7 +185,13 @@ export function canonicalContentMirror(release: FrozenPackRelease): string {
     scopeVersion: release.scopeVersion,
     buildId: release.buildId,
     declaredScope: release.declaredScope,
-    entries: release.entries,
+    entries: release.entries.map((entry) => ({
+      ...entry,
+      evidence: {
+        ...entry.evidence,
+        lockedAt: null,
+      },
+    })),
     exclusions: release.exclusions,
     sources: release.sources,
     qualityDistribution: release.qualityDistribution,

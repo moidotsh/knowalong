@@ -108,9 +108,9 @@ describe('packRelease: the learner seed layer', () => {
 describe('packRelease: golden Studio bundle parses and projects', () => {
   it('parses the Studio-produced bytes, checksum included', async () => {
     const parsed = await parsedGolden();
-    expect(parsed.releaseId).toBe('ru.e944cb9d8a98');
+    expect(parsed.releaseId).toBe('ru.c27faa6f3810');
     expect(parsed.contentSha256).toBe(
-      'e944cb9d8a98ab5b8705a175c81742984437dd6ba89cbc990761d556b58fe3f1',
+      'c27faa6f38107ead655b93675bc3d8570238211af5878c9b625d245c32f3eaa6',
     );
     // All three entries are seed-layer codes with usable glosses.
     expect(parsed.seedLayerEntries).toHaveLength(3);
@@ -294,7 +294,7 @@ describe('packRelease: production vs demo resolution', () => {
     });
     expect(resolution.status).toBe('release');
     if (resolution.status === 'release') {
-      expect(resolution.releaseId).toBe('ru.e944cb9d8a98');
+      expect(resolution.releaseId).toBe('ru.c27faa6f3810');
       expect(resolution.overlayEntryCount).toBe(0);
     }
   });
