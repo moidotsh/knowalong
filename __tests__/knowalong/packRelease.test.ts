@@ -28,18 +28,13 @@ import {
   type ParsedPackRelease,
 } from '../../utils/knowalong/packRelease';
 import { createMockSpine } from '../../utils/knowalong/spine';
+import { GOLDEN_BUNDLE_JSON } from './goldenBundle';
 
 /**
- * Golden bundle — the exact serialized bytes Studio's delivery tests
- * produce for the SEED-TRIPLE workspace (tests/delivery.test.ts
- * freezeSeedTriple(): 3 ru entries over learner seed codes EXIST, GO,
- * WANT, with cited examples). Transport createdAt is a pinned timestamp
- * (outside the content identity). Every entry here is inside the
- * 40-code seed layer, so this bundle is fully consumable — the overlay
- * cases are built below by extending it.
+ * The golden bundle lives in ./goldenBundle.ts, shared with
+ * packLessonSmoke.test.ts — ONE source of truth for the Studio-produced
+ * bytes (see the provenance comment there).
  */
-const GOLDEN_BUNDLE_JSON =
-  '{"bundleSchemaVersion":1,"packContractSchemaVersion":1,"release":{"schemaVersion":1,"releaseId":"ru.e944cb9d8a98","languageCode":"ru","scopeId":"test-ru-v1","scopeVersion":1,"buildId":null,"createdAt":"2026-10-02T18:33:03.256Z","contentSha256":"e944cb9d8a98ab5b8705a175c81742984437dd6ba89cbc990761d556b58fe3f1","declaredScope":["EXIST","GO","WANT"],"entries":[{"entryId":"EXIST/word/есть","languageCode":"ru","coreConceptCode":"EXIST","realizationType":"word","surfaceForm":"есть","transliteration":"est\'","gloss":"there is / to be","grammaticalNote":null,"grammar":null,"lemma":null,"pos":null,"sourceCorroborated":false,"examples":[{"sourceText":"Бог есть.","translation":"God exists.","sourceCorpus":"tatoeba","sourceAttribution":"Tatoeba Corpus (CC-BY 2.0)"}],"prerequisites":[],"enables":[],"evidence":{"provenance":"catalog-sourced","tier":"citation-backed","bindingWatermark":null,"bindingStatusAtFreeze":"unbound","lockedAt":"2026-09-01T00:00:00.000Z"}},{"entryId":"GO/word/идти","languageCode":"ru","coreConceptCode":"GO","realizationType":"word","surfaceForm":"идти","transliteration":"idti","gloss":"to go","grammaticalNote":null,"grammar":null,"lemma":null,"pos":null,"sourceCorroborated":false,"examples":[{"sourceText":"Я иду домой.","translation":"I am going home.","sourceCorpus":"tatoeba","sourceAttribution":"Tatoeba Corpus (CC-BY 2.0)"}],"prerequisites":[],"enables":[],"evidence":{"provenance":"catalog-sourced","tier":"citation-backed","bindingWatermark":null,"bindingStatusAtFreeze":"unbound","lockedAt":"2026-09-01T00:00:00.000Z"}},{"entryId":"WANT/word/хотеть","languageCode":"ru","coreConceptCode":"WANT","realizationType":"word","surfaceForm":"хотеть","transliteration":"khotet\'","gloss":"to want","grammaticalNote":null,"grammar":null,"lemma":null,"pos":null,"sourceCorroborated":false,"examples":[{"sourceText":"Дети хотят играть.","translation":"Children want to play.","sourceCorpus":"tatoeba","sourceAttribution":"Tatoeba Corpus (CC-BY 2.0)"}],"prerequisites":[],"enables":[],"evidence":{"provenance":"catalog-sourced","tier":"citation-backed","bindingWatermark":null,"bindingStatusAtFreeze":"unbound","lockedAt":"2026-09-01T00:00:00.000Z"}}],"exclusions":[],"sources":[{"kind":"corpus-example","name":"tatoeba","title":"tatoeba","attribution":"Tatoeba Corpus (CC-BY 2.0)"}],"qualityDistribution":{"citationBacked":3,"frontierVerified":0,"unboundAtFreeze":3},"policy":{"embeddingRescueAtFreeze":"not-run"}}}';
 
 // ── Test helpers ──────────────────────────────────────────────────────
 
@@ -191,6 +186,11 @@ describe('packRelease: rejection modes (typed, actionable)', () => {
   it('refuses a wrong-language release', async () => {
     await expect(
       parsePackRelease(goldenRaw(), { expectedLanguage: 'fr' }),
+    ).rejects.toMatchObject({ kind: 'wrong-language' });
+    // Phase 7.4: every registered expectation rejects ru content, not
+    // just fr — the language guard is registry-wide, not per-pair.
+    await expect(
+      parsePackRelease(goldenRaw(), { expectedLanguage: 'fa' }),
     ).rejects.toMatchObject({ kind: 'wrong-language' });
   });
 

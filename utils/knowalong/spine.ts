@@ -20,9 +20,10 @@
 // today; no unused surface.
 
 import type { LessonStep } from './fixtures/decks';
-import { LEARNING_ITEMS, type LearningItem } from './fixtures/learningItems';
+import { LEARNING_ITEMS, type LearningItem, type WordPart } from './fixtures/learningItems';
 import { ALL_CLCC_STEPS } from './fixtures/clccDeck';
 import { SVETOFOR_SONG } from './fixtures/svetoforSong';
+import { PALETTE } from './fixtures/palette';
 
 /** The scaffolding + target corpus the consumer pipeline reads, behind a seam
  *  so the data source (mock fixtures today, Supabase/Studio in Phase 6) is
@@ -39,6 +40,13 @@ export interface SpineProvider {
   /** Lyric-phrase steps for the current song — the targets layer, each phrase
    *  already decomposed into words with glosses. */
   lyricSteps(): readonly LessonStep[];
+  /** The versatile vocabulary palette — high-frequency words (R7 context
+   *  wrapping). One single-word step per palette form. These are the atoms a
+   *  context phrase's unknown non-target words must be (wrappability): a
+   *  palette word not yet graduated scaffolds cleanly; a non-palette novel
+   *  word would be a single-word "victim" and is rejected. Server reuse: this
+   *  is the AI's composition vocabulary (ADR §4; see palette.ts header). */
+  paletteSteps(): readonly LessonStep[];
 }
 
 /** Map a LearningItem to the unified LessonStep shape (mirrors decks.ts
@@ -83,12 +91,24 @@ function lyricStepsFromSong(): LessonStep[] {
 /** Build a mock spine backed by the local fixtures. The v1 (and only)
  *  implementation; Phase 6 adds a Supabase/Studio implementation that reads
  *  published concept_realizations, with this mock as the fallback. Pure. */
+/** The palette as single-word steps — one per form (palette.ts). Surface
+ *  forms, mastery-keyed (R3). Pure. */
+function paletteStepsFromWords(): LessonStep[] {
+  return PALETTE.map((w: WordPart) => ({
+    itemId: `palette-${w.form}`,
+    surfaceForm: w.form,
+    meaning: w.gloss,
+    words: [{ form: w.form, gloss: w.gloss, role: w.role }],
+  }));
+}
+
 export function createMockSpine(languageCode: string): SpineProvider {
   return {
     languageCode,
     foundationalSteps: () => LEARNING_ITEMS.map(stepFromLearningItem),
     conceptSteps: () => [...ALL_CLCC_STEPS],
     lyricSteps: lyricStepsFromSong,
+    paletteSteps: paletteStepsFromWords,
   };
 }
 
@@ -100,4 +120,13 @@ export function getSpine(): SpineProvider {
   if (DEFAULT_SPINE) return DEFAULT_SPINE;
   DEFAULT_SPINE = createMockSpine('ru');
   return DEFAULT_SPINE;
+}
+
+/** Pin the app-wide default spine (the pack-release activation path).
+ *  Additive seam: getSpine() returns the pinned provider instead of lazily
+ *  constructing the mock; pass null to clear and restore the lazy mock.
+ *  This is the documented Phase-6 activation point (see supabaseSpine.ts)
+ *  and the test seam for pack-driven lesson generation. */
+export function setDefaultSpine(spine: SpineProvider | null): void {
+  DEFAULT_SPINE = spine;
 }

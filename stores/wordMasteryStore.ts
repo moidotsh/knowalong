@@ -56,12 +56,15 @@ export const useWordMasteryStore = create<WordMasteryState>()(
       recordExposure: (forms) => {
         const now = Date.now();
         const keys = Array.from(new Set(forms.map((f) => wordKey(f))));
-        set((s) =>
-          keys.reduce<MasteryMap>((acc, k) => {
+        // Wrap in { mastery } — the updater's return value is shallow-merged
+        // into the state ROOT, so returning the bare map silently dropped
+        // every exposure (found by the packLessonSmoke vertical test).
+        set((s) => ({
+          mastery: keys.reduce<MasteryMap>((acc, k) => {
             const prev = acc[k] ?? emptyWord();
             return { ...acc, [k]: { ...prev, exposures: prev.exposures + 1, lastSeenMs: now } };
           }, s.mastery),
-        );
+        }));
       },
       recordCorrect: (form) => {
         const k = wordKey(form);
