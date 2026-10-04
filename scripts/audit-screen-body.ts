@@ -15,6 +15,11 @@
  * a StyleSheet entry, inline in style={[...]}, etc.); it only verifies
  * the screen author acknowledged the constraint by importing the name.
  *
+ * Screens composing `ScreenScaffold`
+ * (components/composed/ScreenScaffold) satisfy SB1 by
+ * delegation — the scaffold applies SCREEN_BODY_STYLE centrally and is
+ * itself the acknowledgement. Detection accepts either name.
+ *
  * ── Policy mode ──────────────────────────────────────────────────────
  *
  * SB1 reads `CONTENT_WIDTH_MODE` from constants/styles.ts at module
@@ -110,11 +115,11 @@ for (const file of files) {
   // Skip files with the escape hatch.
   if (/\/\/\s*sb1-exempt/.test(content)) continue;
 
-  if (!/SCREEN_BODY_STYLE/.test(content)) {
+  if (!/SCREEN_BODY_STYLE|ScreenScaffold/.test(content)) {
     violations.push({
       file: `app/${rel}`,
       message:
-        '[SB1] Screen does not apply SCREEN_BODY_STYLE. Import from ../constants and spread into the body StyleSheet entry (e.g. `body: { ...SCREEN_BODY_STYLE, paddingHorizontal: 20 }`).',
+        '[SB1] Screen does not apply SCREEN_BODY_STYLE (or compose ScreenScaffold, which applies it). Import from ../constants and spread into the body StyleSheet entry (e.g. `body: { ...SCREEN_BODY_STYLE, paddingHorizontal: 20 }`).',
     });
   }
 }

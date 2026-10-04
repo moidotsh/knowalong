@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../../../components/MobilePremium';
 import { useAppTheme } from '../../../context';
 import { safeGoBack, navigateToStudy } from '../../../navigation';
-import { SCREEN_BODY_STYLE } from '../../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../../constants';
 import { SVETOFOR_SONG, type LyricWord, type SongSection } from '../../../utils/knowalong/fixtures/svetoforSong';
 import { ConceptIcon } from '../../../components/knowalong/ConceptIcon';
 
@@ -56,7 +56,12 @@ export default function SvetoforLessonScreen() {
       {/* Section progress dots */}
       <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 6, paddingBottom: 8 }}>
         {SVETOFOR_SONG.sections.map((s, i) => (
-          <Pressable key={s.id} onPress={() => { setActiveSection(i); scrollRef.current?.scrollTo({ y: 0, animated: false }); }}>
+          <Pressable key={s.id} onPress={() => { setActiveSection(i); scrollRef.current?.scrollTo({ y: 0, animated: false }); }}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: i === activeSection }}
+            accessibilityLabel={`Go to ${s.label}`}
+            hitSlop={8}
+            style={({ pressed }) => [{ opacity: pressed ? 0.6 : 1 }]}>
             <View style={{
               width: i === activeSection ? 24 : 8, height: 8, borderRadius: 4,
               backgroundColor: i === activeSection ? colors.brand : i < activeSection ? colors.brand + '40' : colors.cardBorder,
@@ -69,11 +74,11 @@ export default function SvetoforLessonScreen() {
 
         {/* Section intro */}
         <View style={{ alignItems: 'center', marginBottom: 16 }}>
-          <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textMuted, textTransform: 'uppercase' }}>
             {section.kind}
           </Text>
-          <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text, marginTop: 2 }}>{section.label}</Text>
-          <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4 }}>
+          <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 22, lineHeight: 28, fontFamily: theme.fonts.display, color: colors.text, marginTop: 2 }}>{section.label}</Text>
+          <Text style={{ ...theme.typography.mobileBody, fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginTop: 4 }}>
             {section.newWords.length} new word{section.newWords.length === 1 ? '' : 's'} · {section.cumulativeWords} total
           </Text>
         </View>
@@ -81,7 +86,7 @@ export default function SvetoforLessonScreen() {
         {/* New vocabulary — learn before reading */}
         {section.newWords.length > 0 ? (
           <View style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+            <Text style={{ ...theme.typography.mobileEyebrow, color: colors.brand, textTransform: 'uppercase', marginBottom: 8 }}>
               New vocabulary
             </Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
@@ -90,11 +95,11 @@ export default function SvetoforLessonScreen() {
                   paddingVertical: 4, paddingHorizontal: 10, borderRadius: 8,
                   backgroundColor: colors.brand + '12', borderWidth: 1, borderColor: colors.brand + '30',
                 }}>
-                  <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand }}>{word}</Text>
+                  <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 14, lineHeight: 18, fontFamily: theme.fonts.display, color: colors.brand }}>{word}</Text>
                 </View>
               ))}
               {section.newWords.length > 16 ? (
-                <Text style={{ fontSize: 12, color: colors.textMuted, alignSelf: 'center' }}>+{section.newWords.length - 16} more</Text>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, alignSelf: 'center' }}>+{section.newWords.length - 16} more</Text>
               ) : null}
             </View>
           </View>
@@ -106,12 +111,12 @@ export default function SvetoforLessonScreen() {
             <MobileSurface key={line.ordinal} padding={16}>
               {/* Difficulty + ordinal */}
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                <Text style={{ fontSize: 10, color: colors.textMuted }}>{line.ordinal}</Text>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted }}>{line.ordinal}</Text>
                 <Text style={{ fontSize: 10 }}>{difficultyTone(line.difficulty)}</Text>
               </View>
 
               {/* Russian text — words color-coded */}
-              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, lineHeight: 26 }}>
+              <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 26, color: colors.text }}>
                 {line.words.map((w, i) => (
                   <Text key={i}>
                     <Text style={{ color: wordColor(colors, w), fontWeight: w.isNew ? '700' : w.isKnown ? '500' : '400' }}>
@@ -122,7 +127,7 @@ export default function SvetoforLessonScreen() {
               </Text>
 
               {/* Translation */}
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 6, fontStyle: 'italic' }}>
+              <Text style={{ ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, color: colors.textSecondary, marginTop: 6 }}>
                 {line.translation}
               </Text>
 
@@ -130,19 +135,19 @@ export default function SvetoforLessonScreen() {
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: colors.cardBorder }}>
                 {line.words.map((w, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: wordColor(colors, w) }}>{w.form}</Text>
-                    <Text style={{ fontSize: 11, color: colors.textMuted }}>{w.gloss}</Text>
-                    {i < line.words.length - 1 ? <Text style={{ fontSize: 10, color: colors.textMuted, marginHorizontal: 2 }}>·</Text> : null}
+                    <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 13, lineHeight: 17, color: wordColor(colors, w) }}>{w.form}</Text>
+                    <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted }}>{w.gloss}</Text>
+                    {i < line.words.length - 1 ? <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted, marginHorizontal: 2 }}>·</Text> : null}
                   </View>
                 ))}
               </View>
 
               {/* Known/New markers */}
               <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                <Text style={{ fontSize: 10, color: colors.status.success }}>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.status.success }}>
                   ● {line.words.filter(w => w.isKnown).length} known
                 </Text>
-                <Text style={{ fontSize: 10, color: colors.brand }}>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.brand }}>
                   ● {line.words.filter(w => w.isNew).length} new
                 </Text>
               </View>

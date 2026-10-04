@@ -90,6 +90,15 @@ function host(tagName: string, opts: { touchable?: boolean } = {}) {
     } = props ?? {};
     const flat = flattenProps(rest);
     const finalProps: AnyProps = { ...flat };
+    // Mirror react-native-web: accessibilityLabel/Role also surface as the
+    // standard aria-label/role attributes (the raw accessibility*
+    // attributes stay for the tests that query them directly).
+    if (typeof flat.accessibilityLabel === 'string') {
+      finalProps['aria-label'] = flat.accessibilityLabel;
+    }
+    if (typeof flat.accessibilityRole === 'string') {
+      finalProps.role = flat.accessibilityRole;
+    }
     if (ref !== null && ref !== undefined) {
       finalProps.ref = ref;
     }
@@ -188,9 +197,12 @@ export const NativeEventEmitter = class NativeEventEmitter {
 export const Easing = {
   linear: () => () => 0,
   ease: () => () => 0,
+  quad: () => () => 0,
+  cubic: () => () => 0,
   in: (fn: (t: number) => number) => fn,
   out: (fn: (t: number) => number) => fn,
   inOut: (fn: (t: number) => number) => fn,
+  back: () => () => 0,
   bezier: () => () => 0,
 };
 

@@ -50,17 +50,13 @@ export interface EmptyStateProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const TITLE_STYLE = {
-  fontSize: theme.typography.mobileTitle.fontSize,
-  fontWeight: theme.typography.mobileTitle.fontWeight as any,
-  lineHeight: theme.typography.mobileTitle.lineHeight,
-  letterSpacing: theme.typography.mobileTitle.letterSpacing,
-} as const;
+const TITLE_STYLE = theme.typography.mobileTitle;
 
 const MESSAGE_STYLE = {
-  fontSize: 14,
-  fontWeight: '400',
-  lineHeight: 20,
+  fontSize: theme.typography.mobileMeta.fontSize,
+  fontWeight: theme.typography.mobileMeta.fontWeight as any,
+  lineHeight: theme.typography.mobileMeta.lineHeight,
+  letterSpacing: theme.typography.mobileMeta.letterSpacing,
 } as const;
 
 export function EmptyState({

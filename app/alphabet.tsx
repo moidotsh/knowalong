@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 
 interface LetterInfo {
   letter: string;
@@ -90,21 +90,22 @@ export default function AlphabetScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 80 }}>
         {isComplete ? (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileFigure, fontSize: 32, lineHeight: 36, letterSpacing: -1, color: colors.text, textAlign: 'center' }}>
               {score.correct} / {TOTAL}
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 10 }}>
               {score.correct >= TOTAL * 0.8 ? 'Great recognition!' : 'Keep practicing the alphabet.'}
             </Text>
           </MobileSurface>
         ) : (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textMuted, textTransform: 'uppercase', textAlign: 'center' }}>
               {question.promptLabel}
             </Text>
+            {/* Sounds are latin transcripts (mono); Cyrillic letters get the display face. */}
             <Text style={{
-              fontSize: 56, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: 16,
-              fontFamily: question.mode === 'sound-to-letter' ? 'monospace' : 'normal',
+              fontSize: 56, lineHeight: 60, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: 16,
+              fontFamily: question.mode === 'sound-to-letter' ? theme.fonts.mono : theme.fonts.display,
             }}>
               {question.prompt}
             </Text>
@@ -121,8 +122,13 @@ export default function AlphabetScreen() {
                 }
                 return (
                   <Pressable key={i} disabled={selected !== null} onPress={() => handleSelect(i)}
-                    style={{ paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, borderWidth: 2, borderColor: border, backgroundColor: bg, minWidth: 80, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text, fontFamily: question.mode === 'letter-to-sound' ? 'monospace' : 'normal' }}>{opt}</Text>
+                    accessibilityRole="button"
+                    accessibilityLabel={opt}
+                    accessibilityState={{ selected: isSelected }}
+                    style={({ pressed }) => [{ opacity: pressed && selected === null ? 0.7 : 1 }]}>
+                    <View style={{ paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, borderWidth: 2, borderColor: border, backgroundColor: bg, minWidth: 80, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 22, lineHeight: 26, fontWeight: '700', color: colors.text, fontFamily: question.mode === 'letter-to-sound' ? theme.fonts.mono : theme.fonts.display }}>{opt}</Text>
+                    </View>
                   </Pressable>
                 );
               })}
@@ -130,10 +136,10 @@ export default function AlphabetScreen() {
 
             {selected !== null ? (
               <View style={{ marginTop: 16, padding: 14, borderRadius: 12, backgroundColor: (selected === question.correctIndex ? colors.status.success : colors.status.error) + '15' }}>
-                <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
+                <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 15, lineHeight: 21, color: colors.textSecondary, textAlign: 'center' }}>
                   {question.correct.letter} = {question.correct.sound} — {question.correct.example}
                 </Text>
-                <Text style={{ fontSize: 12, color: colors.textMuted, textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, textAlign: 'center', marginTop: 6 }}>
                   e.g. {question.correct.exampleWord}
                 </Text>
               </View>

@@ -37,6 +37,22 @@
 //     scrim to a short fade — the drawer still works, just without motion.
 //   • Tapping the scrim or any item calls onClose() after the press
 //     handler runs. Drawer state is fully controlled by the consumer.
+//
+// Surface language (theme.drawer.style — the override point beside
+// shapes/atmosphere):
+//   • 'sheet' (default): the glass-scrim iOS sheet described above.
+//   • 'ink': the inverted plate — InkPanel (text-color plate + print
+//     grain) running the panel's FULL height. In cutout mode the plate
+//     owns its cap: the masthead rides ON it (MobileHomeHeader's
+//     onPlate stacks the real header above the overlay, its type
+//     bleeding to the background color); in 'slideout' mode it sits
+//     under the header slot. The brand rule replaces the hairline and
+//     runs the panel's FULL height — cap-to-body continuity in cutout,
+//     the platen edge in slideout. Flat dim scrim (no blur — the glass
+//     dialect dies; pass no glass cap), and the out-cubic slide curve
+//     so the motion matches ink-transition consumers (route curtains,
+//     boot plates). Item labels invert to the background color; the
+//     active row keeps the brand strip.
 
 import React, { useEffect, useRef, useState } from 'react';
 import {
@@ -46,14 +62,18 @@ import {
   Text,
   View,
   useWindowDimensions,
+  type StyleProp,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAppTheme } from '../../context';
-import { useAndroidChromeBlurFix, useReducedMotion } from '../../hooks';
+import { useAndroidChromeBlurFix } from '../../hooks';
 import { isWeb } from '../../utils';
-import { usePressedStyle } from '../premium/shared';
+import { useReducedMotion, usePressedStyle } from '../premium/shared';
 import { MobileAtmosphere, type MobileAtmosphereSurface } from './MobileAtmosphere';
+import { InkPanel } from './InkPanel';
+import { theme } from '../../constants';
 
 export interface MobileNavDrawerItem {
   /** Stable id; typically the route pathname (used for active match). */
@@ -89,8 +109,23 @@ export interface MobileNavDrawerProps {
   header?: React.ReactNode;
   /** Optional element rendered at the bottom (sign-out slot, etc.). */
   footer?: React.ReactNode;
+  /**
+   * Optional element rendered ABOVE the item list (just under the
+   * header / cutout area). Consumer-supplied account identity, context
+   * strips, etc. — the mechanism carries none of it. Sits outside the
+   * items' scroll list; keep it compact.
+   */
+  topContent?: React.ReactNode;
   /** Atmosphere surface for the drawer body (default: 'analytics'). */
   atmosphere?: MobileAtmosphereSurface;
+  /**
+   * Whether the drawer body's drifting orbs render. Undefined (the
+   * default) defers to the theme's atmosphere style
+   * (`theme.atmosphere.style`) — declare 'flat' there to settle the
+   * whole app on the base surface; pass an explicit boolean only to
+   * override the theme for this drawer alone.
+   */
+  atmosphereShowOrbs?: boolean;
   /**
    * How the brand area is handled when the drawer is open.
    * - 'slideout' (default): panel covers full screen height; brand lives
@@ -125,6 +160,20 @@ export interface MobileNavDrawerProps {
    * MobilePremium screen).
    */
   columnWidth?: number;
+  /**
+   * Optional style merged into every item label (font family, tracking,
+   * case). The ink surface invites a monospaced/ledger drawer — pass the
+   * consumer's receipt face here; the sheet default needs nothing.
+   */
+  itemLabelStyle?: StyleProp<TextStyle>;
+  /**
+   * Explicit per-callsite surface-language override for the dev showcase
+   * (the same discipline as atmosphereShowOrbs): the theme's
+   * `drawer.style` is the single declaration point — this prop exists so
+   * the showcase can demo both languages side by side. Consumers leave
+   * it unset.
+   */
+  drawerStyle?: 'sheet' | 'ink';
   /** Test ID. */
   testID?: string;
 }
@@ -167,14 +216,22 @@ export function MobileNavDrawer({
   activePathname,
   header,
   footer,
+  topContent,
   atmosphere = 'analytics',
+  atmosphereShowOrbs,
   brandPersistence = 'slideout',
   cutoutHeight,
   anchor = 'window',
   columnWidth = 420,
+  itemLabelStyle,
+  drawerStyle,
   testID,
 }: MobileNavDrawerProps) {
   const { colors } = useAppTheme();
+  // Surface language — optional-chained so an older consumer theme copy
+  // (pre-drawer-block) still renders the sheet default. The prop is the
+  // showcase's explicit override (atmosphereShowOrbs discipline).
+  const ink = (drawerStyle ?? theme.drawer?.style) === 'ink';
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const { isAndroidChrome } = useAndroidChromeBlurFix();
@@ -211,8 +268,12 @@ export function MobileNavDrawer({
   const slideDuration = reduced ? 0 : 300;
   const scrimDuration = reduced ? 150 : 250;
   const unmountDelay = Math.max(slideDuration, scrimDuration);
-  // iOS sheet curve — fast start, smooth deceleration.
-  const slideEasing = 'cubic-bezier(0.32, 0.72, 0, 1)';
+  // iOS sheet curve — fast start, smooth deceleration. The ink surface
+  // uses the out-cubic instead so the drawer's motion matches its
+  // ink-transition siblings (route curtains, boot plates).
+  const slideEasing = ink
+    ? 'cubic-bezier(0.215, 0.61, 0.355, 1)'
+    : 'cubic-bezier(0.32, 0.72, 0, 1)';
 
   useEffect(() => {
     if (open) {
@@ -266,25 +327,33 @@ export function MobileNavDrawer({
           renders saturate() poorly. */}
       <Pressable
         onPress={onClose}
-        style={[
-          styles.scrim,
-          {
-            backgroundColor: `${colors.backgroundDeep}${isAndroidChrome ? 'f2' : 'cc'}`,
-            opacity: animatedIn ? 1 : 0,
-            ...(isCutout ? { top: 0, left: anchorOffset + DRAWER_WIDTH } : null),
-            ...(isWeb
-              ? {
-                  transition: `opacity ${scrimDuration}ms ease`,
-                  backdropFilter: isAndroidChrome
-                    ? colors.mobilePremium.androidChromeSurfaceBlur
-                    : colors.mobilePremium.navScrimBackdropBlur,
-                  WebkitBackdropFilter: isAndroidChrome
-                    ? colors.mobilePremium.androidChromeSurfaceBlur
-                    : colors.mobilePremium.navScrimBackdropBlur,
-                }
-              : null),
-          },
-        ]}
+          style={[
+            styles.scrim,
+            {
+              // Ink mode dims flat — the frosted blur is the glass-sheet
+              // dialect and would fight the opaque plate.
+              backgroundColor: ink
+                ? `${colors.backgroundDeep}d9`
+                : `${colors.backgroundDeep}${isAndroidChrome ? 'f2' : colors.mobilePremium.navScrimAlpha}`,
+              opacity: animatedIn ? 1 : 0,
+              ...(isCutout ? { top: 0, left: anchorOffset + DRAWER_WIDTH } : null),
+              ...(isWeb
+                ? {
+                    transition: `opacity ${scrimDuration}ms ease`,
+                    ...(ink
+                      ? null
+                      : {
+                          backdropFilter: isAndroidChrome
+                            ? colors.mobilePremium.androidChromeSurfaceBlur
+                            : colors.mobilePremium.navScrimBackdropBlur,
+                          WebkitBackdropFilter: isAndroidChrome
+                            ? colors.mobilePremium.androidChromeSurfaceBlur
+                            : colors.mobilePremium.navScrimBackdropBlur,
+                        }),
+                  }
+                : null),
+            },
+          ]}
       />
 
       {/* Drawer panel — slides from left. In cutout mode the panel is
@@ -299,24 +368,33 @@ export function MobileNavDrawer({
           darkening the brand cutout. */}
       <Animated.View
         pointerEvents={isCutout ? 'box-none' : 'auto'}
-        style={[
-          styles.panel,
-          {
-            width: DRAWER_WIDTH,
-            backgroundColor: isCutout ? 'transparent' : colors.backgroundDeep,
-            borderRightColor: colors.mobilePremium.hairlineBorder,
-            // Closed: translateX(-DRAWER_WIDTH) → panel off-screen left.
-            // Open: translateX(anchorOffset) → panel at the column's
-            // left edge in 'column' mode, or x=0 in 'window' mode.
-            transform: [{ translateX: animatedIn ? anchorOffset : -DRAWER_WIDTH }],
-            ...(isWeb
-              ? {
-                  transition: `transform ${slideDuration}ms ${slideEasing}`,
-                  boxShadow: colors.mobilePremium.navPanelShadow,
-                }
-              : null),
-          },
-        ]}
+          style={[
+            styles.panel,
+            {
+              width: DRAWER_WIDTH,
+              // Ink mode: InkPanel (below) owns the surface — the panel
+              // shell stays transparent; its rule replaces the hairline
+              // and the depth shadow (flat air on ink).
+              backgroundColor: isCutout || ink ? 'transparent' : colors.backgroundDeep,
+              // Ink: the brand rule IS the edge, full panel height (the
+              // cutout band keeps the continuity line; the depth shadow
+              // is gone — flat air on ink).
+              borderRightWidth: ink ? 3 : 1,
+              borderRightColor: ink
+                ? colors.brand
+                : colors.mobilePremium.hairlineBorder,
+              // Closed: translateX(-DRAWER_WIDTH) → panel off-screen left.
+              // Open: translateX(anchorOffset) → panel at the column's
+              // left edge in 'column' mode, or x=0 in 'window' mode.
+              transform: [{ translateX: animatedIn ? anchorOffset : -DRAWER_WIDTH }],
+              ...(isWeb
+                ? {
+                    transition: `transform ${slideDuration}ms ${slideEasing}`,
+                    ...(ink ? null : { boxShadow: colors.mobilePremium.navPanelShadow }),
+                  }
+                : null),
+            },
+          ]}
       >
         {isCutout ? (
           // Cutout frame — empty band at the top of the panel. No fill,
@@ -335,19 +413,29 @@ export function MobileNavDrawer({
         {/* Opaque surface + atmosphere + tint. In cutout mode this layer
             starts below the cap so the brand area stays clear. In slideout
             mode it fills the whole panel. */}
-        <View
-          pointerEvents="none"
-          style={[
-            styles.panelBackground,
-            isCutout ? { top: effectiveCutoutHeight } : null,
-            { backgroundColor: colors.backgroundDeep },
-          ]}
-        >
-          <MobileAtmosphere surface={atmosphere} />
+        {ink ? (
+          // The ink surface: text-color plate + grain running the panel's
+          // FULL height. In cutout mode the plate owns its cap — the
+          // masthead rides ON it (MobileHomeHeader `onPlate` stacks the
+          // real header above the overlay, its type bleeding to the
+          // background color), so the material arrives by geometry with
+          // the slide and the rule reads cap-to-body with no seam.
+          <InkPanel rule={false} style={styles.panelBackground} />
+        ) : (
           <View
-            style={[styles.panelTint, { backgroundColor: `${colors.backgroundDeep}99` }]}
-          />
-        </View>
+            pointerEvents="none"
+            style={[
+              styles.panelBackground,
+              isCutout ? { top: effectiveCutoutHeight } : null,
+              { backgroundColor: colors.backgroundDeep },
+            ]}
+          >
+            <MobileAtmosphere surface={atmosphere} showOrbs={atmosphereShowOrbs} />
+            <View
+              style={[styles.panelTint, { backgroundColor: `${colors.backgroundDeep}99` }]}
+            />
+          </View>
+        )}
 
         <View
           style={[
@@ -362,6 +450,8 @@ export function MobileNavDrawer({
             <View style={{ height: insets.top + 12 }} />
           )}
 
+          {topContent ? <View style={styles.topContent}>{topContent}</View> : null}
+
           <View style={styles.items}>
             {items.map((item) => (
               <DrawerItem
@@ -369,6 +459,8 @@ export function MobileNavDrawer({
                 item={item}
                 active={isActive(item.id)}
                 accent={accent}
+                ink={ink}
+                labelStyle={itemLabelStyle}
                 onClose={onClose}
               />
             ))}
@@ -390,11 +482,15 @@ function DrawerItem({
   item,
   active,
   accent,
+  ink,
+  labelStyle,
   onClose,
 }: {
   item: MobileNavDrawerItem;
   active: boolean;
   accent: string;
+  ink: boolean;
+  labelStyle?: StyleProp<TextStyle>;
   onClose: () => void;
 }) {
   const { colors } = useAppTheme();
@@ -402,10 +498,18 @@ function DrawerItem({
   const [hovered, setHovered] = useState(false);
   const showBadge = item.badge != null && item.badge > 0;
 
+  // Active row: on ink the wash lifts the plate in the CONTRAST direction
+  // (background alpha — always neutral against the plate); the brand strip
+  // alone carries the accent. The brand-alpha wash tints the whole row —
+  // mud on the dark plate, a pale block on the bone one.
   const backgroundColor = active
-    ? `${accent}1a`
+    ? ink
+      ? `${colors.background}1f`
+      : `${accent}1a`
     : hovered && isWeb
-      ? colors.mobilePremium.hairlineBorder
+      ? ink
+        ? `${colors.background}14`
+        : colors.mobilePremium.hairlineBorder
       : 'transparent';
 
   return (
@@ -443,9 +547,13 @@ function DrawerItem({
         <Text
           style={[
             styles.itemLabel,
+            labelStyle,
             {
-              color: active ? accent : colors.text,
-              fontWeight: active ? '600' : '400',
+              // On ink the label reads in the background color (paper on
+              // the plate); the brand strip marks the active row — brand
+              // text on ink stays reserved for large display type.
+              color: ink ? colors.background : active ? accent : colors.text,
+              fontWeight: active ? (ink ? '700' : '600') : '400',
               opacity: active ? 1 : 0.85,
             },
           ]}
@@ -509,6 +617,10 @@ const styles = StyleSheet.create({
   header: {
     paddingHorizontal: 16,
     paddingBottom: 12,
+  },
+  topContent: {
+    paddingHorizontal: 12,
+    paddingBottom: 4,
   },
   items: {
     flex: 1,

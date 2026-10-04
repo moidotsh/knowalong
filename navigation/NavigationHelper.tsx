@@ -5,7 +5,7 @@
 // `hooks/useAuthNavigation.ts`). Every other file in the app navigates
 // through the helpers exported from this file — that way the call sites
 // read as intent (`replaceWithLogin()`) rather than mechanism
-// (`router.replace('/login')`), and a global navigation change (e.g.
+// (`replace('/login')`), and a global navigation change (e.g.
 // swizzling every push with a transition) lands in one place.
 //
 // Naming convention:
@@ -21,6 +21,19 @@
 
 import { router, Router } from 'expo-router';
 import { useAuthStore } from '../stores';
+import { withRouteCurtain } from '../utils';
+
+/**
+ * Every shell navigation routes through `withRouteCurtain` — the
+ * route-curtain seam declared by `theme.transition.style`. Inert under
+ * the starter's 'none' default (the call passes straight through, zero
+ * behavior change); under 'curtain' (the ink dialect's preset) the plate
+ * covers before the router fires and lifts over the arrival. Back
+ * navigation reveals 'down'; everything else drills 'up'.
+ */
+const push = (path: string) => withRouteCurtain(() => router.push(path), 'up');
+const replace = (path: string) => withRouteCurtain(() => router.replace(path), 'up');
+const back = () => withRouteCurtain(() => router.back(), 'down');
 
 /**
  * Shell navigation paths. Consumers add their own routes to a sibling
@@ -49,6 +62,20 @@ export enum NavigationPath {
   CLCC = 'clcc',
   CLCC_RUN = 'clcc-run',
   SETTINGS_COMPANION = 'settings-companion',
+  // Song-first surfaces (§1.1)
+  SONG_DETAIL = 'song',
+  SONG_SECTION = 'song-section',
+  // Learner-journey experience (consumer prototype)
+  JOURNEY = 'journey',
+  WELCOME = 'welcome',
+  COLLECTION = 'collection',
+  COLLECTION_ITEM = 'collection-item',
+  READER = 'reader',
+  COLLECTION_ADD = 'collection-add',
+  NOTEBOOK = 'notebook',
+  NOTEBOOK_ENTRY = 'notebook-entry',
+  SESSION = 'session',
+  DEV_JOURNEY = 'dev/journey',
 }
 
 /**
@@ -80,28 +107,42 @@ export const navigationHierarchy: Record<string, NavigationPath> = {
   [NavigationPath.CLCC]: NavigationPath.HOME,
   [NavigationPath.CLCC_RUN]: NavigationPath.CLCC,
   [NavigationPath.SETTINGS_COMPANION]: NavigationPath.SETTINGS,
+  // Song-first surfaces (§1.1)
+  [NavigationPath.SONG_DETAIL]: NavigationPath.HOME,
+  [NavigationPath.SONG_SECTION]: NavigationPath.SONG_DETAIL,
+  // Learner-journey experience
+  [NavigationPath.JOURNEY]: NavigationPath.HOME,
+  [NavigationPath.WELCOME]: NavigationPath.JOURNEY,
+  [NavigationPath.COLLECTION]: NavigationPath.JOURNEY,
+  [NavigationPath.COLLECTION_ITEM]: NavigationPath.COLLECTION,
+  [NavigationPath.READER]: NavigationPath.COLLECTION_ITEM,
+  [NavigationPath.COLLECTION_ADD]: NavigationPath.COLLECTION,
+  [NavigationPath.NOTEBOOK]: NavigationPath.JOURNEY,
+  [NavigationPath.NOTEBOOK_ENTRY]: NavigationPath.NOTEBOOK,
+  [NavigationPath.SESSION]: NavigationPath.JOURNEY,
+  [NavigationPath.DEV_JOURNEY]: NavigationPath.HOME,
 };
 
 // ─── Push helpers (drill in) ────────────────────────────────────────────
 
 export function navigateToHome() {
-  router.push('/');
+  push('/');
 }
 
 export function navigateToLogin() {
-  router.push('/login');
+  push('/login');
 }
 
 export function navigateToRegister() {
-  router.push('/register');
+  push('/register');
 }
 
 export function navigateToForgotPassword() {
-  router.push('/forgot-password');
+  push('/forgot-password');
 }
 
 export function navigateToSettings() {
-  router.push('/settings');
+  push('/settings');
 }
 
 /**
@@ -109,172 +150,247 @@ export function navigateToSettings() {
  * linked from any user-facing surface by default.
  */
 export function navigateToPremiumShowcase() {
-  router.push('/dev/premium');
+  push('/dev/premium');
 }
 
 // ─── KnowAlong domain push helpers ─────────────────────────────────────
 
 export function navigateToImport() {
-  router.push('/import');
+  push('/import');
 }
 
 export function navigateToStudy() {
-  router.push('/study');
+  push('/study');
 }
 
 export function navigateToLessons() {
-  router.push('/lessons');
+  push('/lessons');
 }
 
 export function navigateToLesson(lessonId: string) {
-  router.push(`/lessons/${lessonId}`);
+  push(`/lessons/${lessonId}`);
 }
 
 // Drill into a deck overview (song = deck). For song decks this lists the
 // sub-decks (sections); for flat decks it lists lessons directly.
 export function navigateToDeck(deckId: string) {
-  router.push(`/deck/${deckId}`);
+  push(`/deck/${deckId}`);
 }
 
 // Drill into a section (sub-deck) within a song deck — the locked lesson list.
 export function navigateToSubDeck(deckId: string, subDeckId: string) {
-  router.push(`/deck/${deckId}/section/${subDeckId}`);
+  push(`/deck/${deckId}/section/${subDeckId}`);
 }
 
 export function navigateToProgress() {
-  router.push('/progress');
+  push('/progress');
 }
 
 export function navigateToAchievements() {
-  router.push('/achievements');
+  push('/achievements');
 }
 
 export function navigateToVocabulary() {
-  router.push('/vocabulary');
+  push('/vocabulary');
 }
 
 export function navigateToDaily() {
-  router.push('/daily');
+  push('/daily');
 }
 
 export function navigateToOnboarding() {
-  router.push('/onboarding');
+  push('/onboarding');
 }
 
 export function navigateToConversation() {
-  router.push('/conversation');
+  push('/conversation');
 }
 
 export function navigateToProfile() {
-  router.push('/profile');
+  push('/profile');
 }
 
 export function navigateToGrammar() {
-  router.push('/grammar');
+  push('/grammar');
 }
 
 export function navigateToConcept(code: string) {
-  router.push(`/concept/${code}`);
+  push(`/concept/${code}`);
 }
 
 export function navigateToStudySettings() {
-  router.push('/settings/study');
+  push('/settings/study');
 }
 
 export function navigateToListen() {
-  router.push('/listen');
+  push('/listen');
 }
 
 export function navigateToMatch() {
-  router.push('/match');
+  push('/match');
 }
 
 export function navigateToReading() {
-  router.push('/reading');
+  push('/reading');
 }
 
 export function navigateToMistakes() {
-  router.push('/mistakes');
+  push('/mistakes');
 }
 
 export function navigateToSongs() {
-  router.push('/songs');
+  push('/songs');
 }
 
 export function navigateToConnections() {
-  router.push('/connections');
+  push('/connections');
 }
 
 export function navigateToType() {
-  router.push('/type');
+  push('/type');
 }
 
 export function navigateToAlphabet() {
-  router.push('/alphabet');
+  push('/alphabet');
 }
 
 export function navigateToNumbers() {
-  router.push('/numbers');
+  push('/numbers');
 }
 
 export function navigateToSvetofor() {
-  router.push('/source/svetofor/svetofor');
+  push('/source/svetofor/svetofor');
 }
 
 export function navigateToSource(sourceId: string) {
-  router.push(`/source/${sourceId}`);
+  push(`/source/${sourceId}`);
+}
+
+// ─── Song-first surfaces (§1.1) ─────────────────────────────────────────
+
+/** Drill into a song's detail surface — the shelf's primary drill-in. */
+export function navigateToSong(songId: string) {
+  push(`/song/${songId}`);
+}
+
+/** Open a song's passage reader for one canonical section. */
+export function navigateToSongSection(songId: string, sectionId: string) {
+  push(`/song/${songId}/section/${sectionId}`);
 }
 
 export function navigateToSection(sourceId: string, sectionId: string) {
-  router.push(`/source/${sourceId}/section/${sectionId}`);
+  push(`/source/${sourceId}/section/${sectionId}`);
 }
 
 export function navigateToLemma(lemmaId: string) {
-  router.push(`/vocabulary/${lemmaId}`);
+  push(`/vocabulary/${lemmaId}`);
 }
 
 export function navigateToReview() {
-  router.push('/review');
+  push('/review');
 }
 
 export function navigateToKnowAlongDemo() {
-  router.push('/dev/knowalong');
+  push('/dev/knowalong');
 }
 
 // ─── Local analysis & CLCC push helpers ─────────────────────────────────
 
 export function navigateToSourceAnalysis(sourceId: string) {
-  router.push(`/source/${sourceId}/analysis`);
+  push(`/source/${sourceId}/analysis`);
 }
 
 export function navigateToAnalysisRun(sourceId: string, runId: string) {
-  router.push(`/source/${sourceId}/analysis/${runId}`);
+  push(`/source/${sourceId}/analysis/${runId}`);
 }
 
 export function navigateToClcc() {
-  router.push('/clcc');
+  push('/clcc');
 }
 
 export function navigateToClccRun(runId: string) {
-  router.push(`/clcc/${runId}`);
+  push(`/clcc/${runId}`);
 }
 
 export function navigateToCompanionSettings() {
-  router.push('/settings/companion');
+  push('/settings/companion');
+}
+
+// ─── Learner-journey experience (push) ──────────────────────────────────
+
+export function navigateToJourney() {
+  push('/journey');
+}
+
+export function navigateToWelcome() {
+  push('/welcome');
+}
+
+export function navigateToCollection() {
+  push('/collection');
+}
+
+export function navigateToCollectionItem(itemId: string) {
+  push(`/collection/${itemId}`);
+}
+
+/** Open a collection item's Explore reader. */
+export function navigateToReader(itemId: string) {
+  push(`/collection/${itemId}/read`);
+}
+
+export function navigateToCollectionAdd() {
+  push('/collection/add');
+}
+
+export function navigateToNotebook() {
+  push('/notebook');
+}
+
+export function navigateToNotebookEntry(entryId: string) {
+  push(`/notebook/${encodeURIComponent(entryId)}`);
+}
+
+/** Open the one session player for a session plan id. */
+export function navigateToSession(sessionId: string) {
+  push(`/session/${encodeURIComponent(sessionId)}`);
+}
+
+export function navigateToDevJourney() {
+  push('/dev/journey');
+}
+
+// ─── Learner-journey experience (tab switches) ──────────────────────────
+//
+// The three primary destinations switch with `replace`, like the
+// song-first tabs above — Journey ↔ Collection ↔ Notebook must not
+// grow a back-stack entry per visit. The back gesture belongs to
+// drilling into a chapter, an item, or a session.
+
+export function switchToJourney() {
+  replace('/journey');
+}
+
+export function switchToCollection() {
+  replace('/collection');
+}
+
+export function switchToNotebook() {
+  replace('/notebook');
 }
 
 // ─── Replace helpers (redirects) ────────────────────────────────────────
 
 export function replaceWithHome() {
-  router.replace('/');
+  replace('/');
 }
 
 export function replaceWithLogin() {
-  router.replace('/login');
+  replace('/login');
 }
 
 export function replaceWithRegister() {
-  router.replace('/register');
+  replace('/register');
 }
 
 /**
@@ -284,7 +400,39 @@ export function replaceWithRegister() {
  * redirect-from-deep-link case.
  */
 export function replaceWithForgotPassword() {
-  router.replace('/forgot-password');
+  replace('/forgot-password');
+}
+
+/** Entry redirect: onboarding done → the Journey; otherwise → Welcome. */
+export function replaceWithJourneyEntry(onboardingComplete: boolean) {
+  if (onboardingComplete) {
+    replace('/journey');
+  } else {
+    replace('/welcome');
+  }
+}
+
+// ─── Tab switches (song-first shell, §1.1) ──────────────────────────────
+//
+// Bottom-tab movement REPLACES instead of pushes — today → words → today
+// must not build a back-stack entry per surface visited. The back gesture
+// belongs to drilling into a song and its passages, not replaying tab
+// history. (expo-router's Tabs aren't used; these pair with SongTabBar.)
+
+export function switchToToday() {
+  replace('/');
+}
+
+export function switchToSongs() {
+  replace('/songs');
+}
+
+export function switchToWords() {
+  replace('/words');
+}
+
+export function switchToProfile() {
+  replace('/profile');
 }
 
 // ─── Back navigation ────────────────────────────────────────────────────
@@ -302,15 +450,15 @@ export function replaceWithForgotPassword() {
  */
 export function safeGoBack() {
   if (router.canGoBack()) {
-    router.back();
+    back();
     return;
   }
 
   const { status } = useAuthStore.getState();
   if (status === 'authenticated') {
-    router.replace('/');
+    replace('/');
   } else {
-    router.replace('/login');
+    replace('/login');
   }
 }
 
@@ -328,14 +476,14 @@ export function goBack(currentPath: NavigationPath | string) {
   if (Object.values(NavigationPath).includes(currentPath as NavigationPath)) {
     const parentPath = navigationHierarchy[currentPath] || NavigationPath.HOME;
     if (parentPath === NavigationPath.HOME) {
-      router.push('/');
+      push('/');
       return;
     }
-    router.push(`/${parentPath}`);
+    push(`/${parentPath}`);
     return;
   }
 
-  router.push('/');
+  push('/');
 }
 
 // Re-export the underlying router instance + type for consumers that

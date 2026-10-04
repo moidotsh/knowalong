@@ -237,12 +237,17 @@ The fastest verification path post-deploy:
 
 - **Override brand colors in manifest.** Edit `public/manifest.json`
   → `theme_color` and `background_color` to match the consumer's
-  brand. Arqavellum defaults to indigo `#4F46E5` and white `#FFFFFF`.
+  brand. Arqavellum defaults to indigo `#4F46E5` and white `#FFFFFF`;
+  KnowAlong's Night Metro override ships night ground `#0C1016` for
+  both (dark-first — the installed app must not white-flash on boot).
 - **Override status-bar style.** Edit the `apple-mobile-web-app-status-bar-style`
   meta in the runtime injection block. Arqavellum defaults to `default`
-  (light surface treatment).
+  (light surface treatment); KnowAlong ships `black` to match the night
+  ground.
 - **Override theme-color split.** Edit the two `theme-color` meta
-  injections in `app/_layout.tsx`. Arqavellum splits desktop/mobile; a
+  injections in `app/_layout.tsx`. Arqavellum splits desktop/mobile;
+  KnowAlong keeps the split with Night Metro values — night ground
+  `#0C1016` on desktop, filament amber `#FFB020` on mobile — a
   consumer can collapse to one or use different brand tints.
 - **Add offline caching.** Replace `public/sw.js` with a cache-aware
   service worker (Workbox, etc.). Don't extend the passthrough in

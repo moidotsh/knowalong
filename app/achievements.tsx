@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobileSectionEyebrow } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { useStreakStore } from '../stores/streakStore';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { ACHIEVEMENT_ICONS, type IconName } from '../utils/knowalong/icons';
@@ -57,16 +57,16 @@ export default function AchievementsScreen() {
         <MobileSurface padding={20}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-around' }}>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: colors.status.success }}>{earned.length}</Text>
-              <Text style={{ fontSize: 11, color: colors.textMuted }}>earned</Text>
+              <Text style={{ ...theme.typography.mobileFigure, fontSize: 28, lineHeight: 34, letterSpacing: -0.5, color: colors.status.success }}>{earned.length}</Text>
+              <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 2 }}>earned</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: colors.brand }}>{streak}</Text>
-              <Text style={{ fontSize: 11, color: colors.textMuted }}>streak</Text>
+              <Text style={{ ...theme.typography.mobileFigure, fontSize: 28, lineHeight: 34, letterSpacing: -0.5, color: colors.brand }}>{streak}</Text>
+              <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 2 }}>streak</Text>
             </View>
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 28, fontWeight: '700', color: colors.text }}>{sessions}</Text>
-              <Text style={{ fontSize: 11, color: colors.textMuted }}>sessions</Text>
+              <Text style={{ ...theme.typography.mobileFigure, fontSize: 28, lineHeight: 34, letterSpacing: -0.5, color: colors.text }}>{sessions}</Text>
+              <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 2 }}>sessions</Text>
             </View>
           </View>
         </MobileSurface>
@@ -79,8 +79,8 @@ export default function AchievementsScreen() {
               {earned.map((a) => (
                 <View key={a.id} style={{ width: '47%', padding: 14, borderRadius: 14, borderWidth: 2, borderColor: colors.status.success + '30', backgroundColor: colors.status.success + '08' }}>
                   <ConceptIcon name={a.icon} size={32} color={colors.status.success} />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.text, marginTop: 6 }}>{a.title}</Text>
-                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{a.description}</Text>
+                  <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text, marginTop: 6 }}>{a.title}</Text>
+                  <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 2 }}>{a.description}</Text>
                 </View>
               ))}
             </View>
@@ -95,8 +95,8 @@ export default function AchievementsScreen() {
               {locked.map((a) => (
                 <View key={a.id} style={{ width: '47%', padding: 14, borderRadius: 14, borderWidth: 2, borderColor: colors.cardBorder, backgroundColor: colors.cardAlt, opacity: 0.6 }}>
                   <ConceptIcon name={a.icon} size={32} color={colors.textMuted} />
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: colors.textSecondary, marginTop: 6 }}>{a.title}</Text>
-                  <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{a.description}</Text>
+                  <Text style={{ ...theme.typography.mobileItemTitle, color: colors.textSecondary, marginTop: 6 }}>{a.title}</Text>
+                  <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 2 }}>{a.description}</Text>
                 </View>
               ))}
             </View>

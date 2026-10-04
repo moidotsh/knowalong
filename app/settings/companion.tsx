@@ -18,7 +18,7 @@ import {
 } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import {
   useCompanionCredential,
   useCompanionHealth,
@@ -201,11 +201,11 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
     marginBottom: 6,
   },
   body: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -213,10 +213,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   statusLabel: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
   },
   statusText: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 18,
   },

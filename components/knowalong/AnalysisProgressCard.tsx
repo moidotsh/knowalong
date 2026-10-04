@@ -10,6 +10,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { MobileSurface } from '../MobilePremium';
 import { useAppTheme } from '../../context';
+import { theme } from '../../constants';
 import type { AnalysisRun, AnalysisEvent } from '../../shared/types/knowalong';
 import type { CompanionJobStatusResponse } from '../../shared/types/knowalong';
 
@@ -67,7 +68,7 @@ export function AnalysisProgressCard({ run, companionStatus, latestEvent }: Prop
               : 'Starting…'}
         </Text>
       </View>
-      <View style={styles.barOuter}>
+      <View style={[styles.barOuter, { backgroundColor: colors.cardBorder + '40' }]}>
         <View
           style={[
             styles.barInner,
@@ -103,17 +104,18 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   title: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 20,
   },
   stageIndex: {
-    fontSize: 12,
-    fontWeight: '500',
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 15,
   },
   barOuter: {
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(127,127,127,0.18)',
     overflow: 'hidden',
   },
   barInner: {
@@ -121,18 +123,21 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   stageName: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
-    fontWeight: '500',
+    lineHeight: 18,
     marginTop: 10,
   },
   message: {
-    fontSize: 12,
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 6,
-    lineHeight: 17,
   },
   failureReason: {
+    ...theme.typography.mobileBody,
     fontSize: 12,
+    lineHeight: 17,
     marginTop: 8,
-    fontWeight: '500',
   },
 });

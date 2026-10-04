@@ -109,9 +109,9 @@
 - **Prohibited:** `{count && <Component/>}` — renders `0` or `""` as children when the left side is falsy-but-not-boolean.
 
 ### S7. Theme Access
-- **Rule:** Both `theme.colors.light.*` and `theme.colors.dark.*` ship in `constants/theme.ts`. The active palette is resolved at runtime by `useAppTheme()` (per invariant #3 in `CLAUDE.md`); component code reads `colors.*` from the resolved palette and never indexes by mode. Light is the default; dark is opt-in.
+- **Rule:** Both `theme.colors.dark.*` and `theme.colors.light.*` ship in `constants/theme.ts`. The active palette is resolved at runtime by `useAppTheme()` (per invariant #3 in `CLAUDE.md`); component code reads `colors.*` from the resolved palette and never indexes by mode. Dark is the default (Night Metro night service); light is opt-in.
 - **Audit:** `audit-ui-theme.ts` blocks hardcoded hex colors and `Dimensions.get('window')` — both are S7 violations.
-- **Prohibited:** `'#4F46E5'` literal in a component. Direct mode-indexed access (`theme.colors.light.*` or `theme.colors.dark.*`) in component code — read from `useAppTheme()`'s resolved `colors.*` instead. SVG vectors and `constants/theme.ts` are exempt — they are the source of truth.
+- **Prohibited:** A hardcoded brand hex literal (e.g. `'#FFB020'`) in a component. Direct mode-indexed access (`theme.colors.light.*` or `theme.colors.dark.*`) in component code — read from `useAppTheme()`'s resolved `colors.*` instead. SVG vectors and `constants/theme.ts` are exempt — they are the source of truth.
 
 ### S8. API Client (fetchWithRetry)
 - **Rule:** Use `fetchWithRetry()` from `utils/api-client.ts`. Better: go through the repository layer — repositories should be the only call sites for network I/O outside `api-client.ts` itself.

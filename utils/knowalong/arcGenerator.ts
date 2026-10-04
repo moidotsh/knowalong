@@ -35,10 +35,11 @@
 // Pure + deterministic (stable corpus order; no Math.random). The hard cap is a
 // correctness gate, asserted on every emitted lesson.
 
-import type { Lesson, LessonStep } from './fixtures/decks';
+import type { Lesson, LessonStep, StepMode } from './fixtures/decks';
 import type { WordPart, WordRole } from './fixtures/learningItems';
 import { WORD_FADE_THRESHOLD, classifyWord, phraseReadiness, wordKey, type MasteryMap, type WordMastery } from './mastery';
 import { assertLessonWithinCap, MAX_NEW_CONCEPTS_PER_CARD, MAX_NEW_CONCEPTS_PER_LESSON, newConceptKeys } from './concept';
+import { AppError, ErrorCode } from '../errors';
 import type { SpineProvider } from './spine';
 import type { ContextPhrase, ContextProvider } from './contextProvider';
 
@@ -64,18 +65,6 @@ const GRADUATED_RECORD: WordMastery = {
   lastSeenMs: 1,
 };
 
-/** A single-concept card: one surface form, one word. Used only to scaffold a
- *  SPINE atom (gradient/CLCC) that a context phrase needs — never as a target's
- *  own card (targets are always revealed inside a multi-word phrase or deferred). */
-function singleWordStep(concept: WordPart, itemId: string): LessonStep {
-  return {
-    itemId,
-    surfaceForm: concept.form,
-    meaning: concept.gloss,
-    words: [{ form: concept.form, gloss: concept.gloss, role: concept.role }],
-  };
-}
-
 /** Clone a spine step under a fresh itemId so a generated card carries a unique,
  *  namespaced id. All teaching payload is carried through unchanged. */
 function rebasedStep(step: LessonStep, itemId: string): LessonStep {
@@ -87,15 +76,17 @@ function isGraduated(form: string, mastery: MasteryMap): boolean {
   return classifyWord(mastery[wordKey(form)]) === 'graduated';
 }
 
-/** Content roles carry semantic substance; function roles (pronoun/particle) don't. */
+/** Content roles carry semantic substance; function roles (particle) don't. A
+ *  pronoun carries enough semantic anchor for an interjection/conjunction target
+ *  (e.g. «эй, ты», «как ты») — only a pure particle phrase («будто бы») is anchorless. */
 const CONTENT_ROLES: ReadonlySet<WordRole> = new Set(['verb', 'noun', 'adjective', 'adverb']);
 
-/** The teachability filter (Phase 4.1+). A phrase is usable as a build card only
- *  if it has ≥1 content word — a pure function-word phrase (e.g. «будто бы»,
- *  particle + particle) has no semantic anchor and yields a nonsense build prompt.
- *  Source-agnostic: applies to mock and AI phrases alike. */
-function hasContentWord(p: { words: ReadonlyArray<{ role: WordRole }> }): boolean {
-  return p.words.some((w) => CONTENT_ROLES.has(w.role));
+/** The teachability filter (Phase 4.1+; relaxed R7). A phrase is usable as a build
+ *  card if it has ≥1 content word OR ≥1 pronoun — both give a semantic anchor. Only
+ *  a pure particle phrase (e.g. «будто бы», particle + particle) is rejected as
+ *  nonsense. Source-agnostic: applies to mock and AI phrases alike. */
+function hasSemanticAnchor(p: { words: ReadonlyArray<{ role: WordRole }> }): boolean {
+  return p.words.some((w) => CONTENT_ROLES.has(w.role) || w.role === 'pronoun');
 }
 
 // ── Mode A: contextualize via an existing multi-word corpus phrase ───────
@@ -107,7 +98,7 @@ function hasContentWord(p: { words: ReadonlyArray<{ role: WordRole }> }): boolea
 function bestReadyHost(target: ArcTarget, mastery: MasteryMap, spine: SpineProvider): LessonStep | null {
   if (isGraduated(target.form, mastery)) return null; // already known — nothing to contextualize
   const tKey = wordKey(target.form);
-  const candidates = [...spine.foundationalSteps(), ...spine.conceptSteps(), ...spine.lyricSteps()].filter(
+  const candidates = [...spine.foundationalSteps(), ...spine.conceptSteps(), ...spine.lyricSteps(), ...spine.paletteSteps()].filter(
     (s) => s.words.length >= 2 && s.words.some((w) => wordKey(w.form) === tKey),
   );
   const ready = candidates
@@ -175,10 +166,15 @@ function chunkCardsIntoLessons(cards: LessonStep[], inputMastery: MasteryMap, op
   return lessons;
 }
 
-// ── Mode B: context wrapping — never a single-word lesson ──────────────
+// ── Encoding variability (R7) ───────────────────────────────────────────
 
-/** Max ready context phrases a target is revealed in (encoding variability). */
-const MAX_READY_CONTEXT_PHRASES = 2;
+/** R7 floor: the minimum distinct context phrases a target is revealed in. The
+ *  target is the sole NEW concept on each reveal card (palette/spine context is
+ *  graduated or scaffolded first), so all reveal cards land in ONE cap-compliant
+ *  lesson — encoding variability, the i+1 way to teach a word thoroughly rather
+ *  than as a 1–3 card stub. Culminating synthesis lessons (Phase 5) are exempt:
+ *  they never pass through buildArcForTarget. */
+const MIN_ENCODING_VARIABILITY_CARDS = 8;
 
 /** A ContextPhrase → LessonStep (the chip builder consumes steps). */
 function contextPhraseToStep(p: ContextPhrase, itemId: string): LessonStep {
@@ -190,98 +186,229 @@ function contextPhraseToStep(p: ContextPhrase, itemId: string): LessonStep {
   };
 }
 
-/** Mode B body. Wrap `target` in a teachable context phrase so it is taught inside
- *  a real multi-word phrase, never as an isolated single word.
- *
- *  A phrase is usable when it (a) passes the teachability filter (≥1 content word)
- *  and (b) is wrappable — its unknown NON-target words are all SPINE atoms
- *  (gradient/CLCC), which are legitimate to scaffold. It never scaffolds a NOVEL
- *  lyric line-mate (that would be a single-word "victim"). Among usable phrases it
- *  prefers READY ones (zero unknowns), then the fewest scaffolds.
- *
- *  Returns null when no phrase is teachable+wrappable, so the caller DEFERS the
- *  target (emits nothing; it is acquired via the culminating line in Phase 5). */
-function buildContextWrappingArc(target: ArcTarget, phrases: readonly ContextPhrase[], mastery: MasteryMap, spine: SpineProvider, opts: BuildArcOptions): Lesson[] | null {
+/** Does this step reveal the target (is the target among its words)? */
+function revealsTarget(step: LessonStep, tKey: string): boolean {
+  return step.words.some((w) => wordKey(w.form) === tKey);
+}
+
+/** R7 hard gate (authored-served targets). Counts the target-reveal cards across
+ *  the arc; throws if < MIN_ENCODING_VARIABILITY_CARDS. A short target is a DATA
+ *  GAP — missing authored context phrases for `target.form` — surfaced loudly
+ *  (the fixture-completeness test + buildSongSectionLessons fail, pointing at the
+ *  exact target) rather than silently deferred. Parallel to assertLessonWithinCap
+ *  (a cap gate); this is a data-completeness gate. */
+function assertArcEncodingVariety(lessons: readonly Lesson[], target: ArcTarget, idPrefix: string): void {
   const tKey = wordKey(target.form);
-  const teachable = phrases.filter(hasContentWord);
-  if (teachable.length === 0) return null; // no semantic anchor → defer
+  const reveals = lessons.reduce((n, l) => n + l.steps.filter((s) => revealsTarget(s, tKey)).length, 0);
+  if (reveals >= MIN_ENCODING_VARIABILITY_CARDS) return;
+  throw new AppError(
+    `Arc "${idPrefix}" violates R7: target "${target.form}" has ${reveals} context card(s) (needs ≥${MIN_ENCODING_VARIABILITY_CARDS}). Add authored context phrases for "${target.form}" in fixtures/contextPhrases.ts.`,
+    ErrorCode.VALIDATION_ERROR,
+    { details: { idPrefix, target: target.form, reveals, cap: MIN_ENCODING_VARIABILITY_CARDS } },
+  );
+}
 
-  const spineWords = new Set<string>();
-  for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps()]) for (const w of step.words) spineWords.add(wordKey(w.form));
+// ── R8: interaction-mode variety ────────────────────────────────────────
 
-  const evolved: MasteryMap = { ...mastery };
-  const unknownNonTarget = (p: ContextPhrase): WordPart[] =>
-    p.words.filter((w) => wordKey(w.form) !== tKey && !isGraduated(w.form, evolved));
-  // Wrappable: every unknown non-target word is a scaffoldable spine atom.
-  const wrappable = teachable.filter((p) => unknownNonTarget(p).every((w) => spineWords.has(wordKey(w.form))));
-  if (wrappable.length === 0) return null; // context exists but needs novel line-mates → defer
+/** The three interaction modes an encoding-variability card can use (ADR R8).
+ *  build = assemble EN→RU chips; reverse = decode RU→EN chips; cloze = tap the
+ *  word that fills a Russian gap. Round-robin assignment guarantees the learner
+ *  meets the target via all three rather than 8× the same "target ___" build. */
+const VARIETY_MODES: readonly StepMode[] = ['build', 'reverse', 'cloze'];
+/** R8 floor: minimum distinct interaction modes across an arc's cards. */
+const MIN_DISTINCT_MODES = 2;
 
-  const ready = wrappable.filter((p) => unknownNonTarget(p).length === 0);
-  const cards: LessonStep[] = [];
-  const use = (ready.length > 0 ? ready : [...wrappable].sort((a, b) => unknownNonTarget(a).length - unknownNonTarget(b).length)).slice(0, MAX_READY_CONTEXT_PHRASES);
+/** Round-robin assign interaction modes to the reveal cards for variety (R8):
+ *  consecutive cards never share a mode, and the three modes distribute evenly.
+ *  Cloze cards blank the TARGET (the concept under study), revealing it in a
+ *  fill-the-blank frame; their `clozePrompt` is the phrase with the target → ___,
+ *  `clozeAnswer` the target form, `clozeMeaning` the English. Pure. */
+function applyVarietyModes(cards: readonly LessonStep[], target: ArcTarget): LessonStep[] {
+  const tKey = wordKey(target.form);
+  return cards.map((card, i) => {
+    const mode = VARIETY_MODES[i % VARIETY_MODES.length];
+    if (mode !== 'cloze') return { ...card, mode };
+    const tIdx = card.words.findIndex((w) => wordKey(w.form) === tKey);
+    if (tIdx < 0) return { ...card, mode: 'build' }; // target absent (shouldn't happen) → safe fallback
+    const clozePrompt = card.words.map((w, j) => (j === tIdx ? '___' : w.form)).join(' ');
+    return { ...card, mode, clozePrompt, clozeAnswer: card.words[tIdx].form, clozeMeaning: card.meaning };
+  });
+}
 
-  // Scaffold the chosen phrases' unknown spine words (deduped) — always-funded.
-  // Each scaffold card gets a UNIQUE id (per word): the lesson player keys
-  // LessonRound by step.itemId, so duplicate ids would leak placement state
-  // across consecutive cards (a card mounting pre-filled / unsolvable).
-  const scaffolded = new Set<string>();
-  for (const p of use) {
-    for (const w of unknownNonTarget(p)) {
-      const k = wordKey(w.form);
-      if (scaffolded.has(k)) continue;
-      scaffolded.add(k);
-      cards.push(singleWordStep(w, `${opts.idPrefix}-ctx-${k}`));
-      evolved[k] = GRADUATED_RECORD;
-    }
+/** R8 hard gate: an arc's cards span ≥ MIN_DISTINCT_MODES interaction modes. A
+ *  single-mode arc is monotonous (the "8× как ___" failure) — a variety gap the
+ *  round-robin assigner prevents; this asserts it never regresses. */
+function assertArcVariety(lessons: readonly Lesson[], idPrefix: string): void {
+  const modes = new Set<string>();
+  for (const l of lessons) for (const s of l.steps) modes.add(s.mode ?? 'build');
+  if (modes.size >= MIN_DISTINCT_MODES) return;
+  throw new AppError(
+    `Arc "${idPrefix}" violates R8: only ${modes.size} interaction mode(s) — cards are monotonous (need ≥${MIN_DISTINCT_MODES}).`,
+    ErrorCode.VALIDATION_ERROR,
+    { details: { idPrefix, modes: [...modes], cap: MIN_DISTINCT_MODES } },
+  );
+}
+
+/** The spine (foundational gradient + CLCC + palette) as a PRESUMED known-context
+ *  baseline, overlaid on the learner's mastery. Song arcs teach only the target;
+ *  the spine is the known sea it swims in (taught by the Foundations / CLCC / Core
+ *  Vocab decks). This removes inline scaffolding — which split cold-start arcs
+ *  into many small ≤3-card lessons — so each target yields ONE clean ≥8-card
+ *  encoding-variability lesson. Pure. */
+function withSpineBaseline(mastery: MasteryMap, spine: SpineProvider): MasteryMap {
+  const m: MasteryMap = { ...mastery };
+  for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps(), ...spine.paletteSteps()]) {
+    for (const w of step.words) m[wordKey(w.form)] = GRADUATED_RECORD;
   }
-  let phraseIdx = 0;
-  for (const p of use) cards.push(contextPhraseToStep(p, `${opts.idPrefix}-p${(phraseIdx += 1)}`));
+  return m;
+}
 
-  const lessons = chunkCardsIntoLessons(cards, mastery, opts);
-  // Hard rule (Phase 4.1+): never emit a single-card single-word lesson. A lone
-  // scaffold atom (e.g. when a phrase needs exactly one unknown spine word) would
-  // land alone — defer the target rather than ship it; the word is acquired via
-  // the culminating line (Phase 5) or already-known from the Foundations deck.
-  if (lessons.some((l) => l.steps.length === 1 && l.steps[0].words.length === 1)) return null;
-  return lessons;
+/** A phrase is usable when it has a semantic anchor AND every NON-target word is
+ *  graduated in the baseline (the presumed-known spine) — so the target is the
+ *  sole new concept and the phrase is i+1. Extracted so the position-variety
+ *  check can inspect the same candidate pool the builder uses. */
+function usablePhrases(phrases: readonly ContextPhrase[], tKey: string, baseline: MasteryMap): readonly ContextPhrase[] {
+  return phrases.filter(hasSemanticAnchor).filter((p) =>
+    p.words.every((w) => wordKey(w.form) === tKey || isGraduated(w.form, baseline)));
+}
+
+// ── R9: target-position variety ─────────────────────────────────────────
+
+/** Where the target sits in a phrase/card: lead (index 0), tail (last), or mid.
+ *  Used to interleave cards so the target isn't always at the same spot. */
+type TargetPosition = 'start' | 'mid' | 'end';
+function targetPositionOf(step: { words: ReadonlyArray<{ form: string }> }, tKey: string): TargetPosition {
+  const idx = step.words.findIndex((w) => wordKey(w.form) === tKey);
+  if (idx < 0) return 'start';
+  const last = step.words.length - 1;
+  if (idx <= 0) return 'start';
+  if (idx >= last) return 'end';
+  return 'mid';
+}
+
+/** Reorder cards so consecutive ones differ in target position wherever
+ *  possible (R9): greedily pick the bucket with the most remaining cards that
+ *  isn't the previous card's position — this SPREADS the minority positions
+ *  through the lesson instead of clustering them (a plain round-robin would
+ *  exhaust mid/end early and leave a run of the majority at the end). No-op
+ *  when all cards share one position (variety isn't in the data). */
+function interleaveByPosition(cards: readonly LessonStep[], tKey: string): LessonStep[] {
+  const buckets: Record<TargetPosition, LessonStep[]> = { start: [], mid: [], end: [] };
+  for (const c of cards) buckets[targetPositionOf(c, tKey)].push(c);
+  const distinct = (['start', 'mid', 'end'] as const).filter((k) => buckets[k].length > 0);
+  if (distinct.length <= 1) return [...cards]; // nothing to interleave
+  const out: LessonStep[] = [];
+  let prev: TargetPosition | null = null;
+  while (out.length < cards.length) {
+    // Prefer the largest bucket that isn't `prev` (when another has cards).
+    const otherHas = distinct.some((k) => k !== prev && buckets[k].length > 0);
+    let best: TargetPosition | null = null;
+    for (const k of distinct) {
+      if (otherHas && k === prev) continue;
+      if (best === null || buckets[k].length > buckets[best].length) best = k;
+    }
+    out.push(buckets[best as TargetPosition].shift()!);
+    prev = best;
+  }
+  return out;
+}
+
+/** R9 hard gate: the lesson spans ≥ min(MIN, pool) distinct target positions. If
+ *  the candidate pool offered ≥2 positions, the lesson must use ≥2 (the
+ *  interleave guarantees it). When the pool offers only one (a target that
+ *  grammatically leads, e.g. an adverbial participle), the requirement is 1 —
+ *  always satisfiable, never a false failure. */
+const MIN_POSITION_VARIETY = 2;
+function assertArcPositionVariety(lessons: readonly Lesson[], poolPositions: number, tKey: string, target: ArcTarget, idPrefix: string): void {
+  const lessonPositions = new Set<TargetPosition>();
+  for (const l of lessons) for (const s of l.steps) if (revealsTarget(s, tKey)) lessonPositions.add(targetPositionOf(s, tKey));
+  const required = Math.min(MIN_POSITION_VARIETY, poolPositions);
+  if (lessonPositions.size >= required) return;
+  throw new AppError(
+    `Arc "${idPrefix}" violates R9: target "${target.form}" appears at only ${lessonPositions.size} position(s) (pool offered ${poolPositions}; need ≥${required}). Add context phrases placing the target at a different position.`,
+    ErrorCode.VALIDATION_ERROR,
+    { details: { idPrefix, target: target.form, lessonPositions: [...lessonPositions], poolPositions, required } },
+  );
+}
+
+/** Build the encoding-variability card list for `target`: an optional ready host
+ *  (Mode A) first, then the target revealed in EVERY usable context phrase. NO
+ *  scaffolding (the spine is the presumed-known baseline); a novel non-spine word
+ *  makes a phrase not-ready and it is excluded. Because every usable phrase has
+ *  the target as its sole new concept, all reveal cards land in ONE cap-compliant
+ *  lesson. Cards are interleaved by target position (R9) then assigned varied
+ *  interaction modes (R8). Dedupes by surfaceForm. Returns null when nothing is
+ *  usable and there is no host (caller defers). */
+function buildEncodingVariabilityCards(target: ArcTarget, host: LessonStep | null, phrases: readonly ContextPhrase[], baseline: MasteryMap, opts: BuildArcOptions): LessonStep[] | null {
+  const tKey = wordKey(target.form);
+  const usable = usablePhrases(phrases, tKey, baseline);
+  if (usable.length === 0 && !host) return null; // no usable context and no host → defer
+  const cards: LessonStep[] = [];
+  const seenSurface = new Set<string>();
+  const push = (step: LessonStep) => {
+    if (seenSurface.has(step.surfaceForm)) return;
+    seenSurface.add(step.surfaceForm);
+    cards.push(step);
+  };
+  if (host) push(rebasedStep(host, `${opts.idPrefix}-host`));
+  let phraseIdx = 0;
+  for (const p of usable) push(contextPhraseToStep(p, `${opts.idPrefix}-p${(phraseIdx += 1)}`));
+  if (cards.length === 0) return null;
+  return applyVarietyModes(interleaveByPosition(cards, tKey), target);
 }
 
 // ── Public API ──────────────────────────────────────────────────────────
 
 /** Build the mastery-sized arc that graduates `target`, or [] to DEFER it.
- *  Resolution: Mode A (a ready contextualizing phrase) → Mode B context wrapping
- *  (target inside a teachable context phrase) → defer (no card; acquired via the
- *  culminating line in Phase 5). Never emits a single-card single-word lesson.
- *  Pure, deterministic; every lesson is hard-gated on the concept cap. */
+ *  Resolution: gather a ready host (Mode A — a corpus phrase whose only unknown is
+ *  the target) + EVERY teachable+wrappable context phrase (lyric windows +
+ *  authored), then reveal the target across all of them — encoding variability
+ *  (R7: ≥8 context cards for authored-served targets). Never emits a single-card
+ *  single-word TARGET lesson. Pure, deterministic; every lesson is hard-gated on
+ *  the concept cap, and authored-served targets are hard-gated on R7. */
 export function buildArcForTarget(target: ArcTarget, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider, opts: BuildArcOptions): Lesson[] {
-  if (isGraduated(target.form, mastery)) return []; // already graduated
+  if (isGraduated(target.form, mastery)) return []; // already graduated (real learner mastery)
+  const tKey = wordKey(target.form);
 
-  // Mode A: a multi-word corpus/lyric phrase already contextualizes the target —
-  // the phrase's only unknown is the target.
-  const host = bestReadyHost(target, mastery, spine);
-  if (host) {
-    const lesson: Lesson = {
-      id: `${opts.idPrefix}-l1`,
-      title: opts.title ?? opts.idPrefix,
-      subtitle: opts.subtitle ?? host.meaning,
-      icon: opts.icon ?? 'sparkles',
-      steps: [rebasedStep(host, `${opts.idPrefix}-target`)],
-      stepCount: 1,
-    };
-    assertLessonWithinCap(lesson, mastery); // hard gate
-    return [lesson];
-  }
+  // The spine is the presumed-known context baseline (Foundations / CLCC / Core
+  // Vocab). Song targets are the only NEW concepts — so no inline scaffolding and
+  // no cap-driven splitting: a target with ≥8 ready contexts becomes ONE lesson.
+  const baseline = withSpineBaseline(mastery, spine);
 
-  // Mode B: wrap the target in a teachable context phrase (scaffolding any unknown
-  // spine words first). Returns null when no phrase is teachable+wrappable.
+  // Mode A host (may be null) — a ready corpus/lyric phrase whose only unknown is
+  // the target. The FIRST reveal card, not a standalone 1-card short-circuit.
+  const host = bestReadyHost(target, baseline, spine);
+  // Mode B sources: lyric windows + authored phrases (the ContextProvider seam).
   const phrases = context.contextPhrasesFor(target);
-  if (phrases.length > 0) {
-    const wrapped = buildContextWrappingArc(target, phrases, mastery, spine, opts);
-    if (wrapped && wrapped.length > 0) return wrapped;
+
+  const cards = buildEncodingVariabilityCards(target, host, phrases, baseline, opts);
+  if (!cards || cards.length === 0) {
+    // Defer: no ready host and no usable context. The target is not taught as a
+    // card — acquired via exposure in the culminating line (Phase 5).
+    return [];
   }
 
-  // Defer: no ready host and no teachable wrappable context. The target is not
-  // taught as a card — it is acquired via exposure in the culminating line (Phase
-  // 5). This is the durable alternative to a single-word or nonsense card.
-  return [];
+  const lessons = chunkCardsIntoLessons(cards, baseline, opts);
+  // Hard rule (Phase 4.1+): never emit a single-card single-word TARGET lesson
+  // (a lone scaffold atom). Defer instead.
+  if (lessons.some((l) => l.steps.length === 1 && l.steps[0].words.length === 1)) return [];
+
+  // R7 (≥8 or defer): a target ships a lesson only with ≥8 context reveal cards
+  // — no small stub lessons. Authored-served targets that fall short THROW (a
+  // data gap: missing authored phrases for this target, caught by the fixture
+  // test). Unauthored targets (mock coverage pending for later sections) DEFER
+  // silently — the word is acquired via the culminating line (Phase 5) until its
+  // authored set lands, keeping the app runnable during incremental authoring.
+  const reveals = lessons.reduce((n, l) => n + l.steps.filter((s) => revealsTarget(s, tKey)).length, 0);
+  if (reveals < MIN_ENCODING_VARIABILITY_CARDS) {
+    if (context.hasAuthoredContext?.(target)) assertArcEncodingVariety(lessons, target, opts.idPrefix);
+    return [];
+  }
+  assertArcVariety(lessons, opts.idPrefix); // R8: shipped arcs are interaction-mode varied
+  // R9: target-position variety — span ≥ min(2, pool) distinct positions.
+  const poolPositions = new Set(usablePhrases(phrases, tKey, baseline).map((p) => targetPositionOf(p, tKey))).size;
+  assertArcPositionVariety(lessons, poolPositions, tKey, target, opts.idPrefix);
+  return lessons;
 }
+
+export { MIN_ENCODING_VARIABILITY_CARDS, MIN_DISTINCT_MODES };

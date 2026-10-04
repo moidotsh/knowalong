@@ -2,15 +2,16 @@
 // Root layout. Provider stack + PWA bootstrap.
 //
 // Provider stack (outer → inner):
-//   TamaguiProvider(defaultTheme=colorScheme) → ThemeProvider →
-//   SafeAreaProvider → AuthProvider → ToastProvider → QueryProvider → Stack
+//   ThemeProvider → SafeAreaProvider → GestureHandlerRootView →
+//   AuthProvider → AuthGuard → ToastProvider → QueryProvider → Stack
 //   + <ToastContainer/> (sibling of Stack, picks up toasts from anywhere)
 //
-// ThemeProvider sits INSIDE TamaguiProvider so the dynamic `defaultTheme`
-// (Tamagui's own light/dark) tracks the resolved colorScheme. Both stay
-// in sync — provider order is load-bearing.
+// No TamaguiProvider: the shell ships zero Tamagui components (MobilePremium
+// is hand-rolled RN and themes itself through ThemeProvider). Icons — the
+// one real Tamagui dependency — run provider-less via shims/helpers-icon.js
+// (passthrough themed(); every call site passes explicit color/size).
 //
-// Two web-only useEffect blocks are load-bearing:
+// Three web-only useEffect blocks are load-bearing:
 //
 //   1. PWA runtime injection — Expo Web's static export strips every
 //      PWA-related tag from <head> except <link rel="icon">. This block
@@ -22,20 +23,29 @@
 //      criteria require a registered SW with a fetch handler. Production-
 //      only, gated on `isWeb` + `'serviceWorker' in navigator`. See
 //      docs/architecture/pwa-installability.md §4.
+//
+//   3. Boot-plate handshake — lifts the pre-JS cover pasted into
+//      index.html (the opt-in boot recipe), after theme + fonts settle.
+//      Setting data-boot-ready is a no-op when no boot CSS exists.
 
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { TamaguiProvider } from 'tamagui';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import config from '../tamagui.config';
 import { isWeb, hasDocument, hasWindow } from '../utils/platform';
 import { logger } from '../utils';
 import { initializeNetworkListeners } from '../stores';
 import { AuthProvider, ToastProvider, ThemeProvider, useAppTheme } from '../context';
 import { AuthGuard, ToastContainer, AppErrorBoundary } from '../components/primitives';
 import { QueryProvider } from '../lib/react-query';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { RouteCurtain } from '../components/MobilePremium';
+import { curtainEnabled, markBootReady } from '../utils/routeTransition';
+import { APP_DISPLAY_NAME, APP_LAYOUT, SCREEN_BODY_STYLE } from '../constants';
+
+// The curtain is theme-declared machinery (theme.transition.style — a
+// const at module scope), so the mount decision is made once. Under the
+// starter's 'none' default this is false and nothing mounts.
+const CURTAIN_ON = curtainEnabled();
 
 function RootShell() {
   const { colorScheme, colors } = useAppTheme();
@@ -45,6 +55,15 @@ function RootShell() {
   useEffect(() => {
     const cleanup = initializeNetworkListeners();
     return cleanup;
+  }, []);
+
+  // Boot-plate handshake (web only): lift the pre-JS ink cover, if the
+  // consumer pasted one into index.html (the opt-in boot recipe — see
+  // the design-system docs). Setting data-boot-ready is a no-op when no
+  // boot CSS exists.
+  useEffect(() => {
+    if (!isWeb || !hasDocument()) return;
+    markBootReady();
   }, []);
 
   // PWA runtime injection + service worker registration. Both gated on
@@ -67,7 +86,13 @@ function RootShell() {
     // metas pull from the LIVE palette so they follow colorScheme.
     const ensureMeta = (name: string, content: string, media?: string) => {
       const selector = `meta[name="${name}"]${media ? `[media="${media}"]` : ''}`;
-      if (document.querySelector(selector)) return;
+      const existing = document.querySelector(selector) as HTMLMetaElement | null;
+      if (existing) {
+        // UPDATE — the meta ships a static value in index.html; the
+        // runtime repaints it when the mode switches (PWA theme follows).
+        existing.setAttribute('content', content);
+        return;
+      }
       const m = document.createElement('meta');
       m.name = name;
       m.content = content;
@@ -88,9 +113,17 @@ function RootShell() {
     ensureMeta('apple-mobile-web-app-capable', 'yes');
     ensureMeta('mobile-web-app-capable', 'yes');
     ensureMeta('apple-mobile-web-app-status-bar-style', colorScheme === 'dark' ? 'black' : 'default');
-    ensureMeta('apple-mobile-web-app-title', 'KnowAlong');
+    ensureMeta('apple-mobile-web-app-title', APP_DISPLAY_NAME);
     ensureMeta('theme-color', colors.background, '(min-width: 701px)');
     ensureMeta('theme-color', colors.brand, '(max-width: 700px)');
+
+    // THE ROOT PAINT — the global shell CSS hardcodes the night ground
+    // (Night Metro is dark-first); every pixel the app does not
+    // explicitly paint shows through it. Repaint both from the LIVE
+    // palette so a daytime-timetable user owns the whole canvas too
+    // (the PWA status-bar area included).
+    document.documentElement.style.backgroundColor = colors.background;
+    document.body.style.backgroundColor = colors.background;
 
     // Inject the global scrollbar-hiding CSS at runtime. The same Expo
     // Web export/dev-server strip that removes PWA tags also drops the
@@ -107,7 +140,61 @@ function RootShell() {
     };
     ensureStyle(
       'global-scrollbar-css',
-      '*::-webkit-scrollbar{display:none}*{scrollbar-width:none;-ms-overflow-style:none}',
+      '*::-webkit-scrollbar{display:none}*{scrollbar-width:none;-ms-overflow-style:none}*{-webkit-user-select:none;user-select:none}html,body{transition:background-color 200ms ease}input,textarea{-webkit-user-select:auto;user-select:auto;font-size:16px !important}',
+    );
+
+    // The focus law (index.html #global-focus-css, mirrored here): the
+    // UA outline never leaks; every focusable control carries OUR ring
+    // — a 2px rule in its own ink.
+    ensureStyle(
+      'global-focus-css',
+      [
+        "button:focus,[role='button']:focus,[role='link']:focus,a:focus,select:focus{outline-width:0;box-shadow:0 0 0 2px currentColor}",
+        // `outline: none`, not outline-width — WebKit's UA ring is
+        // outline-style: auto and ignores a width kill.
+        'input:focus,textarea:focus,select:focus{outline:none}',
+      ].join(''),
+    );
+
+    // NIGHT METRO faces — runtime restore of index.html's id'd
+    // @font-face block (the export strip drops <head> styles; the
+    // build-time injector covers exported routes, this covers dev and
+    // anything the strip still misses). Unbounded (display/rollsign),
+    // Golos Text (body), PT Mono (ledger), PT Serif (the journey's
+    // literary face — regular + bold + italic). Mirror trio: index.html,
+    // scripts/inject-critical-web.ts, this block.
+    const ensureFontLinks = () => {
+      const fontFiles = [
+        '/fonts/Unbounded-var.ttf',
+        '/fonts/GolosText-var.ttf',
+        '/fonts/PT_Serif-Web-Regular.ttf',
+        '/fonts/PT_Serif-Web-Bold.ttf',
+      ];
+      for (const href of fontFiles) {
+        if (document.querySelector(`link[rel="preload"][href="${href}"]`)) continue;
+        const l = document.createElement('link');
+        l.rel = 'preload';
+        l.href = href;
+        l.as = 'font';
+        l.type = 'font/ttf';
+        // crossorigin is load-bearing on font preloads — without it the
+        // anonymous-mode fetch is cached under a different key and the
+        // font downloads twice.
+        l.setAttribute('crossorigin', '');
+        document.head.appendChild(l);
+      }
+    };
+    ensureFontLinks();
+    ensureStyle(
+      'global-font-face-css',
+      [
+        "@font-face{font-family:'Unbounded';font-style:normal;font-weight:200 900;font-display:swap;src:url('/fonts/Unbounded-var.ttf') format('truetype')}",
+        "@font-face{font-family:'Golos Text';font-style:normal;font-weight:400 900;font-display:swap;src:url('/fonts/GolosText-var.ttf') format('truetype')}",
+        "@font-face{font-family:'PT Mono';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/PTMono-Regular.ttf') format('truetype')}",
+        "@font-face{font-family:'PT Serif';font-style:normal;font-weight:400;font-display:swap;src:url('/fonts/PT_Serif-Web-Regular.ttf') format('truetype')}",
+        "@font-face{font-family:'PT Serif';font-style:normal;font-weight:700;font-display:swap;src:url('/fonts/PT_Serif-Web-Bold.ttf') format('truetype')}",
+        "@font-face{font-family:'PT Serif';font-style:italic;font-weight:400;font-display:swap;src:url('/fonts/PT_Serif-Web-Italic.ttf') format('truetype')}",
+      ].join(''),
     );
 
     // Register the installability-enabling service worker (passthrough,
@@ -142,30 +229,29 @@ function RootShell() {
   }, [colorScheme, colors]);
 
   return (
-    <TamaguiProvider config={config} defaultTheme={colorScheme}>
-      <SafeAreaProvider>
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <AuthProvider>
-            <AuthGuard>
-              <ToastProvider>
-                <QueryProvider>
-                  <Stack
-                    screenOptions={{
-                      headerShown: false,
-                      contentStyle: {
-                        ...SCREEN_BODY_STYLE,
-                        backgroundColor: colors.backgroundDeep,
-                      },
-                    }}
-                  />
-                  <ToastContainer />
-                </QueryProvider>
-              </ToastProvider>
-            </AuthGuard>
-          </AuthProvider>
-        </GestureHandlerRootView>
-      </SafeAreaProvider>
-    </TamaguiProvider>
+    <SafeAreaProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <AuthProvider>
+          <AuthGuard enabled={APP_LAYOUT.authGuard}>
+            <ToastProvider>
+              <QueryProvider>
+                <Stack
+                  screenOptions={{
+                    headerShown: false,
+                    contentStyle: {
+                      ...SCREEN_BODY_STYLE,
+                      backgroundColor: colors.backgroundDeep,
+                    },
+                  }}
+                />
+                <ToastContainer />
+                {CURTAIN_ON ? <RouteCurtain /> : null}
+              </QueryProvider>
+            </ToastProvider>
+          </AuthGuard>
+        </AuthProvider>
+      </GestureHandlerRootView>
+    </SafeAreaProvider>
   );
 }
 

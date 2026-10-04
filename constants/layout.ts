@@ -10,6 +10,22 @@ export type NavDrawerAnchor = 'window' | 'column';
 
 export const APP_LAYOUT = {
   /**
+   * Whether AuthGuard walls non-public routes for unauthenticated
+   * visitors. FALSE by default: a fresh arqavellum clone is the
+   * showcase-and-launchpad until the consumer starts building in it —
+   * and plenty of consumers never use login at all (browse-first
+   * shops, tools, internal surfaces). The auth screens, AuthService,
+   * and the auth store all ship regardless; this switch only decides
+   * whether unauthenticated visitors get redirected to /login.
+   *
+   * Flip to true when your consumer app has authenticated surfaces —
+   * the guard then walls everything except PUBLIC_SEGMENTS (dev, qr,
+   * +not-found) in AuthGuard.tsx. Signed-in users sitting on auth
+   * screens are redirected home in BOTH modes.
+   */
+  authGuard: true as boolean,
+
+  /**
    * How the nav drawer handles the brand area when open.
    *
    * - 'cutout': the panel + scrim start below the home header so the

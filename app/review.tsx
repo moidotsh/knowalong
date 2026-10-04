@@ -16,7 +16,7 @@ import {
 } from '../components/MobilePremium';
 import { useAppTheme, useToast } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { useReviewQueue, useRecordReviewAttempt } from '../hooks';
 import type { StudyCard, ReviewRating } from '@shared/types';
 
@@ -179,9 +179,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  // Card metadata reads as a timetable eyebrow — tracked mono caps.
   cardKind: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
     textTransform: 'uppercase',
   },
   genChip: {
@@ -190,57 +190,66 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   genChipText: {
+    ...theme.typography.mobileEyebrow,
     fontSize: 10,
-    fontWeight: '700',
+    lineHeight: 13,
   },
+  // The prompt is the card's signage — the display face at deck-hero
+  // register (Unbounded carries the Cyrillic prompts).
   cardPrompt: {
-    fontSize: 18,
-    fontWeight: '600',
-    lineHeight: 26,
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 28,
+    fontFamily: theme.fonts.display,
   },
   answerSection: {
     padding: 12,
   },
   answerLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
     textTransform: 'uppercase',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   answerText: {
+    ...theme.typography.mobileBody,
     fontSize: 16,
     lineHeight: 24,
   },
+  // Fine print rides the ledger face — generated-content disclaimers
+  // are exactly the fine-print slot.
   genNotice: {
-    fontSize: 12,
+    ...theme.typography.mobileLedger,
     marginTop: 8,
-    fontStyle: 'italic',
   },
   hintText: {
-    fontSize: 13,
+    ...theme.typography.mobileBody,
   },
+  // Session-complete headline — the display face, same register as the
+  // deck hero.
   completeTitle: {
     fontSize: 20,
     fontWeight: '700',
+    lineHeight: 26,
+    fontFamily: theme.fonts.display,
     marginBottom: 8,
   },
   completeBody: {
-    fontSize: 14,
-    lineHeight: 20,
+    ...theme.typography.mobileBody,
   },
   ratingRow: {
     flexDirection: 'row',
     gap: 8,
     width: '100%',
   },
+  // Rating chits — transit-ticket rectangles (tight radius), filled
+  // with the mastery color each rating feeds.
   ratingButton: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 8,
     alignItems: 'center',
   },
   ratingLabel: {
-    fontSize: 14,
-    fontWeight: '600',
+    ...theme.typography.mobileAction,
   },
 });

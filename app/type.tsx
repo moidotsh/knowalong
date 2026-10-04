@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS } from '../utils/knowalong/fixtures/learningItems';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
@@ -59,10 +59,10 @@ export default function TypeScreen() {
         <MobileHeader title="Complete" onBack={safeGoBack} />
         <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 40 }}>
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileFigure, fontSize: 32, lineHeight: 36, letterSpacing: -1, color: colors.text, textAlign: 'center' }}>
               {score.correct} / {ITEMS.length}
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
               {score.correct === ITEMS.length ? 'Flawless spelling!' : `${score.wrong} to review.`}
             </Text>
           </MobileSurface>
@@ -84,22 +84,25 @@ export default function TypeScreen() {
 
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 24 }}>
         <MobileSurface padding={28}>
-          <Text style={{ fontSize: 13, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>
+          <Text style={{ ...theme.typography.mobileEyebrow, textTransform: 'uppercase', color: colors.textMuted, textAlign: 'center' }}>
             Type this in Russian:
           </Text>
           {ITEM_ICONS[item.id] ? (
             <View style={{ alignItems: 'center', marginTop: 12 }}><ConceptIcon name={ITEM_ICONS[item.id]} size={40} color={colors.brand} /></View>
           ) : null}
-          <Text style={{ fontSize: 28, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: 12 }}>
+          {/* The prompt — the card's signage (display face). */}
+          <Text style={{ fontSize: 26, fontWeight: '700', lineHeight: 34, fontFamily: theme.fonts.display, color: colors.text, textAlign: 'center', marginTop: 12 }}>
             {item.meaning}
           </Text>
 
-          {/* Input */}
+          {/* Input — the learner's answer in the display face; the muted
+              placeholder keeps the empty field readable on the night ground. */}
           <TextInput
             value={input}
             onChangeText={setInput}
             editable={!checked}
             placeholder="Type the Russian..."
+            placeholderTextColor={colors.textMuted}
             autoCapitalize="none"
             autoCorrect={false}
             style={{
@@ -108,21 +111,22 @@ export default function TypeScreen() {
               borderColor: checked === 'correct' ? colors.status.success : checked === 'wrong' ? colors.status.error : colors.cardBorder,
               backgroundColor: colors.cardAlt,
               fontSize: 22, fontWeight: '700', color: colors.text, textAlign: 'center',
+              fontFamily: theme.fonts.display,
             }}
           />
 
           {/* Result */}
           {checked === 'correct' ? (
             <View style={{ marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: colors.status.success + '15' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.status.success, textAlign: 'center' }}>✓ Correct!</Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
+              <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, color: colors.status.success, textAlign: 'center' }}>✓ Correct!</Text>
+              <Text style={{ ...theme.typography.mobileLedger, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
                 {item.surfaceForm} · {item.transliteration}
               </Text>
             </View>
           ) : checked === 'wrong' ? (
             <View style={{ marginTop: 12, padding: 14, borderRadius: 12, backgroundColor: colors.status.error + '15' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: colors.status.error, textAlign: 'center' }}>✗ "{item.surfaceForm}"</Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 4, fontStyle: 'italic' }}>
+              <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, color: colors.status.error, textAlign: 'center' }}>✗ "{item.surfaceForm}"</Text>
+              <Text style={{ ...theme.typography.mobileLedger, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
                 {item.transliteration}
               </Text>
             </View>
@@ -130,7 +134,7 @@ export default function TypeScreen() {
 
           {/* Hint */}
           {!checked ? (
-            <Text style={{ fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 12 }}>
+            <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, textAlign: 'center', marginTop: 12 }}>
               Accepts Cyrillic or transliteration
             </Text>
           ) : null}

@@ -5,12 +5,12 @@
 // chip-builder player at /lessons/[lessonId].
 
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToDeck } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { ALL_DECKS } from '../utils/knowalong/fixtures/decks';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 
@@ -31,9 +31,9 @@ export default function LessonsScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                   <ConceptIcon name={deck.icon} size={32} color={colors.brand} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text }}>{deck.title}</Text>
+                    <Text style={styles.deckTitle}>{deck.title}</Text>
                     <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>{deck.subtitle}</Text>
-                    <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4 }}>
+                    <Text style={[styles.deckCount, { color: colors.textMuted }]}>
                       {sectionCount ? `${sectionCount} sections · ` : ''}{deck.lessons.length} lesson{deck.lessons.length === 1 ? '' : 's'}
                     </Text>
                   </View>
@@ -48,3 +48,18 @@ export default function LessonsScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  // Deck titles ride the display face — each deck is a line on the
+  // network map, and lines get signage type.
+  deckTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 24,
+    fontFamily: theme.fonts.display,
+  },
+  deckCount: {
+    ...theme.typography.mobileEyebrow,
+    marginTop: 4,
+  },
+});

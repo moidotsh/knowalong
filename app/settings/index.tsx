@@ -23,7 +23,7 @@ import {
   navigateToKnowAlongDemo,
   navigateToCompanionSettings,
 } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import { CompanionStatusChip } from '../../components/knowalong';
 
 const PREFERENCE_LABELS: Record<ColorSchemePreference, string> = {
@@ -195,11 +195,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   companionRowLabel: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 20,
     marginBottom: 2,
   },
   companionRowValue: {
+    ...theme.typography.mobileBody,
     fontSize: 12,
     lineHeight: 16,
   },
@@ -220,8 +222,7 @@ const styles = StyleSheet.create({
   },
   preferenceLabel: {
     flex: 1,
-    fontSize: 15,
-    fontWeight: '500',
+    ...theme.typography.mobileItemTitle,
   },
   preferenceRadio: {
     width: 22,
@@ -232,11 +233,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   privacyTitle: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 20,
     marginBottom: 6,
   },
   privacyBody: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
   },

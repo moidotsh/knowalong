@@ -22,12 +22,30 @@ export interface HamburgerButtonProps {
   onPress: () => void;
   /** Whether the drawer is currently open. Drives the icon crossfade. */
   isOpen?: boolean;
+  /**
+   * Icon color override. Defaults to text. Pass the background color
+   * while the drawer's ink plate rides under the header (MobileHomeHeader
+   * `onPlate`) so the close X reads on the plate.
+   */
+  color?: string;
+  /** Localized a11y label for the open state (consumers shipping non-English). */
+  openLabel?: string;
+  /** Localized a11y label for the close state. */
+  closeLabel?: string;
   /** Test ID. */
   testID?: string;
 }
 
-export function HamburgerButton({ onPress, isOpen = false, testID }: HamburgerButtonProps) {
+export function HamburgerButton({
+  onPress,
+  isOpen = false,
+  color,
+  openLabel = 'Open menu',
+  closeLabel = 'Close menu',
+  testID,
+}: HamburgerButtonProps) {
   const { colors } = useAppTheme();
+  const iconColor = color ?? colors.text;
   // Rotation + opacity crossfade. The transition props are web-only and not
   // in RN's ViewStyle types, so they go through a conditional spread rather
   // than typed keys.
@@ -40,7 +58,7 @@ export function HamburgerButton({ onPress, isOpen = false, testID }: HamburgerBu
       hitSlop={12}
       testID={testID}
       accessibilityRole="button"
-      accessibilityLabel={isOpen ? 'Close menu' : 'Open menu'}
+      accessibilityLabel={isOpen ? closeLabel : openLabel}
       style={({ pressed }) => [styles.button, pressed ? { opacity: 0.6 } : null]}
     >
       <View style={styles.iconBox}>
@@ -55,7 +73,7 @@ export function HamburgerButton({ onPress, isOpen = false, testID }: HamburgerBu
             },
           ]}
         >
-          <Menu size={22} color={colors.text} />
+          <Menu size={22} color={iconColor} />
         </View>
         <View
           style={[
@@ -68,7 +86,7 @@ export function HamburgerButton({ onPress, isOpen = false, testID }: HamburgerBu
             },
           ]}
         >
-          <X size={22} color={colors.text} />
+          <X size={22} color={iconColor} />
         </View>
       </View>
     </Pressable>
@@ -77,6 +95,11 @@ export function HamburgerButton({ onPress, isOpen = false, testID }: HamburgerBu
 
 const styles = StyleSheet.create({
   button: {
+    // 44×44 — the touch-target floor. RN-web does NOT expand the DOM
+    // hit area for hitSlop (measured: elementFromPoint 2px outside a
+    // 36px box misses), so the box itself must clear 44.
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
   },

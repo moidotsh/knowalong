@@ -10,8 +10,9 @@ import { MobileAtmosphere, MobileSurface, MobileHeader, MobileSectionEyebrow } f
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToStudy } from '../navigation';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
+import { LineMap, type LineMapStation } from '../components/knowalong';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import {
   LEARNING_PATH,
   LEARNER_STATS,
@@ -33,8 +34,36 @@ function masteryLabel(state: MasteryState): string {
 
 const DAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+/**
+ * The learner's route as a transit line — one station per tier. A tier
+ * all-mastered is served (known), a tier in progress is the lit current
+ * stop (seen), an untouched tier is beyond the terminus (locked).
+ */
+function buildTierLine(): LineMapStation[] {
+  const states = LEARNING_PATH.map((tier) => {
+    const mastered = tier.concepts.filter((c) => c.state === 'mastered').length;
+    const started = tier.concepts.filter((c) => c.state === 'in-progress').length;
+    return { mastered, started, total: tier.concepts.length };
+  });
+  const currentIdx = states.findIndex((s) => s.mastered < s.total || s.started > 0);
+  return LEARNING_PATH.map((tier, i) => {
+    const s = states[i];
+    const isCurrent = i === currentIdx;
+    const state: LineMapStation['state'] =
+      s.mastered === s.total ? 'known' : isCurrent ? 'seen' : 'locked';
+    return {
+      id: `tier-${tier.tier}`,
+      title: `Tier ${tier.tier} · ${tier.label}`,
+      meta: `${s.mastered}/${s.total} concepts`,
+      state,
+      current: isCurrent,
+    };
+  });
+}
+
 export default function ProgressScreen() {
   const { colors } = useAppTheme();
+  const tierLine = buildTierLine();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundDeep }} edges={['top', 'bottom']}>
@@ -42,7 +71,7 @@ export default function ProgressScreen() {
       <MobileHeader title="Your progress" eyebrow="Learn Russian" onBack={safeGoBack} />
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}>
 
-        {/* Stats row */}
+        {/* Stats row — the figures ride the display face, tabular. */}
         <View style={{ flexDirection: 'row', gap: 10 }}>
           {[
             { value: `${LEARNER_STATS.conceptsMastered}/${LEARNER_STATS.conceptsTotal}`, label: 'Concepts', color: colors.status.success },
@@ -52,11 +81,19 @@ export default function ProgressScreen() {
           ].map((stat, i) => (
             <MobileSurface key={i} padding={12}>
               <View style={{ flex: 1, minWidth: 60 }}>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: stat.color }}>{stat.value}</Text>
-                <Text style={{ fontSize: 10, color: colors.textMuted, marginTop: 2 }}>{stat.label}</Text>
+                <Text style={[styles.statFigure, { color: stat.color }]}>{stat.value}</Text>
+                <Text style={[styles.statLabel, { color: colors.textMuted }]}>{stat.label}</Text>
               </View>
             </MobileSurface>
           ))}
+        </View>
+
+        {/* Your line — the route so far, as the network reads it. */}
+        <View style={{ marginTop: 20 }}>
+          <MobileSectionEyebrow>Your line</MobileSectionEyebrow>
+          <MobileSurface padding={16}>
+            <LineMap stations={tierLine} testID="progress-line" />
+          </MobileSurface>
         </View>
 
         {/* Streak calendar */}
@@ -93,7 +130,7 @@ export default function ProgressScreen() {
           <MobileSectionEyebrow>Skill tree</MobileSectionEyebrow>
           {LEARNING_PATH.map((tier) => (
             <View key={tier.tier} style={{ marginBottom: 16 }}>
-              <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>
+              <Text style={[styles.tierLabel, { color: colors.textSecondary }]}>
                 Tier {tier.tier} · {tier.label}
               </Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -132,7 +169,7 @@ export default function ProgressScreen() {
         <View style={{ marginTop: 8 }}>
           <MobileSectionEyebrow>Accuracy</MobileSectionEyebrow>
           <MobileSurface padding={16}>
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.brand, textAlign: 'center' }}>
+            <Text style={[styles.accuracyFigure, { color: colors.brand }]}>
               {LEARNER_STATS.accuracyPct}%
             </Text>
             <View style={{ height: 8, borderRadius: 4, backgroundColor: 'rgba(128,128,128,0.15)', marginTop: 12 }}>
@@ -148,3 +185,30 @@ export default function ProgressScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  // Stat figures ride the named figure token (display face, tabular) —
+  // the ledger voice for numbers.
+  statFigure: {
+    ...theme.typography.mobileFigure,
+    fontSize: 18,
+    lineHeight: 22,
+    letterSpacing: -0.2,
+  },
+  statLabel: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  tierLabel: {
+    ...theme.typography.mobileEyebrow,
+    marginBottom: 8,
+  },
+  // The hero accuracy figure — the display face at poster size.
+  accuracyFigure: {
+    ...theme.typography.mobileFigure,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1,
+    textAlign: 'center',
+  },
+});

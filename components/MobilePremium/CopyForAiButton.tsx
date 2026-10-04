@@ -35,8 +35,11 @@ import { useCopyForAi } from '../../hooks';
 export interface CopyForAiButtonProps {
   /** Pre-built payload string from `buildAiPayload`. Required. */
   payload: string;
-  /** Visible label. Defaults to "Copy for AI". */
+  /** Visible label (and aria-label). Defaults to "Copy for AI". */
   label?: string;
+  /** Icon-only rendering for crowded toolbars — the label survives as the
+   *  accessibility label. Defaults to false. */
+  compact?: boolean;
   /** Disabled state (independent of the in-flight copy). */
   disabled?: boolean;
   /** Visual variant — see file header. Defaults to 'ghost'. */
@@ -50,6 +53,7 @@ const JUST_COPIED_FEEDBACK_MS = 1500;
 export function CopyForAiButton({
   payload,
   label = 'Copy for AI',
+  compact = false,
   disabled = false,
   variant = 'ghost',
   testID,
@@ -88,6 +92,7 @@ export function CopyForAiButton({
       accessibilityState={{ disabled: isDisabled }}
       style={({ pressed }) => [
         styles.button,
+        compact && styles.buttonCompact,
         {
           backgroundColor: isSubtle ? colors.brandMuted : 'transparent',
           borderColor: isSubtle ? colors.brandSoft : 'transparent',
@@ -110,15 +115,18 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 6,
     paddingHorizontal: 12,
-    borderRadius: 999,
+    borderRadius: theme.shapes.tag,
     borderWidth: 1,
-    minHeight: 32,
+    // 44 — the touch-target floor. RN-web does not expand the DOM hit
+    // area for hitSlop (measured), so the box itself clears 44.
+    minHeight: 44,
+  },
+  buttonCompact: {
+    paddingHorizontal: 9,
+    justifyContent: 'center',
   },
   label: {
-    fontSize: theme.typography.mobileEyebrow.fontSize,
-    fontWeight: theme.typography.mobileEyebrow.fontWeight as any,
-    lineHeight: theme.typography.mobileEyebrow.lineHeight,
-    letterSpacing: theme.typography.mobileEyebrow.letterSpacing,
+    ...theme.typography.mobileEyebrow,
     textTransform: 'uppercase',
   },
 });

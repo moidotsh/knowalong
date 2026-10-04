@@ -45,8 +45,6 @@ export type {
 } from './useScaleAnimation';
 export { useContainerQuery, useContainerMeasure } from './useContainerQuery';
 export type { ContainerMeasurement } from './useContainerQuery';
-export { useResponsive } from './useResponsive';
-export type { UseResponsiveReturn } from './useResponsive';
 export { useShake } from './useShakeAnimation';
 export type { ShakeAnimationOptions, UseShakeReturn } from './useShakeAnimation';
 export { useTranslateY, useTranslateX } from './useTranslateAnimation';

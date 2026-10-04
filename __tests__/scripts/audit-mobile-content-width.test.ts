@@ -38,8 +38,18 @@ import {
 } from '../../constants';
 
 describe('Policy mode — single source of truth', () => {
-  it('ships constrained as the default', () => {
-    expect(CONTENT_WIDTH_MODE).toBe('constrained');
+  // FLIPPED to 'fluid' for the consumer journey experience: phone bottom
+  // nav → desktop nav rail, reading column + contextual panel. The fixed
+  // 420pt cap is retired; SB1/SB2 skip width findings in this mode. The
+  // constrained shape below stays pinned so a future flip back is a
+  // conscious act, not drift.
+  it('ships fluid as the active mode', () => {
+    expect(CONTENT_WIDTH_MODE).toBe('fluid');
+  });
+
+  it('collapses the policy styles to empty in fluid mode', () => {
+    expect(MOBILE_CONTENT_WIDTH_STYLE).toEqual({});
+    expect(MOBILE_DIALOG_WIDTH_STYLE).toEqual({});
   });
 
   it("runtime styles and audits read the same CONTENT_WIDTH_MODE source", () => {
@@ -53,42 +63,20 @@ describe('Policy mode — single source of truth', () => {
 });
 
 describe('Runtime policy styles — constrained shape', () => {
-  // These tests pin the constrained-mode shape because the test suite
-  // runs against the as-checked-in tree (mode = 'constrained'). If a
-  // consumer flips the mode to 'fluid' in the source, these tests
-  // break loudly — which is the intended behavior: the test forces
-  // an acknowledgement that the policy shape has changed.
+  // The constrained variants are what a flip back to
+  // CONTENT_WIDTH_MODE='constrained' would produce. They are asserted
+  // through the constants' own constrained-branch literals so this file
+  // pins the contract without depending on the active mode.
 
-  it('MOBILE_CONTENT_WIDTH_STYLE applies the canonical content-column treatment', () => {
-    expect(MOBILE_CONTENT_WIDTH_STYLE).toEqual({
-      width: '100%',
-      maxWidth: MOBILE_CONTENT_MAX_WIDTH,
-      alignSelf: 'center',
-    });
-  });
-
-  it('MOBILE_DIALOG_WIDTH_STYLE applies the canonical dialog-column treatment', () => {
-    expect(MOBILE_DIALOG_WIDTH_STYLE).toEqual({
-      width: '100%',
-      maxWidth: MOBILE_DIALOG_MAX_WIDTH,
-      alignSelf: 'center',
-    });
-  });
-
-  it('SCREEN_BODY_STYLE consumes MOBILE_CONTENT_WIDTH_STYLE plus flex', () => {
-    // Screen-body keeps `flex: 1` and `width: '100%'` as universal
-    // properties; the column cap is policy-derived.
-    expect(SCREEN_BODY_STYLE).toMatchObject({
-      flex: 1,
-      width: '100%',
-      maxWidth: MOBILE_CONTENT_MAX_WIDTH,
-      alignSelf: 'center',
-    });
-  });
-
-  it('canonical caps are 420 (content) and 380 (dialog)', () => {
+  it('keeps the canonical constrained content-column treatment on record', () => {
     expect(MOBILE_CONTENT_MAX_WIDTH).toBe(420);
     expect(MOBILE_DIALOG_MAX_WIDTH).toBe(380);
+  });
+
+  it('SCREEN_BODY_STYLE keeps the universal flex body in fluid mode', () => {
+    // The fluid spread collapses to {}, so the body carries only the
+    // universal `flex: 1`; width behavior belongs to each screen.
+    expect(SCREEN_BODY_STYLE).toEqual({ flex: 1 });
   });
 });
 

@@ -7,12 +7,11 @@
 //   Enter       → <FadeIn>           (mount-time fade + slide up)
 //   Transition  → <Crossfade>        (step-to-step crossfade + drift)
 //   Respond     → RESPOND_PRESSED + useFocusRing + usePressedStyle
-//   Shake       → <Shake>            (error feedback)
+//   Shake       → useShake           (hooks/useShakeAnimation — error feedback)
 //
 // All primitives honor `prefers-reduced-motion`:
 //   • FadeIn collapses to a fade-only (no slide).
 //   • Crossfade collapses to a fade-only (no drift).
-//   • Shake collapses to a no-op (the surrounding error UI conveys it).
 //   • Respond's press/focus scales collapse to opacity-only.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
@@ -25,7 +24,6 @@ import {
   type ViewStyle,
 } from 'react-native';
 import {
-  useControlledShake,
   useFadeSlide,
   usePlatformAnimation,
   useReducedMotion,
@@ -46,6 +44,12 @@ export interface FadeInProps {
   y?: number;
   /** Override reduced-motion (force the slide even when the user has reduced motion on). Rare. */
   ignoreReducedMotion?: boolean;
+  /**
+   * Vertical gap between children (px). FadeIn renders one wrapper view;
+   * screen scaffolds gap only their DIRECT children, so a FadeIn hosting
+   * several sections must carry the rhythm itself or they stack flush.
+   */
+  gap?: number;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -64,6 +68,7 @@ export function FadeIn({
   duration = 480,
   y = 8,
   ignoreReducedMotion = false,
+  gap,
   style,
 }: FadeInProps) {
   const reduced = useReducedMotion();
@@ -76,29 +81,11 @@ export function FadeIn({
     animateOnMount: true,
   });
 
-  return <Animated.View style={[animStyle, style]}>{children}</Animated.View>;
-}
-
-// ─────────────────────────────────────────────────────────────────────
-// SHAKE — error feedback
-// ─────────────────────────────────────────────────────────────────────
-
-export interface ShakeProps {
-  children: React.ReactNode;
-  /** Fire a shake on this round. */
-  shake: boolean;
-  /** Called when the shake completes (use to clear the trigger). */
-  onComplete?: () => void;
-  style?: StyleProp<ViewStyle>;
-}
-
-/**
- * Controlled shake for error feedback. Wraps the useControlledShake hook so
- * screens import motion from one place.
- */
-export function Shake({ children, shake, onComplete, style }: ShakeProps) {
-  const { style: animStyle } = useControlledShake({ trigger: shake, onComplete });
-  return <Animated.View style={[animStyle, style]}>{children}</Animated.View>;
+  return (
+    <Animated.View style={[animStyle, gap != null ? { gap } : null, style]}>
+      {children}
+    </Animated.View>
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -237,8 +224,13 @@ export function Crossfade({
           propagation for initial visibility, which left carousel/wizard
           slides rendering empty on some web builds. The outgoing layer's
           fade-out + drift still carries the crossfade feel; the incoming
-          child simply appears underneath as the old one fades away. */}
-      <View key={`in-${current.key}`}>{current.element}</View>
+          child simply appears underneath as the old one fades away.
+          While the key is unchanged the LIVE children render — a re-render
+          that changes only content (a theme flip) must re-ink the slide
+          rather than replay the mount-time snapshot. */}
+      <View key={`in-${current.key}`}>
+        {index === current.key ? children : current.element}
+      </View>
     </View>
   );
 }
@@ -278,6 +270,11 @@ export interface UseFocusRingOptions {
   focused: boolean;
   /** Animation duration (ms). Default 220ms. */
   duration?: number;
+  /**
+   * The ring's corner radius — pass the host's own shape so the ring
+   * never invents a corner the trigger doesn't have. Default 0.
+   */
+  radius?: number;
 }
 
 /**
@@ -288,7 +285,7 @@ export interface UseFocusRingOptions {
  *
  * Under `prefers-reduced-motion`, the ring snaps instead of animating.
  */
-export function useFocusRing({ color, focused, duration = 220 }: UseFocusRingOptions) {
+export function useFocusRing({ color, focused, duration = 220, radius = 0 }: UseFocusRingOptions) {
   const { useNativeDriver } = usePlatformAnimation();
   const reduced = useReducedMotion();
   const opacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
@@ -310,13 +307,13 @@ export function useFocusRing({ color, focused, duration = 220 }: UseFocusRingOpt
       left: -1,
       right: -1,
       bottom: -1,
-      borderRadius: 14,
+      borderRadius: radius,
       borderWidth: 1.5,
       borderColor: color,
       opacity,
       pointerEvents: 'none',
     }),
-    [color, opacity],
+    [color, radius, opacity],
   );
 
   const glowStyle: StyleProp<ViewStyle> = useMemo(() => {

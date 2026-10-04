@@ -14,26 +14,33 @@
 // gradient-only BY DESIGN, so the beginner profile asserts the pack
 // ladder is staged-but-not-yet-served.
 
-import { afterEach, beforeEach, describe, expect, it, beforeAll } from 'vitest';
-import { mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, beforeAll, vi } from 'vitest';
 
 // The persisted stores reach their zustand persistence adapter
-// (stores/storage.ts) on first state access, and Bun cannot parse the
-// react-native entry that adapter's native branch loads. Replace the
-// adapter with an in-memory implementation BEFORE the stores load so the
-// smoke stays hermetic; the localStorage branch the PWA actually ships is
-// production behavior and is not what this smoke exercises.
-const memoryStorage = new Map<string, string>();
-const memoryZustandStorage = {
-  getItem: async (key: string): Promise<string | null> => memoryStorage.get(key) ?? null,
-  setItem: async (key: string, value: string): Promise<void> => {
-    memoryStorage.set(key, value);
-  },
-  removeItem: async (key: string): Promise<void> => {
-    memoryStorage.delete(key);
-  },
-};
-mock.module('../../stores/storage', () => ({
+// (stores/storage.ts) on first state access, and bundling the react-native
+// entry that adapter's native branch loads breaks the jsdom transform.
+// Replace the adapter with an in-memory implementation BEFORE the stores
+// load so the smoke stays hermetic; the localStorage branch the PWA actually
+// ships is production behavior and is not what this smoke exercises.
+// vi.hoisted keeps the fixture visible to the hoisted vi.mock factory.
+const { memoryZustandStorage } = vi.hoisted(() => {
+  const memoryStorage = new Map<string, string>();
+  return {
+    memoryZustandStorage: {
+      getItem: async (key: string): Promise<string | null> => memoryStorage.get(key) ?? null,
+      setItem: async (key: string, value: string): Promise<void> => {
+        memoryStorage.set(key, value);
+      },
+      removeItem: async (key: string): Promise<void> => {
+        memoryStorage.delete(key);
+      },
+    },
+  };
+});
+// t2-exempt: smoke-specific swap of the zustand persistence adapter for an
+// in-memory store (hermetic mastery round-trips). Centralizing in setup.ts
+// would change storage semantics for every suite using the localStorage branch.
+vi.mock('../../stores/storage', () => ({
   zustandStorage: memoryZustandStorage,
   default: memoryZustandStorage,
 }));

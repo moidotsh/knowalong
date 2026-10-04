@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { GRAMMAR_PATTERNS, type GrammarPattern } from '../utils/knowalong/fixtures/grammarPatterns';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 
@@ -29,19 +29,23 @@ export default function GrammarScreen() {
       <MobileAtmosphere surface="analytics" />
       <MobileHeader title="Grammar reference" eyebrow="Russian" onBack={safeGoBack} />
 
-      {/* Category filter */}
+      {/* Category filter — mono tab chips */}
       <View style={{ flexDirection: 'row', paddingHorizontal: 20, paddingTop: 8, gap: 6, flexWrap: 'wrap' }}>
         {CATEGORIES.map((cat) => (
           <Pressable
             key={cat}
             onPress={() => setCategory(cat)}
-            style={{
+            accessibilityRole="button"
+            accessibilityLabel={`Filter by ${cat}`}
+            accessibilityState={{ selected: category === cat }}
+            style={({ pressed }) => ({
               paddingVertical: 6, paddingHorizontal: 12, borderRadius: 8, borderWidth: 1.5,
               borderColor: category === cat ? colors.brand : colors.cardBorder,
               backgroundColor: category === cat ? colors.brand + '12' : 'transparent',
-            }}
+              opacity: pressed ? 0.7 : 1,
+            })}
           >
-            <Text style={{ fontSize: 12, fontWeight: '600', color: category === cat ? colors.brand : colors.textSecondary }}>{cat}</Text>
+            <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 11, lineHeight: 14, color: category === cat ? colors.brand : colors.textSecondary }}>{cat}</Text>
           </Pressable>
         ))}
       </View>
@@ -50,20 +54,27 @@ export default function GrammarScreen() {
         {filtered.map((pattern) => {
           const isOpen = expanded === pattern.id;
           return (
-            <Pressable key={pattern.id} onPress={() => setExpanded(isOpen ? null : pattern.id)}>
+            <Pressable
+              key={pattern.id}
+              onPress={() => setExpanded(isOpen ? null : pattern.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`${pattern.title}${isOpen ? ', expanded' : ', collapsed'}`}
+              style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+            >
               <MobileSurface padding={16}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <ConceptIcon name={pattern.icon} size={28} color={colors.brand} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '700', color: colors.text }}>{pattern.title}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>{pattern.summary}</Text>
+                    <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 15, color: colors.text }}>{pattern.title}</Text>
+                    <Text style={{ ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, color: colors.textSecondary, marginTop: 2 }}>{pattern.summary}</Text>
                   </View>
-                  <Text style={{ fontSize: 18, color: colors.textMuted }}>{isOpen ? '−' : '+'}</Text>
+                  <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, color: colors.textMuted }}>{isOpen ? '−' : '+'}</Text>
                 </View>
 
                 {isOpen ? (
                   <View style={{ marginTop: 16 }}>
-                    {/* Paradigm table */}
+                    {/* Paradigm table — the ledger: mono case names, forms in
+                        the body face, ruled rows */}
                     {pattern.paradigm ? (
                       <View style={{ borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 10, overflow: 'hidden', marginBottom: 12 }}>
                         {pattern.paradigm.map((cell, i) => (
@@ -73,22 +84,22 @@ export default function GrammarScreen() {
                             borderBottomWidth: i < pattern.paradigm!.length - 1 ? 1 : 0,
                             borderBottomColor: colors.cardBorder,
                           }}>
-                            <Text style={{ flex: 1, fontSize: 12, color: colors.textMuted }}>{cell.case}</Text>
-                            <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, minWidth: 60, textAlign: 'center' }}>{cell.singular}</Text>
+                            <Text style={{ flex: 1, ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, color: colors.textMuted }}>{cell.case}</Text>
+                            <Text style={{ ...theme.typography.mobileItemTitle, minWidth: 60, textAlign: 'center', color: colors.text }}>{cell.singular}</Text>
                             {cell.plural ? (
-                              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary, minWidth: 60, textAlign: 'center' }}>{cell.plural}</Text>
+                              <Text style={{ ...theme.typography.mobileItemTitle, minWidth: 60, textAlign: 'center', color: colors.textSecondary }}>{cell.plural}</Text>
                             ) : <View style={{ minWidth: 60 }} />}
                           </View>
                         ))}
                       </View>
                     ) : null}
 
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }}>
+                    <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary }}>
                       {pattern.explanation}
                     </Text>
                     <View style={{ marginTop: 10, padding: 12, borderRadius: 10, backgroundColor: colors.brand + '10' }}>
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{pattern.example}</Text>
-                      <Text style={{ fontSize: 12, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>{pattern.exampleTranslation}</Text>
+                      <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, lineHeight: 24, color: colors.text }}>{pattern.example}</Text>
+                      <Text style={{ ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, color: colors.textSecondary, marginTop: 4 }}>{pattern.exampleTranslation}</Text>
                     </View>
                   </View>
                 ) : null}

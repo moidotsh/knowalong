@@ -22,6 +22,7 @@
 
 import React, { useMemo } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { clampNumber } from '../../utils/number';
 import { useAppTheme } from '../../context';
 
 export interface ProgressSegment {
@@ -54,10 +55,6 @@ export interface SegmentedProgressProps {
   style?: StyleProp<ViewStyle>;
 }
 
-function clamp(v: number, lo: number, hi: number): number {
-  if (hi <= lo) return lo;
-  return Math.max(lo, Math.min(hi, v));
-}
 
 export function SegmentedProgress({
   segments,
@@ -78,7 +75,7 @@ export function SegmentedProgress({
     let total = 0;
     const rendered = segments.map((seg) => {
       const max = seg.max > 0 ? seg.max : 0;
-      const value = clamp(seg.value, 0, max);
+      const value = clampNumber(seg.value, 0, max);
       filled += value;
       total += max;
       const ratio = max > 0 ? value / max : 0;

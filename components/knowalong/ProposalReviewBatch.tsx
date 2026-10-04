@@ -8,6 +8,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MobileSurface, MobilePrimaryButton, MobileSectionEyebrow } from '../MobilePremium';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
 import { useAnalysisProposals, useReviewProposalBatch } from '../../hooks';
 import type { AnalysisProposal, ProposalBatchOutcome } from '../../shared/types/knowalong';
@@ -69,13 +70,16 @@ export function ProposalReviewBatch({ runId }: Props) {
               return (
                 <Pressable
                   key={p.id}
-                  accessibilityRole="button"
+                  accessibilityRole="checkbox"
+                  accessibilityLabel={`Proposal ${p.proposalKind} #${p.ordinal}`}
+                  accessibilityState={{ selected: isSelected }}
                   onPress={() => toggle(p.id)}
-                  style={[
+                  style={({ pressed }) => [
                     styles.row,
                     {
                       borderColor: isSelected ? colors.brand : colors.cardAlt,
                       backgroundColor: isSelected ? colors.brandSoft : 'transparent',
+                      opacity: pressed ? 0.7 : 1,
                     },
                   ]}
                 >
@@ -135,7 +139,9 @@ export function ProposalReviewBatch({ runId }: Props) {
 
 const styles = StyleSheet.create({
   empty: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
   },
   list: {
     gap: 6,
@@ -161,18 +167,21 @@ const styles = StyleSheet.create({
   checkGlyph: {
     fontSize: 12,
     fontWeight: '700',
+    fontFamily: theme.fonts.mono,
   },
   rowBody: {
     flex: 1,
   },
   rowKind: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   rowOutcome: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
     marginTop: 2,
   },
   actionRow: {

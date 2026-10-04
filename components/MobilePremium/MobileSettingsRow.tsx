@@ -27,7 +27,7 @@
 // `icon ?? leftIcon`.
 
 import React from 'react';
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native';
 import { ChevronRight } from '@tamagui/lucide-icons-2';
 import { usePressedStyle } from '../premium/shared';
 import { theme, MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
@@ -74,7 +74,10 @@ const ROW_DESCRIPTION_STYLE = {
   fontSize: 13,
   fontWeight: '400',
   lineHeight: 17,
-} as const;
+  // Row values often carry figures (counts, versions) — tabular by
+  // construction so columns never jitter.
+  fontVariant: ['tabular-nums' as const],
+} satisfies TextStyle;
 
 /**
  * Canonical settings row. Renders an optional 36×36 iconBox + title +

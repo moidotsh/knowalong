@@ -18,8 +18,9 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { AlertCircle, CheckCircle2, Info, AlertTriangle } from '@tamagui/lucide-icons-2';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
-import { MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
+import { hapticNotificationSuccess } from '../../utils/haptics';
 
 export type MobileAlertType = 'error' | 'warning' | 'success' | 'info';
 export type MobileAlertVariant = 'success' | 'warning' | 'error' | 'info';
@@ -42,17 +43,17 @@ export interface MobileAlertProps {
 }
 
 const ALERT_TITLE_STYLE = {
-  fontSize: 14,
-  fontWeight: '600',
-  lineHeight: 18,
-  letterSpacing: 0,
+  fontSize: theme.typography.mobileSubtitle.fontSize,
+  fontWeight: theme.typography.mobileSubtitle.fontWeight as any,
+  lineHeight: theme.typography.mobileSubtitle.lineHeight,
+  letterSpacing: theme.typography.mobileSubtitle.letterSpacing,
 } as const;
 
 const ALERT_MESSAGE_STYLE = {
-  fontSize: 13,
-  fontWeight: '400',
-  lineHeight: 18,
-  letterSpacing: 0,
+  fontSize: theme.typography.mobileMeta.fontSize,
+  fontWeight: theme.typography.mobileMeta.fontWeight as any,
+  lineHeight: theme.typography.mobileMeta.lineHeight,
+  letterSpacing: theme.typography.mobileMeta.letterSpacing,
 } as const;
 
 /**
@@ -75,6 +76,13 @@ export function MobileAlert({
   const resolvedType = type ?? variant ?? 'info';
   const resolvedMessage = message ?? body;
 
+  // Success alerts ARE the celebration path — the confirmation haptic
+  // lives here (once per mount) so every consumer's success signal feels
+  // the same instead of each call site remembering to fire one.
+  React.useEffect(() => {
+    if (resolvedType === 'success') hapticNotificationSuccess();
+  }, [resolvedType]);
+
   const accentMap: Record<MobileAlertType, { accent: string; Icon: typeof Info }> = {
     error: { accent: colors.status.error, Icon: AlertCircle },
     warning: { accent: colors.status.warning, Icon: AlertTriangle },
@@ -96,7 +104,7 @@ export function MobileAlert({
         style,
       ]}
     >
-      <View style={[styles.iconCircle, { backgroundColor: `${accent}26` }]}>
+      <View style={[styles.iconPlate, { backgroundColor: `${accent}26` }]}>
         <Icon size={14} color={accent} strokeWidth={2.5} />
       </View>
       <View style={styles.text}>
@@ -120,16 +128,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    borderRadius: 12,
+    // A notice is a ruled plate, not a rounded chip — the alert rides
+    // the same shape language as every other control.
+    borderRadius: theme.shapes.control,
     borderWidth: 1,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    ...MOBILE_CONTENT_WIDTH_STYLE,
+    // Inline block: fills its container, like MobileSurface — the column
+    // is owned by the layer above (SB1 screen body / portal panel).
+    width: '100%',
   },
-  iconCircle: {
+  iconPlate: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: theme.shapes.control,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 1,

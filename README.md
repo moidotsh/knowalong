@@ -7,6 +7,7 @@
 - A **private study library.** You paste media text you already have the right to use; KnowAlong organizes it into sections, lines, vocabulary, and practice cards. Your library is private — there is no lyric catalogue, scraping, discovery, or sharing.
 - A **lyrics-first vertical** of a broader media-language-learning vision. The architecture is designed so future source types (articles, subtitles, ebooks, conversation transcripts) can land without restructuring the schema, but only **lyric paste import** ships in this checkpoint.
 - **Source-faithful by design.** Source text is preserved exactly as you provided it. Normalized text, translations, transliterations, grammar analysis, and generated practice live in separate fields/records and are always visibly labelled. Generated material is never presented as lyrics or quoted source text.
+- **The Night Metro design language.** Dark-first (the default scheme is the night service; light is the daytime timetable) with a metro/transit register: filament-amber brand, the Unbounded / Golos Text / PT Mono type trio self-hosted with Cyrillic, and mastery rendered as transit states — Rollsign destination blinds, LineMap station spines, StationRow dots (showcase at `/dev/knowalong`).
 - **Built on a 47-pattern architecture constitution** with a 12-audit pre-commit gate, repository pattern, Zustand + React Query, and the MobilePremium design system inherited from a clean PWA-first starter shell.
 
 ## What KnowAlong isn't
@@ -198,7 +199,7 @@ The grammar and morphology columns on `lexical_lemmas` / `lexical_forms` (gender
 
 ## Limitations
 
-- **Palette not yet overridden.** The palette in `constants/theme.ts` is inherited unchanged from the starter shell and is not overridden in this checkpoint. Final logo and brand color are undecided.
+- **Brand icon artwork is a placeholder.** The design language (Night Metro — dark-first, filament amber, Unbounded/Golos Text/PT Mono) is live in `constants/theme.ts` and every screen, but the app icons (`public/icons/`, `assets/`) are generated night-ground + filament placeholders, not final brand artwork. Re-run `bun run scripts/generate-placeholder-icons.ts` after replacing them.
 - **Provisional scheduling.** Review intervals are a simple heuristic, not FSRS. Scheduling will change.
 - **Cloud analysis is unconfigured.** Every attempt to call the cloud-analysis contract returns `{ status: 'unconfigured' }` until cloud analysis is wired. The local companion is the supported path for in-session analysis.
 - **Deployed HTTPS to loopback companion is browser-dependent.** Mixed-content blocking and Private Network Access may intervene. The tested path is the local development origin. See `_reports/local-analysis-clcc.md` for the compatibility matrix and the specific error taxonomy.

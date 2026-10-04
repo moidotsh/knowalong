@@ -13,9 +13,9 @@
  *        `useAppTheme()`. Suppress with `// s7-exempt`.
  *
  *   C3 — no `Dimensions.get('window'/'screen')` calls (the old
- *        non-reactive API). Use the `useResponsive()` hook or the
- *        `useWindowDimensions()` reactive hook instead. Suppress
- *        with `// c3-exempt`.
+ *        non-reactive API). Use `useWindowDimensions()` (window-level)
+ *        or the container-query system (`useContainerQuery` /
+ *        `useContainerVariant`) instead. Suppress with `// c3-exempt`.
  *
  * No --fix mode: these violations aren't safely auto-fixable.
  *
@@ -192,9 +192,10 @@ function auditS7(files: string[]): Violation[] {
 // ── C3: Dimensions.get('window'/'screen') ───────────────────────────
 //
 // The old non-reactive `Dimensions.get(...)` API must not be used in
-// consumer code. Use `useResponsive()` (breakpoint logic) or
-// `useWindowDimensions()` (reactive hook) instead. `useWindowDimensions()`
-// is the official RN reactive hook and is NOT a violation.
+// consumer code. Use `useWindowDimensions()` (reactive hook, window
+// level) or the container-query system (`useContainerQuery` /
+// `useContainerVariant`) instead. `useWindowDimensions()` is the
+// official RN reactive hook and is NOT a violation.
 
 const C3_DIMENSIONS_REGEX =
   /Dimensions\.get\(\s*['"](window|screen)['"]\s*\)/g;
@@ -202,9 +203,8 @@ const C3_DIMENSIONS_REGEX =
 const C3_EXEMPT_REGEX = /\bc3-exempt\b/;
 
 const C3_EXEMPT_FILES = new Set<string>([
-  // These ARE the responsive system — they legitimately use Dimensions.
-  'hooks/useResponsive.ts',
-  'context/ResponsiveContext.tsx',
+  // Consumers that rebuild a window-level responsive system on
+  // Dimensions add their responsive-system files here.
 ]);
 
 function auditC3(files: string[]): Violation[] {
@@ -229,7 +229,7 @@ function auditC3(files: string[]): Violation[] {
         file: rel,
         line: lineOf(content, match.index),
         message:
-          "Dimensions.get('window'/'screen') is non-reactive — use useResponsive() or useWindowDimensions() (or add // c3-exempt with justification)",
+          "Dimensions.get('window'/'screen') is non-reactive — use useWindowDimensions() or the container-query system (or add // c3-exempt with justification)",
       });
     }
   }

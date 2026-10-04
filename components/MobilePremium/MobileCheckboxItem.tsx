@@ -14,12 +14,12 @@
 // pair fits their calling convention; the component resolves
 // `title ?? label` and `subtitle ?? helperText`.
 
-import React, { useEffect, useRef } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Check } from '@tamagui/lucide-icons-2';
+import React from 'react';
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { usePressedStyle } from '../premium/shared';
 import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
+import { CheckBox } from './CheckBox';
 
 export interface MobileCheckboxItemProps {
   /** Checkbox title. `title` is the primary prop name. */
@@ -42,12 +42,7 @@ export interface MobileCheckboxItemProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const TITLE_STYLE = {
-  fontSize: theme.typography.mobileFieldLabel.fontSize,
-  fontWeight: theme.typography.mobileFieldLabel.fontWeight as any,
-  lineHeight: theme.typography.mobileFieldLabel.lineHeight,
-  letterSpacing: theme.typography.mobileFieldLabel.letterSpacing,
-} as const;
+const TITLE_STYLE = theme.typography.mobileFieldLabel;
 
 const SUBTITLE_STYLE = {
   fontSize: 12,
@@ -80,31 +75,6 @@ export function MobileCheckboxItem({
   const resolvedTitle = title ?? label ?? '';
   const resolvedSubtitle = subtitle ?? helperText;
 
-  // Animated check — scale + fade in on toggle. Snaps under reduced motion
-  // (handled by Animated timing; consumer can set duration to 0 if needed).
-  const scale = useRef(new Animated.Value(checked ? 1 : 0)).current;
-  const opacity = useRef(new Animated.Value(checked ? 1 : 0)).current;
-
-  useEffect(() => {
-    const target = checked ? 1 : 0;
-    const scaleAnim = Animated.timing(scale, {
-      toValue: target,
-      duration: 180,
-      useNativeDriver: true,
-    });
-    const opacityAnim = Animated.timing(opacity, {
-      toValue: target,
-      duration: 180,
-      useNativeDriver: true,
-    });
-    scaleAnim.start();
-    opacityAnim.start();
-    return () => {
-      scaleAnim.stop();
-      opacityAnim.stop();
-    };
-  }, [checked, scale, opacity]);
-
   return (
     <Pressable
       testID={testID}
@@ -122,30 +92,13 @@ export function MobileCheckboxItem({
       ]}
     >
       {/* Checkbox indicator */}
-      <View
-        style={[
-          styles.checkbox,
-          {
-            backgroundColor: checked ? accent : 'transparent',
-            borderColor: checked ? accent : colors.border,
-          },
-        ]}
-      >
-        <Animated.View
-          style={{
-            opacity,
-            transform: [{ scale }],
-          }}
-        >
-          <Check size={14} color={colors.textOnBrand} strokeWidth={3} />
-        </Animated.View>
-      </View>
+      <CheckBox checked={checked} accentColor={accentColor} />
 
       {/* Text */}
       <View style={styles.text}>
         <Text style={[TITLE_STYLE, { color: colors.text }]}>{resolvedTitle}</Text>
         {resolvedSubtitle ? (
-          <Text style={[SUBTITLE_STYLE, { color: colors.textColors.tertiary }]}>
+          <Text style={[SUBTITLE_STYLE, { color: colors.textMuted }]}>
             {resolvedSubtitle}
           </Text>
         ) : null}
@@ -159,21 +112,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 12,
+    borderRadius: theme.shapes.tile,
     borderWidth: 1,
     paddingHorizontal: 14,
     // 44px min tap target. With the 12px vertical padding, the total
     // height is ~44px when there's no subtitle, ~60px with subtitle.
     paddingVertical: 12,
     minHeight: 44,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   text: {
     flex: 1,

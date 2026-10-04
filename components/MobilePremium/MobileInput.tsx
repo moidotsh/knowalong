@@ -4,10 +4,13 @@
 // Preserves the 490px test fit by keeping the same input height. The
 // premium signal comes from:
 //
-//   • Considered label rhythm — uses typography.mobileFieldLabel (13/600),
+//   • Considered label rhythm — uses typography.mobileFieldLabel,
 //     with the label sitting tighter to the input (gap 6 vs 8 in legacy).
-//   • Animated focus ring — useFocusRing draws a 1.5px ring at -1px inset
-//     that fades in/out, plus a web-only box-shadow glow.
+//   • Focus is an ink moment — the ring rides the host's shape (no
+//     corner the field doesn't have), snaps (no fade), wears no halo,
+//     and reads the mode's ink, never the brand slot: on any consumer
+//     whose brand reads as an alarm hue, a brand focus ring is
+//     indistinguishable from the error state.
 //   • Refined error state — the error text moves to a dedicated slot
 //     beneath the input (not in the helper-text slot), so the label row
 //     never reflows on error.
@@ -18,7 +21,7 @@
 // API are preserved — `errorText` maps to the new `error` slot, `helperText`
 // renders below the input when no error is present.
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Animated,
   Pressable,
@@ -30,8 +33,8 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
-import { useFocusRing } from '../premium/shared';
-import { theme, MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
+import { useFocusRing, useFieldChrome, FIELD_GROUP_STYLE } from '../premium/shared';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
 
 export interface MobileInputProps {
@@ -41,6 +44,12 @@ export interface MobileInputProps {
   value: string;
   /** Callback when text changes. */
   onChangeText: (text: string) => void;
+  /** Called when the field loses focus (commit-on-blur drafts). */
+  onBlur?: () => void;
+  /** Called when the field is submitted (Enter / return key). */
+  onSubmitEditing?: () => void;
+  /** Return-key hint (web Enter / native return key). */
+  returnKeyType?: 'done' | 'go' | 'next' | 'search' | 'send';
   /** Placeholder text. */
   placeholder?: string;
   /** Error message — rendered in a dedicated slot beneath the input. Alias of `error`. */
@@ -69,24 +78,28 @@ export interface MobileInputProps {
   rightIcon?: React.ReactNode;
   /** Press handler for the right icon. */
   onRightIconPress?: () => void;
-  /** Accent color (default theme brand). */
+  /** Accent color (default theme ink — pass to borrow the brand deliberately). */
   accentColor?: string;
   /** Disabled state. */
   editable?: boolean;
   /** Make the whole input area trigger `onPress` (e.g. for non-editable selectors). */
   onPress?: () => void;
+  /**
+   * Multiline entry (longer pastes — descriptions, notes): the field
+   * grows to `numberOfLines` rows and scrolls internally once full.
+   * Single-line (default) keeps the fixed 54px control height.
+   */
+  multiline?: boolean;
+  /** Rows shown when `multiline` (default 4). */
+  numberOfLines?: number;
   /** Test ID. */
   testID?: string;
   /** Outer style pass-through. */
   style?: StyleProp<ViewStyle>;
 }
 
-const FIELD_LABEL_STYLE: TextStyle = {
-  fontSize: theme.typography.mobileFieldLabel.fontSize,
-  fontWeight: theme.typography.mobileFieldLabel.fontWeight as any,
-  lineHeight: theme.typography.mobileFieldLabel.lineHeight,
-  letterSpacing: theme.typography.mobileFieldLabel.letterSpacing,
-};
+// The token object IS the style — spread/reference it directly.
+const FIELD_LABEL_STYLE = theme.typography.mobileFieldLabel;
 
 /**
  * Refined text input for the mobile premium kit.
@@ -98,6 +111,9 @@ export function MobileInput({
   label,
   value,
   onChangeText,
+  onBlur,
+  onSubmitEditing,
+  returnKeyType,
   placeholder,
   errorText,
   error,
@@ -115,45 +131,39 @@ export function MobileInput({
   accentColor,
   editable = true,
   onPress,
+  multiline = false,
+  numberOfLines = 4,
   testID,
   style,
 }: MobileInputProps) {
   const [isFocused, setIsFocused] = useState(false);
   const { colors } = useAppTheme();
-  const accent = accentColor ?? colors.brand;
+  // Focus is an ink moment: the field you are writing in reads the
+  // mode's ink, not the brand slot. Pass accentColor to borrow the
+  // brand deliberately.
+  const accent = accentColor ?? colors.text;
   const resolvedError = error ?? errorText;
   const hasError = !!resolvedError;
 
-  const { ringStyle, glowStyle } = useFocusRing({
+  // The ring rides the host's shape and snaps — no halo.
+  const { ringStyle } = useFocusRing({
     color: accent,
     focused: isFocused && !hasError,
+    duration: 0,
+    radius: theme.shapes.control,
   });
 
-  // Border color shifts with focus / error.
-  const borderColor = useMemo(() => {
-    if (hasError) return colors.status.error;
-    if (isFocused) return `${accent}66`;
-    return colors.glass.emptyInputBorder;
-  }, [hasError, isFocused, accent, colors.status.error, colors.glass.emptyInputBorder]);
-
-  // Background picks up the accent on focus; tinted red on error.
-  const backgroundColor = useMemo(() => {
-    if (hasError) return `${colors.status.error}0a`;
-    if (isFocused) return colors.glass.inputFocusBackground;
-    return colors.glass.inputBackground;
-  }, [
+  // Border / background / label respond to focus + error — the shared
+  // field-chrome mapping (one rhythm across the form trio).
+  const { borderColor, backgroundColor, labelColor } = useFieldChrome({
+    focused: isFocused,
     hasError,
-    isFocused,
-    colors.status.error,
-    colors.glass.inputFocusBackground,
-    colors.glass.inputBackground,
-  ]);
-
-  const labelColor = hasError ? colors.status.error : isFocused ? accent : colors.text;
+    accent,
+  });
   const isClickable = onPress !== undefined;
 
   return (
-    <View style={[styles.group, style]} testID={testID}>
+    <View style={[FIELD_GROUP_STYLE, style]} testID={testID}>
       {/* Label — typography.mobileFieldLabel rhythm. */}
       <Text style={[FIELD_LABEL_STYLE, { color: labelColor }]}>{label}</Text>
 
@@ -165,7 +175,7 @@ export function MobileInput({
           </View>
         ) : null}
 
-        <View style={[styles.inputInner, glowStyle]}>
+        <View style={styles.inputInner}>
           <TextInput
             style={[
               styles.input,
@@ -175,21 +185,34 @@ export function MobileInput({
                 color: colors.text,
               },
               icon ? { paddingLeft: 50 } : null,
+              // Multiline trades the fixed control height for a row-count
+              // box (22px line + 32px padding — the same metrics the 54px
+              // single-line height is built from) and anchors type at the top.
+              multiline
+                ? { height: 22 * numberOfLines + 32, textAlignVertical: 'top' as const }
+                : null,
             ]}
             value={value}
             onChangeText={onChangeText}
             placeholder={placeholder}
-            placeholderTextColor={colors.textColors.tertiary}
+            placeholderTextColor={colors.textSecondary}
             secureTextEntry={secureTextEntry}
             autoCapitalize={autoCapitalize}
             autoCorrect={autoCorrect}
             keyboardType={keyboardType}
             autoComplete={autoComplete as any}
+            onSubmitEditing={onSubmitEditing}
+            returnKeyType={returnKeyType}
             autoFocus={autoFocus}
             maxLength={maxLength}
             editable={!!editable && !isClickable}
+            multiline={multiline}
+            numberOfLines={multiline ? numberOfLines : undefined}
             onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
+            onBlur={() => {
+              setIsFocused(false);
+              onBlur?.();
+            }}
           />
           {/* Focus ring — Animated.View because opacity is an Animated.Value. */}
           <Animated.View pointerEvents="none" style={ringStyle} />
@@ -219,26 +242,25 @@ export function MobileInput({
 }
 
 const styles = StyleSheet.create({
-  group: {
-    gap: 6,
-    ...MOBILE_CONTENT_WIDTH_STYLE,
-    marginBottom: 16,
-  },
   inputContainer: {
     position: 'relative',
   },
   inputInner: {
     position: 'relative',
-    borderRadius: 14,
+    borderRadius: theme.shapes.control,
   },
   input: {
     borderWidth: 1.5,
-    borderRadius: 14,
+    borderRadius: theme.shapes.control,
     padding: 16,
     paddingRight: 50,
-    fontSize: 16,
+    fontSize: theme.typography.mobileTitle.fontSize,
+    lineHeight: theme.typography.mobileTitle.lineHeight,
     fontWeight: '500',
     height: 54,
+    // WebKit's UA focus ring (`outline: auto`) ignores the kit ring and
+    // glows system blue on RN-web inputs.
+    outlineWidth: 0,
   },
   leftIcon: {
     position: 'absolute',
@@ -258,14 +280,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    fontSize: 12,
+    fontSize: theme.typography.mobileMeta.fontSize,
     fontWeight: '500',
-    lineHeight: 16,
+    lineHeight: theme.typography.mobileMeta.lineHeight,
     marginTop: 2,
   },
   helperText: {
-    fontSize: 13,
-    lineHeight: 18,
+    fontSize: theme.typography.mobileMeta.fontSize,
+    lineHeight: theme.typography.mobileMeta.lineHeight,
     marginTop: 2,
   },
 });

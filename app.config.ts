@@ -17,7 +17,8 @@ const config: ExpoConfig = {
   version: '1.0.0',
   orientation: 'portrait',
   icon: './assets/icon.png',
-  userInterfaceStyle: 'light',
+  // Night Metro is dark-first — the native surface declares it too.
+  userInterfaceStyle: 'dark',
   newArchEnabled: true,
   scheme: 'knowalong',
   ios: {
@@ -31,8 +32,9 @@ const config: ExpoConfig = {
   android: {
     adaptiveIcon: {
       foregroundImage: './assets/adaptive-icon.png',
-      // s7-exempt — build-time Expo config; no runtime theme surface available
-      backgroundColor: '#FFFFFF',
+      // s7-exempt — build-time Expo config; no runtime theme surface available.
+      // Night ground — the night service boots on native too.
+      backgroundColor: '#0C1016',
     },
     edgeToEdgeEnabled: true,
     newArchEnabled: true,
@@ -51,8 +53,9 @@ const config: ExpoConfig = {
       'expo-splash-screen',
       {
         image: './assets/splash-icon.png',
-        // s7-exempt — build-time Expo config; no runtime theme surface available
-        backgroundColor: '#FFFFFF',
+        // s7-exempt — build-time Expo config; no runtime theme surface available.
+        // Night ground — matches the web boot plate's ground color.
+        backgroundColor: '#0C1016',
         imageWidth: 200,
         resizeMode: 'contain',
       },

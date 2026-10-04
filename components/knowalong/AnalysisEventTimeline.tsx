@@ -8,6 +8,7 @@ import React, { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MobileSurface, MobileSectionEyebrow } from '../MobilePremium';
 import { useAppTheme } from '../../context';
+import { theme } from '../../constants';
 import type { AnalysisEvent } from '../../shared/types/knowalong';
 
 interface Props {
@@ -54,8 +55,9 @@ export function AnalysisEventTimeline({ events, initialCap = 12 }: Props) {
           {hiddenCount > 0 ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Show ${hiddenCount} earlier events`}
               onPress={() => setExpanded(true)}
-              style={styles.expandRow}
+              style={({ pressed }) => [styles.expandRow, { opacity: pressed ? 0.7 : 1 }]}
             >
               <Text style={[styles.expandLabel, { color: colors.brand }]}>
                 Show {hiddenCount} earlier event{hiddenCount === 1 ? '' : 's'}
@@ -95,8 +97,9 @@ export function AnalysisEventTimeline({ events, initialCap = 12 }: Props) {
           {!expanded && ordered.length > initialCap ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel={`Show all ${ordered.length} events`}
               onPress={() => setExpanded(true)}
-              style={[styles.expandRow, { marginTop: 8 }]}
+              style={({ pressed }) => [styles.expandRow, { marginTop: 8, opacity: pressed ? 0.7 : 1 }]}
             >
               <Text style={[styles.expandLabel, { color: colors.brand }]}>
                 Show all {ordered.length} events
@@ -106,8 +109,9 @@ export function AnalysisEventTimeline({ events, initialCap = 12 }: Props) {
           {expanded && ordered.length > initialCap ? (
             <Pressable
               accessibilityRole="button"
+              accessibilityLabel="Collapse timeline"
               onPress={() => setExpanded(false)}
-              style={[styles.expandRow, { marginTop: 8 }]}
+              style={({ pressed }) => [styles.expandRow, { marginTop: 8, opacity: pressed ? 0.7 : 1 }]}
             >
               <Text style={[styles.expandLabel, { color: colors.brand }]}>Collapse</Text>
             </Pressable>
@@ -120,14 +124,18 @@ export function AnalysisEventTimeline({ events, initialCap = 12 }: Props) {
 
 const styles = StyleSheet.create({
   emptyText: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
   },
   expandRow: {
     paddingVertical: 4,
   },
   expandLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
+    textTransform: 'uppercase',
   },
   timelineRow: {
     flexDirection: 'row',
@@ -144,13 +152,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   stageLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
     marginBottom: 1,
+    textTransform: 'uppercase',
   },
   message: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 18,
   },

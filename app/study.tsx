@@ -23,8 +23,7 @@ import {
 } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToHome } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
-import type { LessonStep } from '../utils/knowalong/fixtures/decks';
+import { SCREEN_BODY_STYLE, theme } from '../constants';import type { LessonStep } from '../utils/knowalong/fixtures/decks';
 import { generateAdaptiveLesson } from '../utils/knowalong/generateLesson';
 import { summarizeMastery } from '../utils/knowalong/mastery';
 import { prefetchAudio } from '../utils/knowalong/tts';
@@ -192,8 +191,16 @@ const styles = StyleSheet.create({
   progressBar: { height: '100%', borderRadius: 2 },
   bodyContent: { padding: 16 },
   completeCard: { borderRadius: 16, padding: 24 },
-  completeTitle: { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 8 },
-  completeBody: { fontSize: 15, textAlign: 'center', lineHeight: 22 },
+  // Results headline — the session figure in the display face; the
+  // verdict line rides the body face.
+  completeTitle: {
+    ...theme.typography.mobileFigure,
+    fontSize: 24,
+    lineHeight: 30,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  completeBody: { ...theme.typography.mobileBody, textAlign: 'center' },
   loadingAudio: { padding: 48, alignItems: 'center' },
-  loadingText: { marginTop: 12, fontSize: 14 },
+  loadingText: { ...theme.typography.mobileBody, marginTop: 12 },
 });

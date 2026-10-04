@@ -17,7 +17,7 @@ import {
 } from '../../../../components/MobilePremium';
 import { useAppTheme } from '../../../../context';
 import { safeGoBack } from '../../../../navigation';
-import { SCREEN_BODY_STYLE } from '../../../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../../../constants';
 import {
   useAnalysisRun,
   useAnalysisRunEvents,
@@ -167,14 +167,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyText: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
   },
   failureTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
     marginBottom: 4,
   },
   failureBody: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 18,
   },

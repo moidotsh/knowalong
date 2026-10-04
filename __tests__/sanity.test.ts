@@ -13,8 +13,20 @@ describe('theme', () => {
     expect(lightKeys).toEqual(darkKeys);
   });
 
-  it('uses indigo as the default brand color in light mode', () => {
-    expect(theme.colors.light.brand).toBe('#4F46E5');
+  it('uses Night Metro amber as the light-mode brand (fill amber)', () => {
+    expect(theme.colors.light.brand).toBe('#B8790A');
+    expect(theme.colors.light.brandText).toBe('#8F5D00');
+  });
+
+  it('uses Night Metro filament amber as the dark-mode brand', () => {
+    expect(theme.colors.dark.brand).toBe('#FFB020');
+    expect(theme.colors.dark.brandText).toBe('#FFB020');
+  });
+
+  it('ships the Night Metro type families', () => {
+    expect(theme.fonts.display).toBe('Unbounded');
+    expect(theme.fonts.body).toBe('Golos Text');
+    expect(theme.fonts.mono).toBe('PT Mono');
   });
 
   it('exports typography tokens', () => {

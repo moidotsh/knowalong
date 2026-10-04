@@ -21,10 +21,11 @@
 
 import React from 'react';
 import { StyleSheet, View, useWindowDimensions, type ViewStyle } from 'react-native';
+import { useReducedMotion } from '../premium/shared';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { APP_LAYOUT } from '../../constants';
 import { useAppTheme } from '../../context';
-import { useAndroidChromeBlurFix, useReducedMotion } from '../../hooks';
+import { useAndroidChromeBlurFix } from '../../hooks';
 import { isWeb } from '../../utils';
 import { NAV_DRAWER_WIDTH } from './MobileNavDrawer';
 

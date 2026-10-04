@@ -60,38 +60,43 @@ export class AppErrorBoundary extends Component<Props, State> {
     }
 
     const containerStyle: React.CSSProperties = {
-      // s7-exempt — theme-free fallback so the boundary renders even when the theme system is the source of the crash
-      color: '#1f2937',
-      backgroundColor: '#f9fafb',
+      // s7-exempt — theme-free fallback so the boundary renders even when the theme system is the source of the crash.
+      // Night Metro night ground + bone text: a crashed app still reads as
+      // the night service, never a white flash.
+      color: '#F2EFE9',
+      backgroundColor: '#0C1016',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
       padding: 24,
-      fontFamily: 'system-ui, -apple-system, sans-serif',
+      fontFamily: "'Golos Text', system-ui, -apple-system, sans-serif",
       textAlign: 'center',
     };
     const titleStyle: React.CSSProperties = {
-      fontSize: 20,
-      fontWeight: 600,
+      // s7-exempt — theme-free fallback. Signage face with system fallbacks.
+      fontFamily: "'Unbounded', system-ui, sans-serif",
+      fontSize: 18,
+      fontWeight: 700,
       marginBottom: 12,
     };
     const bodyStyle: React.CSSProperties = {
-      // s7-exempt — theme-free fallback
-      color: '#4b5563',
+      // s7-exempt — theme-free fallback (night secondary text)
+      color: '#B9C6D4',
       fontSize: 14,
       marginBottom: 20,
     };
     const buttonStyle: React.CSSProperties = {
-      // s7-exempt — theme-free fallback (arqavellum default brand)
-      color: '#ffffff',
-      backgroundColor: '#4f46e5',
-      padding: '8px 16px',
+      // s7-exempt — theme-free fallback (Night Metro filament amber plate,
+      // textOnBrand ink; plate-square radius)
+      color: '#1A1206',
+      backgroundColor: '#FFB020',
+      padding: '10px 20px',
       fontSize: 14,
-      fontWeight: 500,
+      fontWeight: 700,
       border: 'none',
-      borderRadius: 8,
+      borderRadius: 2,
       cursor: 'pointer',
     };
 

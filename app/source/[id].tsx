@@ -19,7 +19,7 @@ import {
 import type { Segment } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToSection, navigateToLemma, navigateToReview } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import {
   useLearningSource,
   useSourceSections,
@@ -52,15 +52,14 @@ function ReadinessCard({ result }: { result: ReadinessResult | undefined }) {
             <Text style={[styles.componentLabel, { color: colors.textSecondary }]}>
               {c.label}
             </Text>
-            <View style={styles.componentBarOuter}>
+            <View style={[styles.componentBarOuter, { backgroundColor: colors.cardBorder + '40' }]}>
               <View
                 style={[
                   styles.componentBarInner,
                   { width: `${Math.round(c.raw * 100)}%`, backgroundColor: colors.brand },
                 ]}
               />
-            </View>
-          </View>
+            </View>          </View>
         ))}
       </View>
     </MobileSurface>
@@ -142,7 +141,10 @@ export default function SourceDetailScreen() {
                     const sectionLines = lines.filter((l) => l.sectionId === section.id);
                     return (
                       <View key={section.id} style={{ marginBottom: 12 }}>
-                        <Pressable onPress={() => navigateToSection(sourceId!, section.id)}>
+                        <Pressable onPress={() => navigateToSection(sourceId!, section.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Open ${section.sectionType} section`}
+                          style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
                           <MobileSurface padding={14}>
                             <Text style={[styles.sectionLabel, { color: colors.textSecondary }]}>
                               {section.sectionType}
@@ -193,7 +195,10 @@ export default function SourceDetailScreen() {
                 {(vocabulary?.length ?? 0) > 0 ? (
                   <View style={{ gap: 8 }}>
                     {vocabulary!.map((lemma: LexicalLemma) => (
-                      <Pressable key={lemma.id} onPress={() => navigateToLemma(lemma.id)}>
+                      <Pressable key={lemma.id} onPress={() => navigateToLemma(lemma.id)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${lemma.normalizedLemma}${lemma.primaryGloss ? ` — ${lemma.primaryGloss}` : ''}`}
+                        style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
                         <MobileSurface padding={12}>
                           <Text style={[styles.lemmaText, { color: colors.text }]}>
                             {lemma.normalizedLemma}
@@ -236,12 +241,14 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   heroTitle: {
-    fontSize: 22,
-    fontWeight: '700',
+    ...theme.typography.mobileItemTitle,
+    fontSize: 20,
+    lineHeight: 26,
+    fontFamily: theme.fonts.display,
     marginBottom: 4,
   },
   heroMeta: {
-    fontSize: 14,
+    ...theme.typography.mobileBody,
     marginBottom: 8,
   },
   heroChipRow: {
@@ -254,20 +261,26 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   chipText: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
+    textTransform: 'uppercase',
   },
   cardTitle: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
-    fontWeight: '600',
+    lineHeight: 20,
   },
   cardBody: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
   },
   scoreText: {
+    ...theme.typography.mobileFigure,
     fontSize: 24,
-    fontWeight: '700',
+    lineHeight: 28,
+    letterSpacing: -0.5,
   },
   readinessHeader: {
     flexDirection: 'row',
@@ -280,36 +293,39 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   componentLabel: {
-    fontSize: 12,
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 15,
     width: 100,
   },
   componentBarOuter: {
     flex: 1,
     height: 6,
     borderRadius: 3,
-    backgroundColor: 'rgba(0,0,0,0.06)',
   },
   componentBarInner: {
     height: 6,
     borderRadius: 3,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   lineText: {
-    fontSize: 14,
-    lineHeight: 22,
+    ...theme.typography.mobileBody,
     marginBottom: 2,
   },
   lemmaText: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
-    fontWeight: '500',
+    lineHeight: 20,
+    fontFamily: theme.fonts.display,
   },
   lemmaGloss: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
     marginTop: 2,
   },
 });

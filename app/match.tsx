@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS } from '../utils/knowalong/fixtures/learningItems';
 
 function shuffle<T>(arr: readonly T[]): T[] {
@@ -85,16 +85,21 @@ export default function MatchScreen() {
       <MobileAtmosphere surface="training" />
       <MobileHeader title={isComplete ? 'Complete' : `Match ${roundIdx + 1} / ${TOTAL_ROUNDS}`} eyebrow="Speed round" onBack={safeGoBack} />
       <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 16 }}>
-        <Text style={{ fontSize: 18, fontWeight: '700', color: colors.brand }}>{mins}:{secs.toString().padStart(2, '0')}</Text>
-        <Text style={{ fontSize: 12, color: colors.textMuted }}>·</Text>
-        <Text style={{ fontSize: 13, color: colors.textSecondary }}>{matched.length}/{PAIR_COUNT} matched</Text>
+        {/* Live timer — the ledger face: tabular digits hold their columns. */}
+        <Text style={{ ...theme.typography.mobileLedger, fontSize: 18, lineHeight: 24, fontWeight: '700', color: colors.brand }}>
+          {mins}:{secs.toString().padStart(2, '0')}
+        </Text>
+        <Text style={{ ...theme.typography.mobileLedger, color: colors.textMuted }}>·</Text>
+        <Text style={{ ...theme.typography.mobileLedger, color: colors.textSecondary }}>{matched.length}/{PAIR_COUNT} matched</Text>
       </View>
 
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 80 }}>
         {isComplete ? (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, textAlign: 'center' }}>{score.correct} matched</Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileFigure, fontSize: 32, lineHeight: 36, letterSpacing: -1, color: colors.text, textAlign: 'center' }}>
+              {score.correct} matched
+            </Text>
+            <Text style={{ ...theme.typography.mobileLedger, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
               {score.mistakes} mistakes · {mins}:{secs.toString().padStart(2, '0')} total
             </Text>
           </MobileSurface>
@@ -109,13 +114,16 @@ export default function MatchScreen() {
                   const isWrong = wrongPair?.left === word;
                   return (
                     <Pressable key={word} disabled={isMatched} onPress={() => handleLeftTap(word)}
-                      style={{
+                      accessibilityRole="button"
+                      accessibilityLabel={word}
+                      style={({ pressed }) => ({
                         paddingVertical: 14, borderRadius: 12, borderWidth: 2, alignItems: 'center',
                         borderColor: isWrong ? colors.status.error : isSelected ? colors.brand : colors.cardBorder,
                         backgroundColor: isMatched ? colors.status.success + '15' : isWrong ? colors.status.error + '15' : isSelected ? colors.brand + '12' : colors.cardAlt,
-                        opacity: isMatched ? 0.3 : 1,
-                      }}>
-                      <Text style={{ fontSize: 18, fontWeight: '700', color: colors.text, opacity: isMatched ? 0.4 : 1 }}>{word}</Text>
+                        opacity: isMatched ? 0.3 : pressed ? 0.7 : 1,
+                      })}>
+                      {/* Russian side — signage (display face). */}
+                      <Text style={{ fontSize: 18, fontWeight: '700', lineHeight: 24, fontFamily: theme.fonts.display, color: colors.text, opacity: isMatched ? 0.4 : 1 }}>{word}</Text>
                     </Pressable>
                   );
                 })}
@@ -129,13 +137,15 @@ export default function MatchScreen() {
                   const isWrong = wrongPair?.right === meaning;
                   return (
                     <Pressable key={meaning} disabled={isMatched || !selectedLeft} onPress={() => handleRightTap(meaning)}
-                      style={{
+                      accessibilityRole="button"
+                      accessibilityLabel={meaning}
+                      style={({ pressed }) => ({
                         paddingVertical: 14, borderRadius: 12, borderWidth: 2, alignItems: 'center',
                         borderColor: isWrong ? colors.status.error : isMatched ? colors.status.success : colors.cardBorder,
                         backgroundColor: isMatched ? colors.status.success + '15' : isWrong ? colors.status.error + '15' : colors.cardAlt,
-                        opacity: isMatched ? 0.3 : 1,
-                      }}>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text, opacity: isMatched ? 0.4 : 1 }}>{meaning}</Text>
+                        opacity: isMatched ? 0.3 : pressed ? 0.7 : 1,
+                      })}>
+                      <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text, opacity: isMatched ? 0.4 : 1 }}>{meaning}</Text>
                     </Pressable>
                   );
                 })}
@@ -144,7 +154,7 @@ export default function MatchScreen() {
 
             {roundDone ? (
               <View style={{ marginTop: 16, padding: 14, borderRadius: 12, backgroundColor: colors.status.success + '15' }}>
-                <Text style={{ fontSize: 16, fontWeight: '700', color: colors.status.success, textAlign: 'center' }}>✓ All matched!</Text>
+                <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, color: colors.status.success, textAlign: 'center' }}>✓ All matched!</Text>
               </View>
             ) : null}
           </MobileSurface>

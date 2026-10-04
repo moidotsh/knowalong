@@ -47,12 +47,7 @@ export interface MobileActionFooterProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const PROGRESS_STYLE = {
-  fontSize: theme.typography.mobileEyebrow.fontSize,
-  fontWeight: theme.typography.mobileEyebrow.fontWeight as any,
-  lineHeight: theme.typography.mobileEyebrow.lineHeight,
-  letterSpacing: theme.typography.mobileEyebrow.letterSpacing,
-} as const;
+const PROGRESS_STYLE = theme.typography.mobileEyebrow;
 
 /**
  * Sticky bottom action footer. Two modes (see file header). Structured
@@ -79,14 +74,18 @@ export function MobileActionFooter({
   // On web, the inset is 0 — the footer adds its own bottom padding.
   const safeBottom = Platform.OS === 'ios' ? Math.max(insets.bottom, 16) : 16;
 
-  // Children mode (legacy transparent footer).
+  // Children mode (legacy layout, same plate as structured mode).
   if (primary == null) {
     return (
       <View
         testID={testID}
         style={[
           styles.legacyContainer,
-          !disableSafeArea ? { paddingBottom: Math.max(insets.bottom, 16) } : null,
+          {
+            paddingBottom: !disableSafeArea ? Math.max(insets.bottom, 16) : 0,
+            backgroundColor: colors.backgroundDeep,
+            borderTopColor: colors.mobilePremium.hairlineBorder,
+          },
           style,
         ]}
       >
@@ -101,7 +100,14 @@ export function MobileActionFooter({
       testID={testID}
       style={[
         styles.container,
-        { paddingBottom: safeBottom, borderTopColor: colors.mobilePremium.hairlineBorder },
+        {
+          paddingBottom: safeBottom,
+          borderTopColor: colors.mobilePremium.hairlineBorder,
+          // The footer is a plate on the field: page-toned and opaque,
+          // so scrolled content terminates at the hairline instead of
+          // visually colliding with the actions.
+          backgroundColor: colors.backgroundDeep,
+        },
         style,
       ]}
     >
@@ -114,7 +120,7 @@ export function MobileActionFooter({
             pressed ? pressedStyle : null,
           ]}
         >
-          <Text style={[styles.secondaryText, { color: accentColor ?? colors.brand }]}>
+          <Text style={[styles.secondaryText, { color: colors.textSecondary }]}>
             {secondaryLabel}
           </Text>
         </Pressable>
@@ -153,9 +159,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   secondaryText: {
-    fontSize: 14,
-    fontWeight: '600',
-    letterSpacing: 0.1,
+    fontSize: theme.typography.mobileEyebrow.fontSize,
+    fontWeight: theme.typography.mobileEyebrow.fontWeight as any,
+    lineHeight: theme.typography.mobileEyebrow.lineHeight,
+    letterSpacing: theme.typography.mobileEyebrow.letterSpacing,
+    fontFamily: theme.typography.mobileEyebrow.fontFamily,
   },
 
   // ── Children mode (legacy) ───────────────────────────────────────────
@@ -163,6 +171,7 @@ const styles = StyleSheet.create({
     ...MOBILE_CONTENT_WIDTH_STYLE,
     paddingHorizontal: 20,
     paddingTop: 8,
+    borderTopWidth: 1,
   },
 });
 

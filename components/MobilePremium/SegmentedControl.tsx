@@ -1,5 +1,7 @@
 // components/MobilePremium/SegmentedControl.tsx
-// Pill-track segmented control with two explicit accessibility variants.
+// Square-cut segmented control (the active segment paints the
+// declared control shape token — shapes govern the look, not
+// literals) with two explicit accessibility variants.
 // The variants have the same visual treatment but distinct a11y contracts
 // — pick by content semantics, not by visual preference:
 //
@@ -34,7 +36,7 @@ import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Pressable, usePressedStyle } from '../premium/shared';
 import { useAppTheme } from '../../context';
-import { MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
+import { theme, MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
 
 export interface Segment<T> {
   /** Visible label on the segment. */
@@ -104,6 +106,7 @@ export function SegmentedControl<T>({
       {segments.map((segment) => {
         const active = segment.value === value;
         const segmentState = variant === 'tabs' ? { selected: active } : { checked: active };
+        const visualHeight = chromeless && size === 'md' ? height - 8 : height - (chromeless ? 0 : 8);
         return (
           <Pressable
             key={String(segment.value)}
@@ -111,40 +114,49 @@ export function SegmentedControl<T>({
             accessibilityRole={segmentRole as any}
             accessibilityState={segmentState}
             accessibilityLabel={segment.accessibilityLabel ?? segment.label}
+            // The pressable FILLS the track height: RN-web does not expand
+            // the DOM hit area for hitSlop (measured), so the touch-target
+            // floor is the box itself. The visual pill rides inside.
             style={({ pressed }) => [
               {
                 flex: fullWidth ? 1 : 0,
-                height: chromeless && size === 'md' ? height - 8 : height - (chromeless ? 0 : 8),
+                height,
                 alignItems: 'center',
                 justifyContent: 'center',
-                paddingHorizontal: 12,
-                borderRadius: (height - (chromeless ? 0 : 8)) / 2,
-                backgroundColor: active
-                  ? colors.brand
-                  : chromeless
-                    ? 'transparent'
-                    : 'transparent',
                 opacity: pressed ? 0.7 : 1,
               },
               pressed ? pressedStyle : null,
             ]}
           >
-            <Text
-              style={[
-                styles.label,
-                {
-                  color: active
-                    ? colors.textOnBrand
-                    : chromeless
-                      ? colors.text
-                      : colors.textSecondary,
-                  fontWeight: active ? '600' : '500',
-                },
-              ]}
-              numberOfLines={1}
+            <View
+              style={{
+                height: visualHeight,
+                alignItems: 'center',
+                justifyContent: 'center',
+                paddingHorizontal: 12,
+                borderRadius: theme.shapes.control,
+                // Selection is INK INVERSION, not the accent — the
+                // brand slot belongs to a screen's one verb.
+                backgroundColor: active ? colors.text : 'transparent',
+              }}
             >
-              {segment.label}
-            </Text>
+              <Text
+                style={[
+                  styles.label,
+                  {
+                    color: active
+                      ? colors.background
+                      : chromeless
+                        ? colors.text
+                        : colors.textSecondary,
+                    fontWeight: active ? '600' : '500',
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {segment.label}
+              </Text>
+            </View>
           </Pressable>
         );
       })}
@@ -156,14 +168,19 @@ const styles = StyleSheet.create({
   track: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 999,
+    borderRadius: theme.shapes.tag,
     borderWidth: 1,
     gap: 2,
     ...MOBILE_CONTENT_WIDTH_STYLE,
   },
   label: {
-    fontSize: 13,
-    letterSpacing: 0,
+    fontSize: theme.typography.mobileTag.fontSize,
+    fontWeight: theme.typography.mobileTag.fontWeight as any,
+    lineHeight: theme.typography.mobileTag.lineHeight,
+    letterSpacing: theme.typography.mobileTag.letterSpacing,
+    // Selection labels are markings — when the consumer declares a
+    // mono face, segments speak it.
+    fontFamily: theme.fonts.mono,
   },
 });
 

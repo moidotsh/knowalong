@@ -18,3 +18,4 @@ export { useAnalysisRunEvents } from './useAnalysisRunEvents';
 export { useAnalysisProposals } from './useAnalysisProposals';
 export { useSourceAnalysisRuns } from './useSourceAnalysisRuns';
 export { useClccRuns } from './useClccRuns';
+export { useSongLibrarySourceIds, useSourceSong, useDemoSong } from './useSongLibrary';

@@ -11,11 +11,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { MobileAtmosphere, MobileSurface, MobileHeader, EmptyState } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToSubDeck, navigateToLesson } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import { getDeck, type SectionKind } from '../../utils/knowalong/fixtures/decks';
 import { deckProgress, sectionProgress } from '../../utils/knowalong/progress';
 import { useLessonProgressStore } from '../../stores/lessonProgressStore';
 import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
+import { StationRow } from '../../components/knowalong';
 import type { IconName } from '../../utils/knowalong/icons';
 
 const SECTION_ICON: Record<SectionKind, IconName> = {
@@ -78,7 +79,6 @@ export default function DeckOverviewScreen() {
             <ProgressBar pct={progress.pct} color={colors.brand} />
           </View>
         </MobileSurface>
-
         {/* Sub-decks (song) or lessons (flat) */}
         {subDecks ? (
           <View style={{ marginTop: 14 }}>
@@ -107,33 +107,33 @@ export default function DeckOverviewScreen() {
           </View>
         ) : (
           <View style={{ marginTop: 14 }}>
-            {deck.lessons.map((lesson, li) => {
-              const done = completed.includes(lesson.id);
-              return (
-                <Pressable
-                  key={lesson.id}
-                  onPress={() => navigateToLesson(lesson.id)}
-                  style={({ pressed }) => ({ opacity: pressed ? 0.6 : 1, marginBottom: 8 })}
-                >
-                  <MobileSurface padding={14}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                      <View style={[styles.badge, { backgroundColor: colors.cardAlt, borderColor: done ? colors.status.success : colors.cardBorder }]}>
-                        {done ? (
-                          <ConceptIcon name="check" size={16} color={colors.status.success} />
-                        ) : (
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: colors.textSecondary }}>{li + 1}</Text>
-                        )}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.rowTitle, { color: colors.text }]}>{lesson.title}</Text>
-                        <Text style={[styles.rowSub, { color: colors.textMuted }]}>{lesson.subtitle}</Text>
-                      </View>
-                      <Text style={{ fontSize: 16, color: colors.brand }}>→</Text>
-                    </View>
-                  </MobileSurface>
-                </Pressable>
-              );
-            })}
+            {/* The timetable — one plate, the lessons as stops on the
+                line: served (known) stops in green, the next stop lit
+                amber with its ring, the rest unlit. */}
+            <MobileSurface padding={6}>
+              {deck.lessons.map((lesson, li) => {
+                const done = completed.includes(lesson.id);
+                const nextIndex = deck.lessons.findIndex((l) => !completed.includes(l.id));
+                const isNext = li === nextIndex;
+                return (
+                  <StationRow
+                    key={lesson.id}
+                    testID={`deck-lesson-${lesson.id}`}
+                    title={lesson.title}
+                    meta={lesson.subtitle}
+                    state={done ? 'known' : isNext ? 'seen' : 'locked'}
+                    current={isNext}
+                    onPress={() => navigateToLesson(lesson.id)}
+                    right={
+                      <Text style={[styles.rowArrow, { color: done ? colors.status.success : colors.brand }]}>
+                        →
+                      </Text>
+                    }
+                    style={li < deck.lessons.length - 1 ? styles.timetableRow : undefined}
+                  />
+                );
+              })}
+            </MobileSurface>
           </View>
         )}
 
@@ -144,12 +144,33 @@ export default function DeckOverviewScreen() {
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
-  heroTitle: { fontSize: 22, fontWeight: '700' },
+  // The hero destination — the deck title in the display face (the
+  // rollsign read; Unbounded carries the Cyrillic).
+  heroTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    lineHeight: 26,
+    fontFamily: theme.fonts.display,
+  },
   heroSub: { fontSize: 13, marginTop: 2 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-  progressLabel: { fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
-  progressPct: { fontSize: 13, fontWeight: '700' },
+  progressLabel: {
+    ...theme.typography.mobileEyebrow,
+    textTransform: 'uppercase',
+  },
+  progressPct: {
+    ...theme.typography.mobileLedger,
+    fontWeight: '700',
+  },
   rowTitle: { fontSize: 16, fontWeight: '600' },
   rowSub: { fontSize: 12, marginTop: 2 },
+  rowArrow: {
+    ...theme.typography.mobileItemTitle,
+    fontSize: 16,
+  },
+  timetableRow: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(128,128,128,0.16)',
+  },
   badge: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
 });

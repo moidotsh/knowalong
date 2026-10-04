@@ -16,7 +16,7 @@ import {
 } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import {
   useAnalysisRun,
   useAnalysisRunEvents,
@@ -169,35 +169,36 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   internalBannerTitle: {
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
     marginBottom: 4,
+    textTransform: 'uppercase',
   },
   internalBannerBody: {
+    ...theme.typography.mobileBody,
     fontSize: 12,
     lineHeight: 16,
   },
   proposalsHeader: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.3,
+    ...theme.typography.mobileEyebrow,
     marginBottom: 8,
+    textTransform: 'uppercase',
   },
   listGap: {
     gap: 8,
   },
   emptyText: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
   },
   failureTitle: {
-    fontSize: 15,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
     marginBottom: 4,
   },
   failureBody: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 18,
   },

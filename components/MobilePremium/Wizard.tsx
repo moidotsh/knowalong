@@ -35,6 +35,7 @@
 
 import React, { useRef } from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { clampNumber } from '../../utils/number';
 import { theme, MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
 import { useAppTheme } from '../../context';
 import { Crossfade } from '../premium/shared';
@@ -74,23 +75,10 @@ export interface WizardProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const EYEBROW_STYLE = {
-  fontSize: theme.typography.mobileEyebrow.fontSize,
-  fontWeight: theme.typography.mobileEyebrow.fontWeight as any,
-  lineHeight: theme.typography.mobileEyebrow.lineHeight,
-  letterSpacing: theme.typography.mobileEyebrow.letterSpacing,
-} as const;
+const EYEBROW_STYLE = theme.typography.mobileEyebrow;
 
-const TITLE_STYLE = {
-  fontSize: theme.typography.mobileTitle.fontSize,
-  fontWeight: theme.typography.mobileTitle.fontWeight as any,
-  lineHeight: theme.typography.mobileTitle.lineHeight,
-  letterSpacing: theme.typography.mobileTitle.letterSpacing,
-} as const;
+const TITLE_STYLE = theme.typography.mobileTitle;
 
-function clamp(v: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, v));
-}
 
 export function Wizard({
   steps,
@@ -117,7 +105,7 @@ export function Wizard({
     return null;
   }
 
-  const safeStep = clamp(currentStep, 0, total - 1);
+  const safeStep = clampNumber(currentStep, 0, total - 1);
   const isFirst = safeStep === 0;
   const isLast = safeStep === total - 1;
   const activeStep = steps[safeStep];

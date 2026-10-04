@@ -9,9 +9,10 @@
 // the learner builds via the chip-builder. Song sections become lessons
 // within a song deck. Progress is tracked per-lesson via the streak store.
 
-import { LEARNING_ITEMS, type LearningItem } from './learningItems';
+import { LEARNING_ITEMS, type LearningItem, type WordPart } from './learningItems';
 import { ALL_SVETOFOR_LESSONS, SVETOFOR_SUBDECKS } from './svetoforFullDeck';
 import { CLCC_DECK } from './clccDeck';
+import { PALETTE } from './palette';
 
 /** How a step is played. Defaults to 'build' (the original EN→RU chip order).
  *  'reverse' flips direction (RU prompt → EN chips); 'cloze' is a single-tap
@@ -94,6 +95,27 @@ function lessonFromItems(id: string, title: string, subtitle: string, icon: Less
   return { id, title, subtitle, icon, steps, stepCount: steps.length };
 }
 
+// Build a lesson from raw palette WordParts (no LearningItem wrapper — no
+// transliteration/emoji; that is fine for seed vocabulary). Used by the Core
+// Vocabulary deck so a learner graduates the palette (the generator's context-
+// wrapping atoms) before reaching the songs. R5-exempt starter seed.
+function lessonFromWords(id: string, title: string, subtitle: string, icon: Lesson['icon'], words: readonly WordPart[]): Lesson {
+  const steps: LessonStep[] = words.map((w, i) => ({
+    itemId: `${id}-${i + 1}`,
+    surfaceForm: w.form,
+    meaning: w.gloss,
+    words: [{ form: w.form, gloss: w.gloss, role: w.role }],
+  }));
+  return { id, title, subtitle, icon, steps, stepCount: steps.length };
+}
+
+/** Chunk into consecutive groups of `size` (last group may be shorter). */
+function chunkBy<T>(arr: readonly T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
 // ── Foundations Deck: Tier 0 — the first four phrases ──────────────
 const FOUNDATIONS: Deck = {
   id: 'foundations',
@@ -134,6 +156,23 @@ const EXPRESSIONS: Deck = {
   ],
 };
 
+// ── Core Vocabulary Deck: the palette (R7 context-wrapping atoms) ──────
+// Teaches the versatile high-frequency palette (fixtures/palette.ts) so a
+// learner graduates a known-context pool BEFORE the songs. This is the
+// missing "graduate the palette" path the generator's i+1 wrapping relies on:
+// once these are graduated, authored context phrases are i+1-ready (0
+// scaffolding). Chunked ~7/lesson. R5-exempt starter seed; per-language.
+const CORE_VOCAB_LESSONS: Lesson[] = chunkBy(PALETTE, 7).map((words, i) =>
+  lessonFromWords(`cv-${i + 1}`, `Core Vocab · ${i + 1}`, `${words.length} words`, 'book', words),
+);
+const CORE_VOCAB: Deck = {
+  id: 'core-vocab',
+  title: 'Core Vocabulary',
+  subtitle: 'High-frequency words — the palette songs are built from',
+  icon: 'book',
+  lessons: CORE_VOCAB_LESSONS,
+};
+
 // ── Светофор Deck: hand-authored chip-builder lessons per section ───
 const SVETOFOR_DECK: Deck = {
   id: 'svetofor',
@@ -151,6 +190,7 @@ export const ALL_DECKS: readonly Deck[] = [
   FOUNDATIONS,
   DAILY_LIFE,
   EXPRESSIONS,
+  CORE_VOCAB,
   SVETOFOR_DECK,
   CLCC_DECK,
 ];

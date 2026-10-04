@@ -4,7 +4,7 @@
 // home — no per-screen redirect effect needed.
 
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   MobileAtmosphere,
@@ -17,7 +17,7 @@ import {
 } from '../components/MobilePremium';
 import { useAuth, useAppTheme } from '../context';
 import { navigateToRegister, navigateToForgotPassword } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 
 export default function LoginScreen() {
   const { signIn } = useAuth();
@@ -63,13 +63,16 @@ export default function LoginScreen() {
             autoComplete="current-password"
           />
           <View style={{ height: 12 }} />
-          <Text
+          <Pressable
             accessibilityRole="link"
+            accessibilityLabel="Forgot password"
             onPress={navigateToForgotPassword}
-            style={[styles.link, { color: colors.brand }]}
+            style={({ pressed }) => [styles.linkWrap, { opacity: pressed ? 0.7 : 1 }]}
           >
-            Forgot password?
-          </Text>
+            <Text style={[styles.link, { color: colors.brand }]}>
+              Forgot password?
+            </Text>
+          </Pressable>
           {error ? (
             <View style={{ height: 12 }} />
           ) : null}
@@ -111,13 +114,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
   },
+  linkWrap: {
+    alignSelf: 'flex-end',
+  },
   link: {
-    fontSize: 14,
-    fontWeight: '500',
+    ...theme.typography.mobileBody,
     textAlign: 'right',
   },
   help: {
-    fontSize: 14,
+    ...theme.typography.mobileBody,
     textAlign: 'center',
   },
 });

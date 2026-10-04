@@ -8,7 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
 
 const GOALS = [
@@ -43,14 +43,17 @@ export default function StudySettingsScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}>
 
         {/* Daily goal */}
-        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>Daily goal</Text>
+        <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>Daily goal</Text>
         {GOALS.map((g) => (
-          <Pressable key={g.value} onPress={() => setGoal(g.value)} style={{ marginBottom: 8 }}>
+          <Pressable key={g.value} onPress={() => setGoal(g.value)} style={({ pressed }) => [{ marginBottom: 8, opacity: pressed ? 0.7 : 1 }]}
+            accessibilityRole="radio"
+            accessibilityState={{ selected: goal === g.value }}
+            accessibilityLabel={`${g.label} — ${g.desc}`}>
             <MobileSurface padding={14}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
-                  <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{g.label}</Text>
-                  <Text style={{ fontSize: 12, color: colors.textMuted }}>{g.desc}</Text>
+                  <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>{g.label}</Text>
+                  <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted }}>{g.desc}</Text>
                 </View>
                 {goal === g.value ? <ConceptIcon name="check" size={22} color={colors.brand} /> : null}
               </View>
@@ -59,34 +62,40 @@ export default function StudySettingsScreen() {
         ))}
 
         {/* Weekly target */}
-        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginTop: 20, marginBottom: 8 }}>Weekly target</Text>
+        <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textSecondary, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 }}>Weekly target</Text>
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {WEEKLY.map((d) => (
-            <Pressable key={d} onPress={() => setWeekly(d)} style={{
+            <Pressable key={d} onPress={() => setWeekly(d)} style={({ pressed }) => ({
               flex: 1, paddingVertical: 14, borderRadius: 12, borderWidth: 2,
               borderColor: weekly === d ? colors.brand : colors.cardBorder,
               backgroundColor: weekly === d ? colors.brand + '12' : colors.cardAlt,
-              alignItems: 'center',
-            }}>
-              <Text style={{ fontSize: 18, fontWeight: '700', color: weekly === d ? colors.brand : colors.textSecondary }}>{d}</Text>
-              <Text style={{ fontSize: 10, color: colors.textMuted }}>days</Text>
+              alignItems: 'center', opacity: pressed ? 0.7 : 1,
+            })}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: weekly === d }}
+              accessibilityLabel={`${d} days per week`}>
+              <Text style={{ ...theme.typography.mobileFigure, fontSize: 18, lineHeight: 22, letterSpacing: -0.3, color: weekly === d ? colors.brand : colors.textSecondary }}>{d}</Text>
+              <Text style={{ ...theme.typography.mobileLedger, fontSize: 9, lineHeight: 12, color: colors.textMuted }}>days</Text>
             </Pressable>
           ))}
         </View>
 
         {/* Learning focus */}
-        <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginTop: 20, marginBottom: 8 }}>Learning focus</Text>
-        <Text style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>Select what to prioritize in your daily study sessions.</Text>
+        <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textSecondary, textTransform: 'uppercase', marginTop: 20, marginBottom: 8 }}>Learning focus</Text>
+        <Text style={{ ...theme.typography.mobileBody, fontSize: 12, lineHeight: 17, color: colors.textMuted, marginBottom: 8 }}>Select what to prioritize in your daily study sessions.</Text>
         {FOCUSES.map((f) => {
           const selected = focuses.includes(f.id);
           return (
-            <Pressable key={f.id} onPress={() => toggleFocus(f.id)} style={{ marginBottom: 8 }}>
+            <Pressable key={f.id} onPress={() => toggleFocus(f.id)} style={({ pressed }) => [{ marginBottom: 8, opacity: pressed ? 0.7 : 1 }]}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: selected }}
+              accessibilityLabel={`${f.label} — ${f.desc}`}>
               <MobileSurface padding={14}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                   <ConceptIcon name={f.icon} size={24} color={selected ? colors.brand : colors.textMuted} />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: '600', color: colors.text }}>{f.label}</Text>
-                    <Text style={{ fontSize: 12, color: colors.textMuted }}>{f.desc}</Text>
+                    <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>{f.label}</Text>
+                    <Text style={{ ...theme.typography.mobileBody, fontSize: 12, lineHeight: 17, color: colors.textMuted }}>{f.desc}</Text>
                   </View>
                   {selected ? <ConceptIcon name="check" size={20} color={colors.brand} /> : null}
                 </View>

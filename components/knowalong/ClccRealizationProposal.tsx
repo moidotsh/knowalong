@@ -6,6 +6,7 @@
 import React, { useMemo, useState } from 'react';
 import { Pressable, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { MobileSurface, MobilePrimaryButton } from '../MobilePremium';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
 import { useReviewProposal } from '../../hooks';
 import type { AnalysisProposal } from '../../shared/types/knowalong';
@@ -121,20 +122,30 @@ export function ClccRealizationProposal({ proposal, runId }: Props) {
             ]}
           />
           <View style={styles.editActionRow}>
-            <Pressable accessibilityRole="button" onPress={() => setEditing(false)} style={styles.ghostBtn}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => setEditing(false)}
+              style={({ pressed }) => [styles.ghostBtn, { opacity: pressed ? 0.6 : 1 }]}
+            >
               <Text style={[styles.ghostBtnLabel, { color: colors.textSecondary }]}>Cancel</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={onSaveEdit}
-              style={[styles.ghostBtn, { borderColor: colors.brand }]}
+              style={({ pressed }) => [
+                styles.ghostBtn,
+                { borderColor: colors.brand, opacity: pressed ? 0.6 : 1 },
+              ]}
             >
               <Text style={[styles.ghostBtnLabel, { color: colors.brand }]}>Save edit</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={onReject}
-              style={[styles.ghostBtn, { borderColor: colors.status.error }]}
+              style={({ pressed }) => [
+                styles.ghostBtn,
+                { borderColor: colors.status.error, opacity: pressed ? 0.6 : 1 },
+              ]}
             >
               <Text style={[styles.ghostBtnLabel, { color: colors.status.error }]}>Reject</Text>
             </Pressable>
@@ -144,11 +155,12 @@ export function ClccRealizationProposal({ proposal, runId }: Props) {
         <View style={styles.actionRow}>
           <Pressable
             accessibilityRole="button"
+            accessibilityState={{ disabled: proposal.reviewStatus !== 'pending' }}
             onPress={() => setEditing(true)}
             disabled={proposal.reviewStatus !== 'pending'}
             style={({ pressed }) => [
               styles.ghostBtn,
-              { borderColor: colors.brand, opacity: pressed ? 0.5 : 1 },
+              { borderColor: colors.brand, opacity: pressed ? 0.6 : 1 },
             ]}
           >
             <Text style={[styles.ghostBtnLabel, { color: colors.brand }]}>Edit / reject</Text>
@@ -158,7 +170,7 @@ export function ClccRealizationProposal({ proposal, runId }: Props) {
             onPress={onExport}
             style={({ pressed }) => [
               styles.ghostBtn,
-              { borderColor: colors.textSecondary, opacity: pressed ? 0.5 : 1 },
+              { borderColor: colors.textSecondary, opacity: pressed ? 0.6 : 1 },
             ]}
           >
             <Text style={[styles.ghostBtnLabel, { color: colors.textSecondary }]}>Export JSON</Text>
@@ -181,31 +193,32 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   kindLabel: {
-    fontSize: 11,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   statusPill: {
-    fontSize: 11,
-    fontWeight: '700',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
     textTransform: 'uppercase',
-    letterSpacing: 0.3,
   },
   conceptCode: {
-    fontSize: 12,
+    ...theme.typography.mobileLedger,
     fontWeight: '700',
     letterSpacing: 0.5,
     marginBottom: 2,
   },
   surfaceForm: {
-    fontSize: 18,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
+    fontFamily: theme.fonts.display,
+    fontSize: 17,
+    lineHeight: 24,
     marginBottom: 2,
   },
   gloss: {
-    fontSize: 13,
-    lineHeight: 18,
+    ...theme.typography.mobileBody,
   },
   metaRow: {
     flexDirection: 'row',
@@ -213,12 +226,15 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   metaItem: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
   },
   note: {
+    ...theme.typography.mobileBody,
     fontSize: 12,
+    lineHeight: 18,
     marginTop: 8,
-    fontStyle: 'italic',
   },
   actionRow: {
     flexDirection: 'row',
@@ -235,7 +251,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 10,
     minHeight: 60,
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
   },
   editActionRow: {
     flexDirection: 'row',
@@ -249,12 +267,15 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   ghostBtnLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
+    textTransform: 'uppercase',
   },
   deferredNotice: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
     marginTop: 12,
-    fontStyle: 'italic',
   },
 });

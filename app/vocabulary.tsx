@@ -10,7 +10,7 @@ import { MobileAtmosphere, MobileSurface, MobileHeader } from '../components/Mob
 import { MobileInput } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToStudy } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS } from '../utils/knowalong/fixtures/learningItems';
 import { ITEM_ICONS, type IconName } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
@@ -43,19 +43,21 @@ export default function VocabularyScreen() {
           {filtered.map((item) => {
             const iconName = ITEM_ICONS[item.id] ?? 'star';
             return (
-              <Pressable key={item.id} onPress={() => navigateToStudy()} style={{ borderRadius: 14 }}>
+              <Pressable key={item.id} onPress={() => navigateToStudy()} style={({ pressed }) => [{ borderRadius: 14, opacity: pressed ? 0.7 : 1 }]}
+                accessibilityRole="button"
+                accessibilityLabel={`${item.surfaceForm} — ${item.meaning}`}>
                 <MobileSurface padding={14}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
                     <ConceptIcon name={iconName} size={28} color={colors.brand} />
                     <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>
+                      <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 24, fontFamily: theme.fonts.display, color: colors.text }}>
                         {item.surfaceForm}
                       </Text>
-                      <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 1 }}>
+                      <Text style={{ ...theme.typography.mobileBody, fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginTop: 1 }}>
                         {item.transliteration} · {item.meaning}
                       </Text>
                       {item.contextSentence ? (
-                        <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 4, fontStyle: 'italic' }}>
+                        <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, marginTop: 4 }}>
                           {item.contextSentence.ru} — {item.contextSentence.en}
                         </Text>
                       ) : null}
@@ -68,7 +70,7 @@ export default function VocabularyScreen() {
         </View>
 
         {filtered.length === 0 ? (
-          <Text style={{ fontSize: 14, color: colors.textMuted, textAlign: 'center', marginTop: 40 }}>
+          <Text style={{ ...theme.typography.mobileBody, color: colors.textMuted, textAlign: 'center', marginTop: 40 }}>
             No phrases match "{search}".
           </Text>
         ) : null}

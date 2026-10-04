@@ -16,9 +16,19 @@ import {
 } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
+import { Rollsign, LineMap, StationRow, type LineMapStation } from '../../components/knowalong';
 import { useLearningSources, useLearningSource, useSourceSections } from '../../hooks';
 import { resetDemoState } from '../../utils/supabase/repositories';
+
+// The Night Metro demo line — one stop per service state, the second
+// stop "current" so the ring + lit dot read on the demo plate.
+const DEMO_LINE: LineMapStation[] = [
+  { id: 'privet', title: 'Приветствие', meta: 'greeting · known', state: 'known' },
+  { id: 'svetofor', title: 'Светофор', meta: 'traffic light · learning', state: 'seen', current: true },
+  { id: 'vokzal', title: 'Вокзал', meta: 'station · needs work', state: 'new' },
+  { id: 'topor', title: 'Топор', meta: 'axe · locked', state: 'locked' },
+];
 
 export default function KnowAlongDemoScreen() {
   const { colors } = useAppTheme();
@@ -35,6 +45,49 @@ export default function KnowAlongDemoScreen() {
       <MobileAtmosphere surface="analytics" />
       <MobileHeader title="KnowAlong Demo" eyebrow="Dev" onBack={safeGoBack} />
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={styles.bodyContent}>
+        <MobileSectionEyebrow>Night Metro</MobileSectionEyebrow>
+        <Text style={[styles.sectionNote, { color: colors.textSecondary }]}>
+          The design language's signature components — the destination
+          blind, the line map, the station row.
+        </Text>
+        <View style={{ height: 10 }} />
+        <Rollsign
+          destination="Винительный падеж"
+          eyebrow="Line 02 · Cases"
+          meta="Next stop"
+          testID="demo-rollsign-lg"
+        />
+        <View style={{ height: 10 }} />
+        <Rollsign
+          destination="Светофор"
+          eyebrow="Line 01 · Core"
+          size="md"
+          testID="demo-rollsign-md"
+        />
+        <View style={{ height: 12 }} />
+        <MobileSurface padding={16}>
+          <LineMap stations={DEMO_LINE} lineLabel="Line 01 · Core" testID="demo-linemap" />
+        </MobileSurface>
+        <View style={{ height: 12 }} />
+        <MobileSurface padding={6}>
+          <StationRow
+            title="Светофор"
+            meta="Deck · 24 words"
+            state="seen"
+            current
+            testID="demo-station-row"
+            right={<Text style={[styles.demoRight, { color: colors.brand }]}>24</Text>}
+          />
+          <StationRow
+            title="Магазин"
+            meta="Deck · 18 words"
+            state="locked"
+            testID="demo-station-row-locked"
+            right={<Text style={[styles.demoRight, { color: colors.textMuted }]}>18</Text>}
+          />
+        </MobileSurface>
+
+        <View style={{ height: 16 }} />
         <MobileSectionEyebrow>Demo source</MobileSectionEyebrow>
         <MobileSurface padding={16}>
           {sourceDetail ? (
@@ -110,6 +163,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 12,
     paddingBottom: 80,
+  },
+  sectionNote: {
+    fontSize: 13,
+    lineHeight: 18,
+    marginBottom: 4,
+  },
+  demoRight: {
+    ...theme.typography.mobileLedger,
+    fontWeight: '700',
   },
   demoTitle: {
     fontSize: 18,

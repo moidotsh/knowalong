@@ -167,8 +167,13 @@ export function MobileStepper({
     cleanup();
   }, [cleanup]);
 
-  const canDecrement = onChange ? value > min : !decrementDisabled;
-  const canIncrement = onChange ? value < max : !incrementDisabled;
+  // NaN min/max mean "no bound" (the handlers already treat them so);
+  // comparing against NaN directly is always false and would permanently
+  // disable both buttons.
+  const hasMin = Number.isFinite(min);
+  const hasMax = Number.isFinite(max);
+  const canDecrement = onChange ? !hasMin || value > min : !decrementDisabled;
+  const canIncrement = onChange ? !hasMax || value < max : !incrementDisabled;
 
   const displayValue =
     decimalPlaces === 0 ? Math.round(value).toString() : value.toFixed(decimalPlaces);

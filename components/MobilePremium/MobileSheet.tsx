@@ -27,8 +27,9 @@ import {
 } from 'react-native';
 import { X } from '@tamagui/lucide-icons-2';
 import { isWeb } from '../../utils';
-import { MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
+import { MOBILE_CONTENT_WIDTH_STYLE, theme } from '../../constants';
 import { useAppTheme } from '../../context';
+import { useDialogFocus, useDismissOnEscape } from '../premium/shared';
 
 export interface MobileSheetProps {
   /** Whether the sheet is visible. */
@@ -51,6 +52,14 @@ export interface MobileSheetProps {
   accentColor?: string;
   /** Test ID. */
   testID?: string;
+  /**
+   * Lift the panel's content-width cap (e.g. a comparison matrix that
+   * legitimately needs more than the mobile column). The canonical
+   * policy spread stays the default; this prop overrides its maxWidth
+   * for callers whose content is wider by design. Undefined keeps the
+   * constrained cap.
+   */
+  panelMaxWidth?: number;
   /** Outer style pass-through (applied to the sheet panel). */
   style?: StyleProp<ViewStyle>;
 }
@@ -74,24 +83,18 @@ export function MobileSheet({
   children,
   accentColor,
   testID,
+  panelMaxWidth,
   style,
 }: MobileSheetProps) {
   const { colors } = useAppTheme();
   const accent = accentColor ?? colors.brand;
   const resolvedShowClose = showCloseButton ?? !!title;
+  const panelRef = useDialogFocus(!!open);
 
   const handleClose = () => onOpenChange?.(false);
 
   // Escape-to-close on web, gated by closeOnBackdropTap.
-  useEffect(() => {
-    if (!isWeb || !open || !closeOnBackdropTap) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isWeb, open, closeOnBackdropTap]);
+  useDismissOnEscape(open, closeOnBackdropTap, handleClose);
 
   if (!open) return null;
 
@@ -106,21 +109,29 @@ export function MobileSheet({
       onRequestClose={handleClose}
       statusBarTranslucent
     >
-      <Pressable
-        style={[
-          styles.scrim,
-          isBottom ? styles.scrimBottom : styles.scrimTop,
-        ]}
-        onPress={closeOnBackdropTap ? handleClose : undefined}
-        accessibilityRole={closeOnBackdropTap ? 'button' : undefined}
-        accessibilityLabel={closeOnBackdropTap ? 'Close sheet' : undefined}
-      >
+      {/* Scrim and panel are SIBLINGS, not nested: RN-web renders a
+          role=button Pressable as a real <button>, and a <button>
+          cannot contain the panel's own buttons (invalid HTML +
+          hydration errors). The scrim absolute-fills behind the panel;
+          the host owns the anchor justification the scrim used to own. */}
+      <View style={[styles.host, isBottom ? styles.hostBottom : styles.hostTop]}>
         <Pressable
+          style={styles.scrim}
+          onPress={closeOnBackdropTap ? handleClose : undefined}
+          accessibilityRole={closeOnBackdropTap ? 'button' : undefined}
+          accessibilityLabel={closeOnBackdropTap ? 'Close sheet' : undefined}
+        />
+        <Pressable
+          ref={panelRef as unknown as React.Ref<React.ComponentRef<typeof Pressable>>}
           onPress={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-modal
+          tabIndex={isWeb ? -1 : undefined}
           style={[
             styles.sheet,
             isBottom ? styles.sheetBottom : styles.sheetTop,
             { backgroundColor: colors.card },
+            ...(panelMaxWidth != null ? [{ maxWidth: panelMaxWidth }] : []),
             style,
           ]}
         >
@@ -155,21 +166,24 @@ export function MobileSheet({
 
           <View style={styles.body}>{children}</View>
         </Pressable>
-      </Pressable>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  scrim: {
+  host: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
-  scrimBottom: {
+  hostBottom: {
     justifyContent: 'flex-end',
   },
-  scrimTop: {
+  hostTop: {
     justifyContent: 'flex-start',
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   // Policy spread lands on the visible sheet panel — NOT on the Modal
   // root or the backdrop Pressable. SB2 (audit-mobile-content-width.ts)
@@ -180,8 +194,11 @@ const styles = StyleSheet.create({
     ...MOBILE_CONTENT_WIDTH_STYLE,
   },
   sheetBottom: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    // The sheet obeys the theme's shape law — no hardcoded corner
+    // breaks (shapes.sheet is the single shape-language override
+    // point; a literal here bypassed the discipline).
+    borderTopLeftRadius: theme.shapes.sheet,
+    borderTopRightRadius: theme.shapes.sheet,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
     maxHeight: '85%',
@@ -189,8 +206,8 @@ const styles = StyleSheet.create({
   sheetTop: {
     borderTopLeftRadius: 0,
     borderTopRightRadius: 0,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: theme.shapes.sheet,
+    borderBottomRightRadius: theme.shapes.sheet,
     maxHeight: '85%',
   },
   handleBar: {
@@ -213,8 +230,10 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: theme.typography.mobileItemTitle.fontSize,
+    fontWeight: theme.typography.mobileItemTitle.fontWeight as any,
+    lineHeight: theme.typography.mobileItemTitle.lineHeight,
+    letterSpacing: theme.typography.mobileItemTitle.letterSpacing,
   },
   closeButton: {
     padding: 4,

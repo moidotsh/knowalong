@@ -16,7 +16,7 @@ import {
 } from '../../../../components/MobilePremium';
 import { useAppTheme } from '../../../../context';
 import { safeGoBack, navigateToReview } from '../../../../navigation';
-import { SCREEN_BODY_STYLE } from '../../../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../../../constants';
 import { useSourceSections, useSectionReadiness } from '../../../../hooks';
 
 export default function SectionDetailScreen() {
@@ -112,13 +112,14 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   sectionType: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
     textTransform: 'uppercase',
   },
   readinessScore: {
+    ...theme.typography.mobileFigure,
     fontSize: 20,
-    fontWeight: '700',
+    lineHeight: 26,
+    letterSpacing: -0.3,
     marginTop: 4,
   },
   lineItem: {
@@ -127,24 +128,30 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   lineNumber: {
-    fontSize: 12,
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 15,
     width: 20,
     paddingTop: 4,
   },
   lineText: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
     lineHeight: 22,
   },
   lineTranslation: {
-    fontSize: 13,
-    lineHeight: 19,
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 16,
     marginTop: 2,
-    fontStyle: 'italic',
   },
   emptyText: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
+    lineHeight: 18,
   },
   genText: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
   },

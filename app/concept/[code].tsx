@@ -11,7 +11,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobileSectionEyebrow } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToStudy } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import { LEARNING_ITEMS } from '../../utils/knowalong/fixtures/learningItems';
 import { ConceptIcon } from '../../components/knowalong/ConceptIcon';
 import { ITEM_ICONS } from '../../utils/knowalong/icons';
@@ -39,18 +39,18 @@ export default function ConceptDetailScreen() {
         <MobileSurface padding={28}>
           <View style={{ alignItems: 'center' }}>
             <ConceptIcon name={ITEM_ICONS[item.id] ?? 'star'} size={56} color={colors.brand} />
-            <Text style={{ fontSize: 40, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: 12 }}>
+            <Text style={{ fontSize: 40, lineHeight: 46, fontWeight: '700', fontFamily: theme.fonts.display, color: colors.text, textAlign: 'center', marginTop: 12 }}>
               {item.surfaceForm}
             </Text>
-            <Text style={{ fontSize: 16, color: colors.textSecondary, fontStyle: 'italic', marginTop: 4 }}>
+            <Text style={{ ...theme.typography.mobileLedger, fontSize: 13, lineHeight: 17, color: colors.textSecondary, marginTop: 4 }}>
               {item.transliteration}
             </Text>
             {item.ipa ? (
-              <Text style={{ fontSize: 14, color: colors.textMuted, fontFamily: 'monospace', marginTop: 4 }}>
+              <Text style={{ ...theme.typography.mobileLedger, fontSize: 13, lineHeight: 17, color: colors.textMuted, marginTop: 4 }}>
                 /{item.ipa}/
               </Text>
             ) : null}
-            <Text style={{ fontSize: 20, fontWeight: '600', color: colors.brand, marginTop: 12 }}>
+            <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 20, lineHeight: 26, fontFamily: theme.fonts.display, color: colors.brand, marginTop: 12 }}>
               "{item.meaning}"
             </Text>
           </View>
@@ -65,9 +65,9 @@ export default function ConceptDetailScreen() {
                 paddingVertical: 10, paddingHorizontal: 14, borderRadius: 10, borderWidth: 2,
                 borderColor: colors.cardBorder, backgroundColor: colors.cardAlt, alignItems: 'center', minWidth: 72,
               }}>
-                <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>{w.form}</Text>
-                <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 2 }}>{w.gloss}</Text>
-                <Text style={{ fontSize: 9, color: colors.textMuted, marginTop: 2, textTransform: 'uppercase' }}>{w.role}</Text>
+                <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 22, fontFamily: theme.fonts.display, color: colors.text }}>{w.form}</Text>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted, marginTop: 2 }}>{w.gloss}</Text>
+                <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 9, lineHeight: 12, color: colors.textMuted, marginTop: 3, textTransform: 'uppercase' }}>{w.role}</Text>
               </View>
             ))}
           </View>
@@ -78,7 +78,7 @@ export default function ConceptDetailScreen() {
           <View style={{ marginTop: 20 }}>
             <MobileSectionEyebrow>Grammar note</MobileSectionEyebrow>
             <MobileSurface padding={16}>
-              <Text style={{ fontSize: 14, color: colors.textSecondary, lineHeight: 20 }}>{item.note}</Text>
+              <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary }}>{item.note}</Text>
             </MobileSurface>
           </View>
         ) : null}
@@ -88,14 +88,14 @@ export default function ConceptDetailScreen() {
           <View style={{ marginTop: 20 }}>
             <MobileSectionEyebrow>How it works</MobileSectionEyebrow>
             <MobileSurface padding={16}>
-              <Text style={{ fontSize: 14, color: colors.text, lineHeight: 20 }}>{item.construction.intro}</Text>
+              <Text style={{ ...theme.typography.mobileBody, color: colors.text }}>{item.construction.intro}</Text>
               <View style={{ marginTop: 12, gap: 6 }}>
                 {item.construction.breakdown.map((part, i) => (
                   <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-                    <Text style={{ fontSize: 16, fontWeight: '700', color: colors.brand }}>{part.form}</Text>
-                    <Text style={{ fontSize: 14, color: colors.textMuted }}>=</Text>
-                    <Text style={{ fontSize: 14, fontWeight: '500', color: colors.text }}>{part.literal}</Text>
-                    <Text style={{ fontSize: 12, fontStyle: 'italic', color: colors.textMuted }}>({part.note})</Text>
+                    <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, lineHeight: 21, fontFamily: theme.fonts.display, color: colors.brand }}>{part.form}</Text>
+                    <Text style={{ ...theme.typography.mobileBody, color: colors.textMuted }}>=</Text>
+                    <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>{part.literal}</Text>
+                    <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted }}>({part.note})</Text>
                   </View>
                 ))}
               </View>
@@ -108,10 +108,10 @@ export default function ConceptDetailScreen() {
           <View style={{ marginTop: 20 }}>
             <MobileSectionEyebrow>In context</MobileSectionEyebrow>
             <MobileSurface padding={16}>
-              <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text, textAlign: 'center' }}>
+              <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 24, fontFamily: theme.fonts.display, color: colors.text, textAlign: 'center' }}>
                 {item.contextSentence.ru}
               </Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 6, fontStyle: 'italic' }}>
+              <Text style={{ ...theme.typography.mobileBody, fontSize: 13, lineHeight: 18, color: colors.textSecondary, textAlign: 'center', marginTop: 6 }}>
                 {item.contextSentence.en}
               </Text>
             </MobileSurface>
@@ -128,7 +128,7 @@ export default function ConceptDetailScreen() {
                 return (
                   <View key={depId} style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: colors.status.success + '15', flexDirection: 'row', alignItems: 'center', gap: 4 }}>
                     <ConceptIcon name="check" size={14} color={colors.status.success} />
-                    <Text style={{ fontSize: 13, fontWeight: '600', color: colors.status.success }}>{dep?.surfaceForm ?? depId}</Text>
+                    <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 13, lineHeight: 17, color: colors.status.success }}>{dep?.surfaceForm ?? depId}</Text>
                   </View>
                 );
               })}

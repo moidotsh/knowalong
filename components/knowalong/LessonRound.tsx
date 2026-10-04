@@ -14,6 +14,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { MobileSurface } from '../MobilePremium';
 import { useAppTheme } from '../../context';
+import { theme } from '../../constants';
 import type { LessonStep } from '../../utils/knowalong/fixtures/decks';
 import { buildChipsForStep, type Chip } from '../../utils/knowalong/fixtures/chips';
 import { ROLE_COLOR_KEYS, type WordRole } from '../../utils/knowalong/fixtures/learningItems';
@@ -210,10 +211,16 @@ export function LessonRound({
         <View style={[styles.solvedBox, { backgroundColor: colors.status.success + '15' }]}>
           <View style={styles.solvedHead}>
             <Text style={[styles.solvedTitle, { color: colors.status.success }]}>
-              {mode === 'cloze' ? (step.clozeAnswer ?? '') : step.surfaceForm}
+              {mode === 'cloze' ? (step.clozeAnswer ?? '') : mode === 'reverse' ? step.meaning : step.surfaceForm}
             </Text>
             {isSpeechAvailable() ? (
-              <Pressable hitSlop={10} onPress={replay} style={styles.replayBtn}>
+              <Pressable
+                hitSlop={10}
+                onPress={replay}
+                style={styles.replayBtn}
+                accessibilityRole="button"
+                accessibilityLabel="Play audio"
+              >
                 <ConceptIcon name="sparkles" size={20} color={colors.status.success} />
               </Pressable>
             ) : null}
@@ -241,12 +248,15 @@ export function LessonRound({
               <Pressable
                 key={chip.id}
                 onPress={() => handleTapChip(chip)}
-                style={[
+                accessibilityRole="button"
+                accessibilityLabel={chip.gloss ? `${chip.form} — ${chip.gloss}` : chip.form}
+                style={({ pressed }) => [
                   styles.chip,
                   {
                     borderLeftColor: rc,
                     backgroundColor: isWrong ? colors.status.error + '20' : colors.cardAlt,
                     borderColor: isWrong ? colors.status.error : colors.cardBorder,
+                    opacity: pressed ? 0.7 : 1,
                   },
                 ]}
               >
@@ -288,38 +298,41 @@ function ClozeSentence({ step, solved, colors }: { step: LessonStep; solved: boo
 }
 
 const styles = StyleSheet.create({
-  promptLabel: { fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center', marginBottom: 6 },
+  // The instruction eyebrow — tracked mono caps, the timetable voice.
+  promptLabel: { ...theme.typography.mobileEyebrow, textTransform: 'uppercase', textAlign: 'center', marginBottom: 8 },
   promptWrap: { alignItems: 'center' },
   promptEmojiWrap: { marginBottom: 4 },
-  prompt: { fontSize: 28, fontWeight: '700', textAlign: 'center' },
-  promptTranslit: { fontSize: 14, fontStyle: 'italic', textAlign: 'center', marginTop: 4 },
+  // The phrase under construction — the card's signage (display face).
+  prompt: { fontSize: 26, fontWeight: '700', lineHeight: 34, textAlign: 'center', fontFamily: theme.fonts.display },
+  promptTranslit: { ...theme.typography.mobileLedger, textAlign: 'center', marginTop: 4 },
   slotsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginBottom: 20 },
   slotFilled: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderLeftWidth: 4, minWidth: 70, alignItems: 'center' },
   slotEmpty: { width: 70, height: 56, borderRadius: 10, borderWidth: 2, borderStyle: 'dashed' },
-  chipForm: { fontSize: 18, fontWeight: '600', textAlign: 'center' },
-  chipGloss: { fontSize: 11, textAlign: 'center', marginTop: 2 },
+  chipForm: { ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 24, textAlign: 'center' },
+  chipGloss: { ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 14, textAlign: 'center', marginTop: 2 },
   chipBank: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' },
   chip: { paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10, borderWidth: 2, borderLeftWidth: 4, minWidth: 70, alignItems: 'center' },
   solvedBox: { marginTop: 16, padding: 16, borderRadius: 12 },
   solvedHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 10 },
-  solvedTitle: { fontSize: 22, fontWeight: '700', textAlign: 'center', flexShrink: 1 },
+  solvedTitle: { fontSize: 22, fontWeight: '700', lineHeight: 28, textAlign: 'center', flexShrink: 1, fontFamily: theme.fonts.display },
   replayBtn: { padding: 4 },
-  solvedTranslit: { fontSize: 14, textAlign: 'center', fontStyle: 'italic', marginTop: 4 },
-  solvedNote: { fontSize: 13, marginTop: 8, lineHeight: 18, textAlign: 'center' },
+  solvedTranslit: { ...theme.typography.mobileLedger, textAlign: 'center', marginTop: 4 },
+  solvedNote: { ...theme.typography.mobileBody, marginTop: 8, textAlign: 'center' },
   contextBox: { marginTop: 12, padding: 12, borderRadius: 10, borderWidth: 1 },
-  contextRu: { fontSize: 17, fontWeight: '600', textAlign: 'center' },
-  contextEn: { fontSize: 13, textAlign: 'center', marginTop: 4, fontStyle: 'italic' },
+  contextRu: { ...theme.typography.mobileItemTitle, fontSize: 17, lineHeight: 24, textAlign: 'center' },
+  contextEn: { ...theme.typography.mobileLedger, textAlign: 'center', marginTop: 4 },
   constructionBox: { marginTop: 12, marginBottom: 0, padding: 14, borderRadius: 12, borderWidth: 1 },
-  constructionIntro: { fontSize: 14, lineHeight: 20, marginBottom: 10 },
+  constructionIntro: { ...theme.typography.mobileBody, marginBottom: 10 },
   constructionBreakdown: { gap: 6 },
   breakdownRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  breakdownForm: { fontSize: 16, fontWeight: '700' },
-  breakdownArrow: { fontSize: 14 },
-  breakdownLiteral: { fontSize: 14, fontWeight: '500' },
-  breakdownNote: { fontSize: 12, fontStyle: 'italic' },
+  // Morphology table rows read as ledger facts — PT Mono for form and literal.
+  breakdownForm: { ...theme.typography.mobileLedger, fontSize: 16, lineHeight: 20, fontWeight: '700' },
+  breakdownArrow: { ...theme.typography.mobileBody },
+  breakdownLiteral: { ...theme.typography.mobileLedger },
+  breakdownNote: { ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16 },
   clozeWrap: { alignItems: 'center', marginBottom: 16 },
-  clozeSentence: { fontSize: 24, fontWeight: '700', textAlign: 'center', lineHeight: 34 },
+  clozeSentence: { fontSize: 24, fontWeight: '700', lineHeight: 32, textAlign: 'center', fontFamily: theme.fonts.display },
   clozeFilled: { fontWeight: '800' },
   clozeBlank: { fontWeight: '700', letterSpacing: 2 },
-  clozeMeaning: { fontSize: 13, fontStyle: 'italic', textAlign: 'center', marginTop: 8 },
+  clozeMeaning: { ...theme.typography.mobileLedger, textAlign: 'center', marginTop: 8 },
 });

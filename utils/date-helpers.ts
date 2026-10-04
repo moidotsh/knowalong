@@ -41,6 +41,18 @@ function toDate(date: Date | string): Date {
 }
 
 /**
+ * Format a Date as a local YYYY-MM-DD string (the kit's wire format —
+ * DatePickerField, CalendarGrid, and the activity grid all speak it).
+ * Built from local components so the day never drifts across timezones.
+ */
+export function toYmd(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+/**
  * Format a date for display in the UI using Intl.DateTimeFormat.
  */
 export function formatDateForDisplay(

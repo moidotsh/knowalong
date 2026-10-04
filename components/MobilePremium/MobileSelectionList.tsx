@@ -14,10 +14,10 @@
 //     `typography.mobileFieldLabel`; subtitle 12/400 muted.
 //   • Optional per-option icon slot.
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import { Check } from '@tamagui/lucide-icons-2';
-import { usePressedStyle } from '../premium/shared';
+import { CheckBox } from './CheckBox';
+import { usePressedStyle, useAnimatedFlag } from '../premium/shared';
 import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
 
@@ -50,12 +50,7 @@ export interface MobileSelectionListProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const TITLE_STYLE = {
-  fontSize: theme.typography.mobileFieldLabel.fontSize,
-  fontWeight: theme.typography.mobileFieldLabel.fontWeight as any,
-  lineHeight: theme.typography.mobileFieldLabel.lineHeight,
-  letterSpacing: theme.typography.mobileFieldLabel.letterSpacing,
-} as const;
+const TITLE_STYLE = theme.typography.mobileFieldLabel;
 
 const SUBTITLE_STYLE = {
   fontSize: 12,
@@ -144,29 +139,8 @@ function SelectionRow({
   onSelect,
 }: SelectionRowProps) {
   const { colors } = useAppTheme();
-  // Animated indicator — scale + fade in on selection.
-  const scale = useRef(new Animated.Value(isSelected ? 1 : 0)).current;
-  const opacity = useRef(new Animated.Value(isSelected ? 1 : 0)).current;
-
-  useEffect(() => {
-    const target = isSelected ? 1 : 0;
-    const scaleAnim = Animated.timing(scale, {
-      toValue: target,
-      duration: 180,
-      useNativeDriver: true,
-    });
-    const opacityAnim = Animated.timing(opacity, {
-      toValue: target,
-      duration: 180,
-      useNativeDriver: true,
-    });
-    scaleAnim.start();
-    opacityAnim.start();
-    return () => {
-      scaleAnim.stop();
-      opacityAnim.stop();
-    };
-  }, [isSelected, scale, opacity]);
+  // Animated indicator — one 0..1 flag value drives scale + fade.
+  const progress = useAnimatedFlag(isSelected, { duration: 180 });
 
   return (
     <Pressable
@@ -184,20 +158,9 @@ function SelectionRow({
     >
       {/* Indicator */}
       {multiSelect ? (
-        // Check style — mirrors MobileCheckboxItem exactly.
-        <View
-          style={[
-            styles.checkbox,
-            {
-              backgroundColor: isSelected ? accent : 'transparent',
-              borderColor: isSelected ? accent : borderColorStrong,
-            },
-          ]}
-        >
-          <Animated.View style={{ opacity, transform: [{ scale }] }}>
-            <Check size={14} color={colors.textOnBrand} strokeWidth={3} />
-          </Animated.View>
-        </View>
+        // The kit's bare checkbox indicator — same geometry + animation
+        // MobileCheckboxItem renders.
+        <CheckBox checked={isSelected} accentColor={accent} size={22} checkSize={14} />
       ) : (
         // Radio ring — always visible border; filled dot scales in on selection.
         <View
@@ -210,8 +173,8 @@ function SelectionRow({
         >
           <Animated.View
             style={{
-              opacity,
-              transform: [{ scale }],
+              opacity: progress,
+              transform: [{ scale: progress }],
               backgroundColor: accent,
               width: 12,
               height: 12,
@@ -244,19 +207,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    borderRadius: 12,
+    borderRadius: theme.shapes.tile,
     borderWidth: 1,
     paddingHorizontal: 14,
     paddingVertical: 12,
     minHeight: 44,
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   radio: {
     width: 22,

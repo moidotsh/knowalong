@@ -8,11 +8,11 @@
 //
 // Under `prefers-reduced-motion`, the fill snaps instead of animating.
 
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useMemo } from 'react';
 import { Animated, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { isWeb } from '../../utils';
-import { usePlatformAnimation, useReducedMotion } from '../../hooks';
 import { useAppTheme } from '../../context';
+import { useAnimatedValue, useTransition } from '../premium/shared';
 import { MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
 
 export interface MobileStepRailProps {
@@ -60,9 +60,6 @@ export function MobileStepRail({
 }: MobileStepRailProps) {
   const { colors } = useAppTheme();
   const accent = fillColor ?? accentColor ?? colors.brand;
-  const { useNativeDriver } = usePlatformAnimation();
-  const reduced = useReducedMotion();
-
   // Normalize the two API shapes into a 0-1 fill ratio.
   const resolvedTotal = total ?? totalSteps ?? 0;
   const resolvedCurrent = current != null ? current : (step != null ? step - 1 : 0);
@@ -70,17 +67,9 @@ export function MobileStepRail({
     resolvedTotal > 0 ? Math.max(0, Math.min(1, (resolvedCurrent + 1) / resolvedTotal)) : 0;
 
   // Animated width — animate a 0-1 number, interpolate to % at render.
-  const progress = useRef(new Animated.Value(fillRatio)).current;
-
-  useEffect(() => {
-    const anim = Animated.timing(progress, {
-      toValue: fillRatio,
-      duration: reduced ? 0 : 320,
-      useNativeDriver: false, // width is not transform/opacity
-    });
-    anim.start();
-    return () => anim.stop();
-  }, [fillRatio, progress, reduced, useNativeDriver]);
+  // 'js' driver: width is not transform/opacity.
+  const progress = useAnimatedValue(fillRatio);
+  useTransition(progress, fillRatio, { duration: 320, reducedDuration: 0, driver: 'js' });
 
   const fillWidth = progress.interpolate({
     inputRange: [0, 1],

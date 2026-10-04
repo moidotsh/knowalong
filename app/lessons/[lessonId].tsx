@@ -16,7 +16,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { MobileAtmosphere, MobileHeader, MobilePrimaryButton, MobileActionFooter, MobileSurface } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack, navigateToLessons, navigateToLesson, navigateToDeck, navigateToSubDeck } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import { getLesson, getLessonDeck, getLessonSubDeck } from '../../utils/knowalong/fixtures/decks';
 import { isDynamicSongLessonId, resolveDynamicSongLesson, nextDynamicSongLesson } from '../../utils/knowalong/songDeck';
 import { isCulminatingLineLessonId, resolveCulminatingLineLesson, nextCulminatingLine } from '../../utils/knowalong/culminatingLines';
@@ -39,10 +39,20 @@ export default function LessonPlayerScreen() {
   // (resolveCulminatingLineLesson — mastery-gated; null when the line is locked).
   // Static decks fall back to the ALL_DECKS lookup. A null resolve → the "Lesson
   // not found" guard sends the learner back to the section.
-  const arcResolved = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine(), getContext()) : null;
-  const culmResolved = !arcResolved && isCulminatingLineLessonId(lessonId) ? resolveCulminatingLineLesson(lessonId ?? '', mastery) : null;
-  const lesson = arcResolved?.lesson ?? culmResolved?.lesson ?? getLesson(lessonId ?? '');
-  const deck = arcResolved?.deck ?? culmResolved?.deck ?? (lesson ? getLessonDeck(lessonId ?? '') : null);
+  //
+  // MEMOIZED on [lessonId, mastery]: resolution builds fresh Lesson objects each
+  // call, so an un-memoized inline call gave `lesson` a new identity every render
+  // → the audio effect re-fired every render → setAudioReady oscillation →
+  // "Maximum update depth" on the now-larger (≥8-card) lessons. Mastery is the
+  // only varying input (getSpine/getContext are singletons), so this is stable
+  // across renders until the learner actually answers.
+  const { lesson, deck, arcResolved, culmResolved } = useMemo(() => {
+    const ar = isDynamicSongLessonId(lessonId) ? resolveDynamicSongLesson(lessonId ?? '', mastery, getSpine(), getContext()) : null;
+    const cr = !ar && isCulminatingLineLessonId(lessonId) ? resolveCulminatingLineLesson(lessonId ?? '', mastery) : null;
+    const ls = ar?.lesson ?? cr?.lesson ?? getLesson(lessonId ?? '');
+    const dk = ar?.deck ?? cr?.deck ?? (ls ? getLessonDeck(lessonId ?? '') : null);
+    return { lesson: ls, deck: dk, arcResolved: ar, culmResolved: cr };
+  }, [lessonId, mastery]);
 
   const [stepIndex, setStepIndex] = useState(0);
   const [solved, setSolved] = useState(false);
@@ -50,15 +60,17 @@ export default function LessonPlayerScreen() {
   const [showConfetti, setShowConfetti] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
 
-  // Prefetch each step's phrase + word forms so chips and sentences are cached.
-  const audioTexts = useMemo(
-    () => (lesson?.steps ?? []).flatMap((s) => [s.surfaceForm, ...s.words.map((w) => w.form)]),
-    [lesson],
-  );
-
-  // Gate the first card behind a spinner until the engine + first ~2 cards'
+  // Gate the first card behind a spinner until the engine + first batch of
   // audio are synthesized; prefetch the rest in the background.
+  //
+  // Keyed on `lesson?.id` (stable per lesson), NOT on the audio-texts array:
+  // the array gets a new identity whenever mastery ticks (the memoized lesson
+  // re-resolves on each answer), which would re-trigger this effect, cancel the
+  // in-flight prefetch, and oscillate audioReady — the "Maximum update depth" /
+  // flashing-cards loop on ≥8-card lessons. A lesson's audio set is fixed for
+  // its id, so one prefetch per lesson is correct.
   useEffect(() => {
+    const audioTexts = (lesson?.steps ?? []).flatMap((s) => [s.surfaceForm, ...s.words.map((w) => w.form)]);
     if (audioTexts.length === 0) { setAudioReady(true); return; }
     let cancelled = false;
     setAudioReady(false);
@@ -69,7 +81,8 @@ export default function LessonPlayerScreen() {
       void prefetchAudio(audioTexts.slice(FIRST_BATCH));
     });
     return () => { cancelled = true; };
-  }, [audioTexts]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [lesson?.id]);
 
   const recordMistake = useStreakStore((s) => s.recordMistake);
   const addMasteredConcept = useStreakStore((s) => s.addMasteredConcept);
@@ -139,14 +152,30 @@ export default function LessonPlayerScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 80 }}>
         {isComplete ? (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 28, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+            <Text
+              style={{
+                ...theme.typography.mobileFigure,
+                fontSize: 24,
+                lineHeight: 30,
+                color: colors.text,
+                textAlign: 'center',
+              }}
+            >
               {lesson.steps.length} phrases built
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
               {score.mistakes === 0 ? 'Flawless — no mistakes!' : `${score.mistakes} mistake${score.mistakes === 1 ? '' : 's'} along the way.`}
             </Text>
             {lesson.steps.map((s, i) => (
-              <Text key={i} style={{ fontSize: 14, fontWeight: '600', color: colors.text, textAlign: 'center', marginTop: 6 }}>
+              <Text
+                key={i}
+                style={{
+                  ...theme.typography.mobileLedger,
+                  color: colors.text,
+                  textAlign: 'center',
+                  marginTop: 6,
+                }}
+              >
                 {s.surfaceForm}
               </Text>
             ))}
@@ -165,7 +194,7 @@ export default function LessonPlayerScreen() {
         ) : (
           <View style={{ padding: 48, alignItems: 'center' }}>
             <LoadingSpinner size="large" color={colors.brand} />
-            <Text style={{ marginTop: 12, fontSize: 14, color: colors.textSecondary }}>Loading audio…</Text>
+            <Text style={{ ...theme.typography.mobileBody, marginTop: 12, color: colors.textSecondary }}>Loading audio…</Text>
           </View>
         )}
       </ScrollView>

@@ -17,7 +17,7 @@ import {
 } from '../../../components/MobilePremium';
 import { useAppTheme } from '../../../context';
 import { safeGoBack, navigateToAnalysisRun } from '../../../navigation';
-import { SCREEN_BODY_STYLE } from '../../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../../constants';
 import {
   useLearningSource,
   useSourceAnalysisRuns,
@@ -105,7 +105,9 @@ export default function SourceAnalysisScreen() {
               <Pressable
                 key={run.id}
                 accessibilityRole="button"
+                accessibilityLabel={`Analysis run ${formatTimestamp(run.completedAt ?? run.startedAt ?? run.requestedAt)}, status ${run.status.replace(/_/g, ' ')}`}
                 onPress={() => sourceId && navigateToAnalysisRun(sourceId, run.id)}
+                style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
               >
                 <MobileSurface padding={12}>
                   <View style={styles.runRowTop}>
@@ -129,6 +131,7 @@ export default function SourceAnalysisScreen() {
                   <View style={styles.runActionsRow}>
                     <Pressable
                       accessibilityRole="button"
+                      accessibilityLabel="Delete this analysis run"
                       onPress={() =>
                         deleteMutation.mutate({
                           runId: run.id,
@@ -137,6 +140,7 @@ export default function SourceAnalysisScreen() {
                         })
                       }
                       disabled={deleteMutation.isPending}
+                      style={({ pressed }) => [{ opacity: pressed && !deleteMutation.isPending ? 0.6 : 1 }]}
                     >
                       <Text
                         style={[
@@ -176,11 +180,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
     marginBottom: 6,
   },
   body: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -194,19 +198,24 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   runStatus: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'capitalize',
+    ...theme.typography.mobileEyebrow,
+    textTransform: 'uppercase',
   },
   runDate: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
   },
   runFailureReason: {
+    ...theme.typography.mobileBody,
     fontSize: 12,
+    lineHeight: 17,
     marginBottom: 4,
   },
   runMeta: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
     marginBottom: 8,
   },
   runActionsRow: {
@@ -214,7 +223,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   deleteLabel: {
-    fontSize: 12,
-    fontWeight: '600',
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
+    textTransform: 'uppercase',
   },
 });

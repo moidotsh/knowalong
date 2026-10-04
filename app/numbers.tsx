@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 
 interface Numeral {
   digit: number;
@@ -90,19 +90,20 @@ export default function NumbersScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 80 }}>
         {isComplete ? (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 32, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileFigure, fontSize: 32, lineHeight: 36, letterSpacing: -1, color: colors.text, textAlign: 'center' }}>
               {score.correct} / {TOTAL}
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
               {score.correct >= TOTAL * 0.8 ? 'Great counting!' : 'Keep practicing numbers.'}
             </Text>
           </MobileSurface>
         ) : (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileEyebrow, textTransform: 'uppercase', color: colors.textMuted, textAlign: 'center' }}>
               {question.promptLabel}
             </Text>
-            <Text style={{ fontSize: 56, fontWeight: '700', color: colors.text, textAlign: 'center', marginTop: 16 }}>
+            {/* The numeral — the hero figure (display face, tabular digits). */}
+            <Text style={{ ...theme.typography.mobileHero, color: colors.text, textAlign: 'center', marginTop: 16 }}>
               {question.prompt}
             </Text>
 
@@ -118,8 +119,13 @@ export default function NumbersScreen() {
                 }
                 return (
                   <Pressable key={i} disabled={selected !== null} onPress={() => handleSelect(i)}
-                    style={{ paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, borderWidth: 2, borderColor: border, backgroundColor: bg, minWidth: 90, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text }}>{opt}</Text>
+                    accessibilityRole="button"
+                    accessibilityLabel={opt}
+                    style={({ pressed }) => ({
+                      paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, borderWidth: 2, borderColor: border, backgroundColor: bg, minWidth: 90, alignItems: 'center',
+                      opacity: pressed ? 0.7 : 1,
+                    })}>
+                    <Text style={{ fontSize: 20, fontWeight: '700', lineHeight: 26, fontFamily: theme.fonts.display, color: colors.text }}>{opt}</Text>
                   </Pressable>
                 );
               })}
@@ -127,7 +133,7 @@ export default function NumbersScreen() {
 
             {selected !== null ? (
               <View style={{ marginTop: 16, padding: 14, borderRadius: 12, backgroundColor: (selected === question.correctIndex ? colors.status.success : colors.status.error) + '15' }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: selected === question.correctIndex ? colors.status.success : colors.status.error, textAlign: 'center' }}>
+                <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, color: selected === question.correctIndex ? colors.status.success : colors.status.error, textAlign: 'center' }}>
                   {question.correct.digit} = {question.correct.russian}
                 </Text>
               </View>

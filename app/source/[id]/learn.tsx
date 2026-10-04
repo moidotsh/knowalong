@@ -12,7 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../../../components/MobilePremium';
 import { useAppTheme } from '../../../context';
 import { safeGoBack, navigateToStudy } from '../../../navigation';
-import { SCREEN_BODY_STYLE } from '../../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../../constants';
 import { SAMPLE_SONG, type SongSection } from '../../../utils/knowalong/fixtures/sampleSong';
 import { LEARNING_ITEMS } from '../../../utils/knowalong/fixtures/learningItems';
 import { ConceptIcon } from '../../../components/knowalong/ConceptIcon';
@@ -36,13 +36,17 @@ export default function SongLearnScreen() {
           <Pressable
             key={s.id}
             onPress={() => setActiveSection(i)}
-            style={{
+            accessibilityRole="tab"
+            accessibilityState={{ selected: i === activeSection }}
+            accessibilityLabel={`${s.label} section`}
+            style={({ pressed }) => [{
               paddingVertical: 8, paddingHorizontal: 14, borderRadius: 10, borderWidth: 2,
               borderColor: i === activeSection ? colors.brand : colors.cardBorder,
               backgroundColor: i === activeSection ? colors.brand + '12' : colors.cardAlt,
-            }}
+              opacity: pressed ? 0.7 : 1,
+            }]}
           >
-            <Text style={{ fontSize: 13, fontWeight: '600', color: i === activeSection ? colors.brand : colors.textSecondary }}>
+            <Text style={{ ...theme.typography.mobileEyebrow, color: i === activeSection ? colors.brand : colors.textSecondary, textTransform: 'uppercase' }}>
               {s.label}
             </Text>
           </Pressable>
@@ -53,7 +57,7 @@ export default function SongLearnScreen() {
 
         {/* Concept summary */}
         <MobileSurface padding={16}>
-          <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+          <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>
             Concepts in this section
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -71,7 +75,7 @@ export default function SongLearnScreen() {
                   {ITEM_ICONS[code] ? (
                     <ConceptIcon name={ITEM_ICONS[code] as IconName} size={14} color={known ? colors.status.success : colors.brand} />
                   ) : null}
-                  <Text style={{ fontSize: 13, fontWeight: '600', color: known ? colors.status.success : colors.brand }}>
+                  <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 13, lineHeight: 17, color: known ? colors.status.success : colors.brand }}>
                     {item?.surfaceForm ?? code}
                   </Text>
                   <ConceptIcon name={known ? 'check' : 'sparkles'} size={12} color={known ? colors.status.success : colors.brand} />
@@ -79,7 +83,7 @@ export default function SongLearnScreen() {
               );
             })}
           </View>
-          <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 8 }}>
+          <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, marginTop: 8 }}>
             {section.knownConcepts.filter((c) => section.allConcepts.includes(c)).length} known · {section.newConcepts.length} to learn
           </Text>
         </MobileSurface>
@@ -89,12 +93,12 @@ export default function SongLearnScreen() {
           {section.lines.map((line) => (
             <MobileSurface key={line.ordinal} padding={14}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 8 }}>
-                <Text style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{line.ordinal}</Text>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, marginTop: 2 }}>{line.ordinal}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 17, fontWeight: '600', color: colors.text, lineHeight: 24 }}>
+                  <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 17, lineHeight: 24, color: colors.text }}>
                     {line.text}
                   </Text>
-                  <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                  <Text style={{ ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, color: colors.textSecondary, marginTop: 4 }}>
                     {line.translation}
                   </Text>
                   {/* Concept chips for this line */}
@@ -107,7 +111,7 @@ export default function SongLearnScreen() {
                           paddingVertical: 2, paddingHorizontal: 6, borderRadius: 4,
                           backgroundColor: known ? colors.status.success + '15' : colors.brand + '15',
                         }}>
-                          <Text style={{ fontSize: 10, fontWeight: '600', color: known ? colors.status.success : colors.brand }}>
+                          <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: known ? colors.status.success : colors.brand }}>
                             {item?.meaning ?? code}
                           </Text>
                         </View>
@@ -123,24 +127,26 @@ export default function SongLearnScreen() {
         {/* New concepts to study */}
         {section.newConcepts.length > 0 ? (
           <View style={{ marginTop: 16 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: colors.textSecondary, marginBottom: 8 }}>
+            <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textSecondary, textTransform: 'uppercase', marginBottom: 8 }}>
               New concepts to learn:
             </Text>
             {section.newConcepts.map((code) => {
               const item = conceptLookup(code);
               if (!item) return null;
               return (
-                <Pressable key={code} onPress={() => navigateToStudy()} style={{ marginBottom: 8, borderRadius: 14 }}>
+                <Pressable key={code} onPress={() => navigateToStudy()} style={({ pressed }) => [{ marginBottom: 8, borderRadius: 14, opacity: pressed ? 0.7 : 1 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Study ${item.surfaceForm} — ${item.meaning}`}>
                   <MobileSurface padding={14}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
                       {ITEM_ICONS[code] ? (
                         <ConceptIcon name={ITEM_ICONS[code] as IconName} size={28} color={colors.brand} />
                       ) : null}
                       <View style={{ flex: 1 }}>
-                        <Text style={{ fontSize: 17, fontWeight: '600', color: colors.text }}>{item.surfaceForm}</Text>
-                        <Text style={{ fontSize: 13, color: colors.textSecondary }}>{item.meaning}</Text>
+                        <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 17, lineHeight: 22, fontFamily: theme.fonts.display, color: colors.text }}>{item.surfaceForm}</Text>
+                        <Text style={{ ...theme.typography.mobileBody, fontSize: 13, lineHeight: 18, color: colors.textSecondary }}>{item.meaning}</Text>
                       </View>
-                      <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand }}>Study →</Text>
+                      <Text style={{ ...theme.typography.mobileEyebrow, color: colors.brand, textTransform: 'uppercase' }}>Study →</Text>
                     </View>
                   </MobileSurface>
                 </Pressable>

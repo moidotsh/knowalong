@@ -66,6 +66,16 @@
  *                narrow case of a Modal with no visible content panel
  *                to constrain (e.g. an offscreen measurement surface).
  *
+ *   SB2-surface — MobileSurface must not re-assert the content-width
+ *                policy on itself. The surface fills its container
+ *                (`width: '100%'`); the centered mobile column belongs
+ *                to the layer above — the screen body (SB1) or the
+ *                portal panel (SB2-portal). A self-capping surface
+ *                defeats a consumer's widened scaffold column: at any
+ *                body width above the cap, every card maroons at the
+ *                mobile width inside a wide column. Sheets and dialogs
+ *                keep their own panel-level caps (SB2-portal).
+ *
  *   SB2-magic-number — no literal numeric `maxWidth: <digits>` under
  *                      components/ (excluding comment lines and the
  *                      canonical definitions in constants/styles.ts).
@@ -217,7 +227,7 @@ export const PORTAL_PANEL_POLICY_SPREAD_REGEX = new RegExp(
 // keep this regex pinned to the policy caps.
 export const MAXWIDTH_LITERAL_REGEX = /maxWidth\s*:\s*(?:420|380)\b/g;
 
-export type PortalCheck = 'SB2-portal' | 'SB2-magic-number';
+export type PortalCheck = 'SB2-portal' | 'SB2-magic-number' | 'SB2-surface';
 
 export interface Violation {
   check: PortalCheck;
@@ -337,6 +347,70 @@ function auditMagicNumber(files: string[]): Violation[] {
   return violations;
 }
 
+// ── SB2-surface ───────────────────────────────────────────────────────
+//
+// The surface primitive itself must not carry the content-width policy.
+// Detection is pinned to MobileSurface.tsx (the single material) and
+// checks two things on its `surface` style entry:
+//   1. no policy-style spread (the cap must not return silently),
+//   2. width: '100%' is present (the fill is load-bearing).
+// A file-level `// sb2-exempt` suppresses both — reserved for a
+// deliberate redesign that rethinks width ownership.
+
+export const SURFACE_POLICY_SPREAD_REGEX =
+  /surface\s*:\s*\{[^}]*\.\.\.\s*MOBILE_(CONTENT|DIALOG)_WIDTH_STYLE\b/;
+export const SURFACE_FILL_WIDTH_REGEX =
+  /surface\s*:\s*\{[^}]*width\s*:\s*['"]100%['"]/;
+
+export function isSurfaceFile(fileRel: string): boolean {
+  return /components\/MobilePremium\/MobileSurface\.tsx$/.test(fileRel);
+}
+
+/**
+ * Scan the surface primitive source for SB2-surface violations. Exported
+ * solely so the test can exercise it against synthetic source without a
+ * temp file.
+ */
+export function scanSurfaceViolations(
+  content: string,
+  fileRel: string,
+): Violation[] {
+  const out: Violation[] = [];
+  if (!isSurfaceFile(fileRel)) return out;
+  if (fileHasSb2Exempt(content)) return out;
+
+  if (SURFACE_POLICY_SPREAD_REGEX.test(content)) {
+    out.push({
+      check: 'SB2-surface',
+      file: fileRel,
+      line: 1,
+      message:
+        "MobileSurface spreads MOBILE_CONTENT_WIDTH_STYLE onto itself — the surface must fill its container and the centered column comes from the scaffold body (SB1) or the portal panel (SB2-portal). A self-capping surface defeats any widened scaffold column (or add // sb2-exempt with justification).",
+    });
+  }
+  if (!SURFACE_FILL_WIDTH_REGEX.test(content)) {
+    out.push({
+      check: 'SB2-surface',
+      file: fileRel,
+      line: 1,
+      message:
+        "MobileSurface's `surface` style must set width: '100%' — the fill is load-bearing (or add // sb2-exempt with justification).",
+    });
+  }
+  return out;
+}
+
+function auditSurface(files: string[]): Violation[] {
+  const violations: Violation[] = [];
+  for (const file of files) {
+    const fileRel = relative(ROOT, file);
+    if (!isSurfaceFile(fileRel)) continue;
+    const content = readFileSync(file, 'utf8');
+    violations.push(...scanSurfaceViolations(content, fileRel));
+  }
+  return violations;
+}
+
 // ── Main ──────────────────────────────────────────────────────────────
 
 function main() {
@@ -355,6 +429,7 @@ function main() {
   const violations: Violation[] = [
     ...auditPortal(files),
     ...auditMagicNumber(files),
+    ...auditSurface(files),
   ];
 
   if (violations.length === 0) {

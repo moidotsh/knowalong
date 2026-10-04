@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS, ROLE_COLOR_KEYS, type WordRole } from '../utils/knowalong/fixtures/learningItems';
 import { ConfettiEffect } from '../components/Celebration/ConfettiEffect';
 
@@ -103,10 +103,10 @@ export default function ConversationScreen() {
         <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 40 }}>
           <MobileSurface padding={24}>
             <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 12 }}>✓</Text>
-            <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 20, lineHeight: 26, fontFamily: theme.fonts.display, color: colors.text, textAlign: 'center' }}>
               {TURNS.length} conversations completed
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
               You answered real questions in Russian!
             </Text>
           </MobileSurface>
@@ -126,20 +126,20 @@ export default function ConversationScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12 }}>
         {/* Question */}
         <MobileSurface padding={20}>
-          <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textMuted, textTransform: 'uppercase' }}>
             They ask:
           </Text>
-          <Text style={{ fontSize: 24, fontWeight: '700', color: colors.text, marginTop: 8 }}>
+          <Text style={{ fontSize: 24, lineHeight: 30, fontWeight: '700', fontFamily: theme.fonts.display, color: colors.text, marginTop: 8 }}>
             {turn.question.ru}
           </Text>
-          <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+          <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, marginTop: 4 }}>
             {turn.question.en}
           </Text>
         </MobileSurface>
 
         {/* Answer area */}
         <View style={{ marginTop: 16 }}>
-          <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+          <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textMuted, textTransform: 'uppercase', marginBottom: 8 }}>
             Your answer:
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center' }}>
@@ -158,8 +158,8 @@ export default function ConversationScreen() {
                 }}>
                   {filled ? (
                     <>
-                      <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>{w.form}</Text>
-                      <Text style={{ fontSize: 11, color: colors.textMuted }}>{w.gloss}</Text>
+                      <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 22, fontFamily: theme.fonts.display, color: colors.text }}>{w.form}</Text>
+                      <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted }}>{w.gloss}</Text>
                     </>
                   ) : null}
                 </View>
@@ -191,26 +191,29 @@ export default function ConversationScreen() {
                 <Pressable
                   key={i}
                   onPress={() => handleTap(i)}
-                  style={{
+                  accessibilityRole="button"
+                  accessibilityLabel={`${chip.form} — ${chip.gloss}`}
+                  style={({ pressed }) => [{
                     paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10,
                     borderWidth: 2, borderLeftWidth: 4, borderLeftColor: rc,
                     borderColor: isWrong ? colors.status.error : colors.cardBorder,
                     backgroundColor: isWrong ? colors.status.error + '20' : colors.cardAlt,
                     minWidth: 70, alignItems: 'center',
-                  }}
+                    opacity: pressed && !isSolved ? 0.7 : 1,
+                  }]}
                 >
-                  <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>{chip.form}</Text>
-                  <Text style={{ fontSize: 11, color: colors.textMuted }}>{chip.gloss}</Text>
+                  <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 22, fontFamily: theme.fonts.display, color: colors.text }}>{chip.form}</Text>
+                  <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted }}>{chip.gloss}</Text>
                 </Pressable>
               );
             })}
           </View>
         ) : (
           <View style={{ marginTop: 20, padding: 16, borderRadius: 12, backgroundColor: colors.status.success + '15' }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: colors.status.success, textAlign: 'center' }}>
+            <Text style={{ fontSize: 18, lineHeight: 22, fontWeight: '700', fontFamily: theme.fonts.display, color: colors.status.success, textAlign: 'center' }}>
               ✓ {turn.answer.ru}
             </Text>
-            <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>
               {turn.answer.en}
             </Text>
           </View>

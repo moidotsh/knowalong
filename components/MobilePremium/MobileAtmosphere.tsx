@@ -20,11 +20,15 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, View, type ViewStyle } from 'react-native';
-import { useReducedMotion, usePlatformAnimation } from '../../hooks';
+import { usePlatformAnimation } from '../../hooks';
 import { isWeb, hasWindow } from '../../utils';
 import { useAppTheme } from '../../context';
+import { CONTENT_WIDTH_MODE, DESKTOP_LAYOUT_MODE, MOBILE_CONTENT_MAX_WIDTH } from '../../constants';
 import {
   PALETTES,
+  useReducedMotion,
+  useAnimatedValue,
+  useLoop,
   type AtmosphereSurface,
   type AtmospherePalette,
 } from '../premium/shared';
@@ -100,6 +104,15 @@ export interface MobileAtmosphereProps {
   surface: MobileAtmosphereSurface;
   backgroundColor?: string;
   showVignette?: boolean;
+  /**
+   * Whether the drifting orbs render. Undefined (the default) defers
+   * to the theme's atmosphere style — `theme.atmosphere.style: 'flat'`
+   * turns the orbs off app-wide while keeping the base tint +
+   * vignette. Pass an explicit boolean only to override the theme for
+   * this one surface (the dev showcase demos both styles this way).
+   * The drift animations also stop when the orbs are off.
+   */
+  showOrbs?: boolean;
   palette?: Partial<AtmospherePalette>;
   style?: ViewStyle | false;
 }
@@ -108,47 +121,51 @@ export function MobileAtmosphere({
   surface,
   backgroundColor,
   showVignette = true,
+  showOrbs,
   palette,
   style,
 }: MobileAtmosphereProps) {
   const reduced = useReducedMotion();
   const { useNativeDriver } = usePlatformAnimation();
-  const { colors } = useAppTheme();
+  const { colors, atmosphere } = useAppTheme();
+  // Theme default, per-callsite override: the single declaration point
+  // for the atmosphere language is `theme.atmosphere.style`.
+  const orbsVisible = showOrbs ?? atmosphere.style !== 'flat';
 
   const [displayedSurface, setDisplayedSurface] = useState<MobileAtmosphereSurface>(surface);
   const [incomingSurface, setIncomingSurface] = useState<MobileAtmosphereSurface | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const prevSurfaceRef = useRef<MobileAtmosphereSurface>(surface);
 
-  const orb1Anim = useRef(new Animated.Value(0)).current;
-  const orb2Anim = useRef(new Animated.Value(0)).current;
-  const orb3Anim = useRef(new Animated.Value(0)).current;
+  const orb1Anim = useAnimatedValue(0);
+  const orb2Anim = useAnimatedValue(0);
+  const orb3Anim = useAnimatedValue(0);
 
-  useEffect(() => {
-    if (reduced) return;
-    if (isWeb && !hasWindow()) return;
-
-    const float = (anim: Animated.Value, delay: number) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, { toValue: 1, duration: 12000, useNativeDriver: !isWeb }),
-          Animated.timing(anim, { toValue: 0, duration: 12000, useNativeDriver: !isWeb }),
-        ]),
-      );
-
-    const a1 = float(orb1Anim, 0);
-    const a2 = float(orb2Anim, 2000);
-    const a3 = float(orb3Anim, 4000);
-    a1.start();
-    a2.start();
-    a3.start();
-    return () => {
-      a1.stop();
-      a2.stop();
-      a3.stop();
-    };
-  }, [orb1Anim, orb2Anim, orb3Anim, reduced]);
+  const orbPaused = !orbsVisible || (isWeb && !hasWindow());
+  useLoop(
+    orb1Anim,
+    [
+      { to: 1, duration: 12000 },
+      { to: 0, duration: 12000 },
+    ],
+    { paused: orbPaused },
+  );
+  useLoop(
+    orb2Anim,
+    [
+      { to: 1, duration: 12000, delay: 2000 },
+      { to: 0, duration: 12000 },
+    ],
+    { paused: orbPaused },
+  );
+  useLoop(
+    orb3Anim,
+    [
+      { to: 1, duration: 12000, delay: 4000 },
+      { to: 0, duration: 12000 },
+    ],
+    { paused: orbPaused },
+  );
 
   useEffect(() => {
     if (surface === prevSurfaceRef.current) return;
@@ -183,28 +200,38 @@ export function MobileAtmosphere({
   const base = backgroundColor ?? colors.backgroundDeep;
   const vignette = colors.mobilePremium.atmosphereVignette;
 
+  // With the desktop layouts shelved, the layout is the centered mobile
+  // column at any viewport width — the orbs belong to that column's
+  // corners, not the desktop viewport's. The base tint + vignette stay
+  // full-bleed; only the orb band is columned.
+  const orbsColumned = CONTENT_WIDTH_MODE === 'constrained' && DESKTOP_LAYOUT_MODE === 'mobile-only';
+
   return (
     <View
       style={[styles.container, { backgroundColor: base }, style === false ? null : style]}
       pointerEvents="none"
     >
-      <AtmosphereOrbs
-        surface={displayedSurface}
-        paletteOverride={palette}
-        orb1Anim={orb1Anim}
-        orb2Anim={orb2Anim}
-        orb3Anim={orb3Anim}
-        opacity={outgoingOpacity}
-      />
-      {incomingSurface ? (
-        <AtmosphereOrbs
-          surface={incomingSurface}
-          paletteOverride={palette}
-          orb1Anim={orb1Anim}
-          orb2Anim={orb2Anim}
-          orb3Anim={orb3Anim}
-          opacity={incomingOpacity}
-        />
+      {orbsVisible ? (
+        <View style={orbsColumned ? styles.orbBandColumned : styles.orbBandFull}>
+          <AtmosphereOrbs
+            surface={displayedSurface}
+            paletteOverride={palette}
+            orb1Anim={orb1Anim}
+            orb2Anim={orb2Anim}
+            orb3Anim={orb3Anim}
+            opacity={outgoingOpacity}
+          />
+          {incomingSurface ? (
+            <AtmosphereOrbs
+              surface={incomingSurface}
+              paletteOverride={palette}
+              orb1Anim={orb1Anim}
+              orb2Anim={orb2Anim}
+              orb3Anim={orb3Anim}
+              opacity={incomingOpacity}
+            />
+          ) : null}
+        </View>
       ) : null}
       {showVignette && isWeb ? (
         <View style={[styles.vignette, { boxShadow: vignette }]} />
@@ -221,6 +248,16 @@ const styles = StyleSheet.create({
   orb: {
     position: 'absolute',
     borderRadius: 999,
+  },
+  orbBandFull: { ...StyleSheet.absoluteFillObject },
+  orbBandColumned: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: '50%',
+    width: MOBILE_CONTENT_MAX_WIDTH,
+    marginLeft: -MOBILE_CONTENT_MAX_WIDTH / 2,
+    overflow: 'hidden',
   },
   orb1: { width: 340, height: 340, top: -120, left: -120 },
   orb2: { width: 300, height: 300, bottom: -100, right: -100 },

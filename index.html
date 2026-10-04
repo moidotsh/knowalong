@@ -2,46 +2,161 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0" />
 
     <!--
       PWA / Add to Home Screen configuration.
 
       This file is the source-of-truth DECLARATION of which PWA tags the
-      app expects to ship with. The runtime DELIVERY mechanism is the
-      web-bootstrap useEffect in app/_layout.tsx (ensureMeta / ensureLink)
-      — Expo Web's static export (`expo export --platform web`) strips
-      every tag below from <head> except <link rel="icon"> when generating
-      dist/index.html, and the runtime injection block restores them.
+      app expects to ship with. Two DELIVERY mechanisms restore them:
 
-      The two are a deliberate mirror pair — keep them in sync in the
-      same change. The theme-color values here are arqavellum's defaults
-      (light surface for desktop, brand indigo for mobile); consumers
-      who override the `brand` slot should update both this file and
-      the matching lines in app/_layout.tsx so the deployed HTML and
-      the runtime injection agree.
+      1. scripts/inject-critical-web.ts — runs after `expo export` and
+         copies the tags below (plus the id'd <style> blocks and any
+         font preload links) into every exported dist/**/*.html <head>,
+         so the DEPLOYED first frame carries them at parse time.
+
+      2. The runtime injection in app/_layout.tsx (ensureMeta /
+         ensureLink / ensureStyle) — restores the same set after
+         hydration (dev server, and any path the export strip still
+         misses).
+
+      Expo Web's static export strips every tag below from <head>
+      except <link rel="icon"> when generating dist/index.html. The
+      three places are a deliberate mirror set — keep them in sync in
+      the same change. The theme-color values here are Night Metro's
+      night-service defaults (tunnel ground for desktop, filament amber
+      for mobile); they are repainted from the live palette at runtime,
+      so a user in the daytime-timetable (light) mode sees the browser
+      chrome follow. Consumers who override the `brand` slot should
+      update this file, the injector's extraction, and the matching
+      lines in app/_layout.tsx so the deployed HTML and the runtime
+      injection agree.
       Full design + debugging checklist: docs/architecture/pwa-installability.md.
     -->
-    <meta name="theme-color" content="#F1F5F9" media="(min-width: 701px)" />
-    <meta name="theme-color" content="#4F46E5" media="(max-width: 700px)" />
+    <meta name="theme-color" content="#0C1016" media="(min-width: 701px)" />
+    <meta name="theme-color" content="#FFB020" media="(max-width: 700px)" />
 
     <link rel="manifest" href="/manifest.json" />
     <link rel="apple-touch-icon" href="/icons/192.png" />
     <link rel="icon" type="image/png" href="/icons/192.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!-- Night Metro boots dark; the runtime ensureMeta repaints this to
+         'default' if the user switches to the light timetable mode. -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="KnowAlong" />
 
     <title>KnowAlong</title>
-    <style>
+
+    <!--
+      NIGHT METRO faces — self-hosted, Cyrillic-complete (the learner
+      target language is Russian), OFL-licensed (public/fonts/OFL-*.txt):
+        Unbounded (variable 200–900)  — the display/rollsign voice.
+        Golos Text (variable 400–900) — the body voice (timetable rows).
+        PT Mono (400)                 — the ledger face (eyebrows, facts).
+        PT Serif (400 + 700)          — the learner journey's literary face
+                                        (chapter titles, target-language
+                                        phrases). Cyrillic-complete, OFL.
+      TTF variable files rather than per-subset woff2: one file per face
+      covers latin + cyrillic with no unicode-range bookkeeping.
+      PT Mono is deliberately NOT preloaded — it enters after the first
+      paint (ledger figures, eyebrows), and swap hides the late load.
+      PT Serif preloads with the first paint: chapter titles and the
+      target-language phrase are the journey's first impression.
+      Mirror trio: this block, app/_layout.tsx's ensureStyle, and
+      scripts/inject-critical-web.ts (which copies id'd styles + /fonts/
+      preloads into every exported route automatically).
+    -->
+    <link rel="preload" href="/fonts/Unbounded-var.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/fonts/GolosText-var.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/fonts/PT_Serif-Web-Regular.ttf" as="font" type="font/ttf" crossorigin />
+    <link rel="preload" href="/fonts/PT_Serif-Web-Bold.ttf" as="font" type="font/ttf" crossorigin />
+    <style id="global-font-face-css">
+      @font-face {
+        font-family: 'Unbounded';
+        font-style: normal;
+        font-weight: 200 900;
+        font-display: swap;
+        src: url('/fonts/Unbounded-var.ttf') format('truetype');
+      }
+      @font-face {
+        font-family: 'Golos Text';
+        font-style: normal;
+        font-weight: 400 900;
+        font-display: swap;
+        src: url('/fonts/GolosText-var.ttf') format('truetype');
+      }
+      @font-face {
+        font-family: 'PT Mono';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/PTMono-Regular.ttf') format('truetype');
+      }
+      @font-face {
+        font-family: 'PT Serif';
+        font-style: normal;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/PT_Serif-Web-Regular.ttf') format('truetype');
+      }
+      @font-face {
+        font-family: 'PT Serif';
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url('/fonts/PT_Serif-Web-Bold.ttf') format('truetype');
+      }
+      @font-face {
+        font-family: 'PT Serif';
+        font-style: italic;
+        font-weight: 400;
+        font-display: swap;
+        src: url('/fonts/PT_Serif-Web-Italic.ttf') format('truetype');
+      }
+    </style>
+
+    <!--
+      The global shell CSS — keyed by id so the injector and the runtime
+      injection share one key. Consumers self-hosting fonts: declare the
+      @font-face block in an id'd <style> here and add the matching
+      <link rel="preload" as="font" crossorigin> lines — the injector
+      carries both into every exported route, so the first frame renders
+      in the real faces instead of swapping them in after hydration.
+    -->
+    <style id="global-scrollbar-css">
+      /* NATIVE FEEL — text is not selectable by default (it's a PWA,
+         not a document); inputs stay selectable so typing works. */
+      * {
+        -webkit-user-select: none;
+        user-select: none;
+      }
+      /* The root canvas eases between the palette and the curtain's
+         ink — the status bar transition matches the sweep. */
+      html,
+      body {
+        transition: background-color 200ms ease;
+      }
+      input,
+      textarea {
+        -webkit-user-select: auto;
+        user-select: auto;
+        /* iOS auto-zooms into any input with font-size < 16px —
+           enforce the minimum to prevent the zoom (maximum-scale
+           alone is ignored by iOS 10+ for accessibility). */
+        font-size: 16px !important;
+      }
       html,
       body,
       #root {
         height: 100%;
         margin: 0;
         padding: 0;
-        background: #f1f5f9;
+        /* NIGHT METRO root paint — the night ground. Every pixel the app
+           does not explicitly paint shows this, pre-JS included, so the
+           first frame is already night service (no white flash). The
+           runtime repaints it from the live palette on scheme switch. */
+        background: #0c1016;
       }
       #root {
         display: flex;
@@ -62,6 +177,92 @@
         scrollbar-width: none;
       }
     </style>
+
+    <!--
+      The focus law: the UA focus outline never leaks — RN-web renders
+      real buttons/inputs whose default WebKit ring reads as alien
+      chrome — and every focusable control carries OUR ring instead: a
+      2px rule in the element's own ink (currentColor — mode-correct by
+      construction; inputs that draw their own focus ring override this
+      on their own boxShadow). Mirror trio: this block + the runtime
+      restore in app/_layout.tsx (the injector carries id'd styles into
+      every exported route).
+    -->
+    <style id="global-focus-css">
+      button:focus,
+      [role='button']:focus,
+      [role='link']:focus,
+      a:focus,
+      select:focus {
+        outline-width: 0;
+        box-shadow: 0 0 0 2px currentColor;
+      }
+      input:focus,
+      textarea:focus {
+        outline-width: 0;
+      }
+    </style>
+
+    <!--
+      NIGHT METRO boot plate — the curtain's cold-boot sibling (the
+      starter's opt-in FCP recipe): a pre-JS cover painting the night
+      service before any JS arrives — tunnel ground, the amber filament
+      rule, the destination stamped in Unbounded. Lifted by the root
+      layout's handshake (markBootReady → <html data-boot-ready>) with a
+      fade; the id'd script is the failsafe lift if JS never arrives.
+      The plate is night in BOTH modes by design — the boot is the night
+      service pulling in; the user's scheme applies once the app takes
+      the canvas. Mirror trio contract: id'd <style> + id'd <script>
+      here; scripts/inject-critical-web.ts copies both into every
+      exported route automatically.
+    -->
+    <style id="knowalong-boot-css">
+      body::after {
+        content: 'KNOWALONG';
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        /* The night ground + the filament rule at 42% height — the
+           platen line the wordmark stamps under. */
+        background:
+          linear-gradient(#ffb020, #ffb020) 50% 42% / 72px 2px no-repeat,
+          #0c1016;
+        color: #f2efe9;
+        font-family: 'Unbounded', system-ui, sans-serif;
+        font-weight: 700;
+        font-size: clamp(18px, 5vw, 30px);
+        letter-spacing: 0.35em;
+        /* +0.35em leading on the last letter — re-center the tracked
+           caps optically. */
+        text-indent: 0.35em;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 1;
+        transition: opacity 360ms ease 60ms;
+      }
+      html[data-boot-ready] body::after {
+        opacity: 0;
+        pointer-events: none;
+        /* visibility flips at transition end — no ghost plate. */
+        visibility: hidden;
+        transition: opacity 360ms ease 60ms, visibility 0s 420ms;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        html:not([data-boot-ready]) body::after {
+          transition: none;
+        }
+        html[data-boot-ready] body::after {
+          transition: none;
+        }
+      }
+    </style>
+    <script id="knowalong-boot-js">
+      // CSS failsafe: if JS never arrives, lift the plate after 4.6s.
+      setTimeout(function () {
+        document.documentElement.dataset.bootReady = '1';
+      }, 4600);
+    </script>
   </head>
   <body>
     <div id="root"></div>

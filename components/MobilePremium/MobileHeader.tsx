@@ -66,10 +66,11 @@ export interface MobileHeaderProps {
 }
 
 const NAV_TITLE_STYLE = {
-  fontSize: 15,
-  fontWeight: '600',
-  lineHeight: 20,
-  letterSpacing: 0.1,
+  fontSize: theme.typography.mobileTitle.fontSize,
+  fontWeight: '700',
+  lineHeight: theme.typography.mobileTitle.lineHeight,
+  letterSpacing: theme.typography.mobileTitle.letterSpacing,
+  fontFamily: theme.fonts.display,
 } as const;
 
 /**
@@ -126,7 +127,11 @@ export function MobileHeader({
             ) : null}
 
             {title ? (
-              <Text style={[NAV_TITLE_STYLE, { color: colors.text }]} numberOfLines={1}>
+              <Text
+                style={[NAV_TITLE_STYLE, { color: colors.text }]}
+                numberOfLines={1}
+                accessibilityRole="header"
+              >
                 {title}
               </Text>
             ) : null}
@@ -225,9 +230,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    // 44×44 — the touch-target floor (RN-web hitSlop does not expand
+    // the DOM hit area; measured).
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },

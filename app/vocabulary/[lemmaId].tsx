@@ -15,7 +15,7 @@ import {
 } from '../../components/MobilePremium';
 import { useAppTheme } from '../../context';
 import { safeGoBack } from '../../navigation';
-import { SCREEN_BODY_STYLE } from '../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../constants';
 import { vocabularyRepository, throwIfFailed } from '../../utils/supabase/repositories';
 import { useCurrentUserId } from '../../hooks';
 import { useQuery } from '@tanstack/react-query';
@@ -133,37 +133,47 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   lemmaHeadword: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 24,
-    fontWeight: '700',
+    lineHeight: 30,
+    fontFamily: theme.fonts.display,
   },
   lemmaPos: {
-    fontSize: 13,
-    marginTop: 2,
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
     textTransform: 'uppercase',
   },
   lemmaGloss: {
+    ...theme.typography.mobileItemTitle,
     fontSize: 15,
+    lineHeight: 21,
     marginTop: 8,
   },
   lemmaGrammar: {
-    fontSize: 13,
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 4,
   },
   formRow: {
     paddingVertical: 6,
   },
   formSurface: {
-    fontSize: 15,
-    fontWeight: '500',
+    ...theme.typography.mobileItemTitle,
+    fontFamily: theme.fonts.display,
   },
   formMorpho: {
-    fontSize: 12,
+    ...theme.typography.mobileLedger,
+    fontSize: 11,
+    lineHeight: 15,
     marginTop: 2,
   },
   sourceLine: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
     paddingVertical: 4,
-    fontStyle: 'italic',
   },
 });

@@ -11,8 +11,9 @@
 
 import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
-import { addDays, parseLocalDate } from '../../utils/date-helpers';
+import { addDays, parseLocalDate, toYmd } from '../../utils/date-helpers';
 import type { ActivityGridDatum } from '../../utils/activityGrid';
 import { ActivityGrid } from './ActivityGrid';
 import { MobileSurface } from './MobileSurface';
@@ -36,7 +37,7 @@ function useSampleData(): readonly ActivityGridDatum[] {
     const out: ActivityGridDatum[] = [];
     for (let i = 0; i < 90; i++) {
       const d = addDays(start, i);
-      const dateStr = toISODate(d);
+      const dateStr = toYmd(d);
       const seed = (i * 7) % 20;
       let value = 0;
       if (seed < 4) value = 0;
@@ -50,13 +51,6 @@ function useSampleData(): readonly ActivityGridDatum[] {
     }
     return out;
   }, []);
-}
-
-function toISODate(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
 }
 
 /**
@@ -115,7 +109,7 @@ export function ActivityGridPreview() {
   const data = useSampleData();
   const [columns, setColumns] = useState<number>(7);
   const start = addDays(parseLocalDate(TODAY_ANCHOR), -89);
-  const startDate = toISODate(start);
+  const startDate = toYmd(start);
   const endDate = TODAY_ANCHOR;
 
   return (
@@ -232,7 +226,7 @@ const styles = StyleSheet.create({
   chip: {
     paddingVertical: 8,
     paddingHorizontal: 14,
-    borderRadius: 999,
+    borderRadius: theme.shapes.tag,
     borderWidth: 1,
     minWidth: 44,
     alignItems: 'center',

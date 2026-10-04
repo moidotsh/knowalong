@@ -20,7 +20,7 @@ import {
 import type { Segment } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack, navigateToClccRun } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import {
   useClccRuns,
   useCompanionCredential,
@@ -160,7 +160,9 @@ export default function ClccScreen() {
                 <Pressable
                   key={run.id}
                   accessibilityRole="button"
+                  accessibilityLabel={`CLCC run, status ${String(status).replace(/_/g, ' ')}`}
                   onPress={() => navigateToClccRun(run.id)}
+                  style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
                 >
                   <MobileSurface padding={12}>
                     <View style={styles.runRowTop}>
@@ -209,11 +211,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    ...theme.typography.mobileItemTitle,
     marginBottom: 6,
   },
   body: {
+    ...theme.typography.mobileBody,
     fontSize: 13,
     lineHeight: 19,
   },
@@ -227,14 +229,17 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   runStatus: {
-    fontSize: 13,
-    fontWeight: '600',
-    textTransform: 'capitalize',
+    ...theme.typography.mobileEyebrow,
+    textTransform: 'uppercase',
   },
   runDate: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
   },
   runMeta: {
+    ...theme.typography.mobileLedger,
     fontSize: 11,
+    lineHeight: 15,
   },
 });

@@ -9,6 +9,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   buildSongSectionLessons,
+  buildSongSectionPlan,
   resolveDynamicSongLesson,
   isDynamicSongLessonId,
 } from '../../utils/knowalong/songDeck';
@@ -27,9 +28,11 @@ const context = getContext();
 const intro = SVETOFOR_SUBDECKS.find((s) => s.id === 'sv-intro')!;
 
 /** Every lesson in a section plan is cap-compliant against the lesson-start
- *  mastery a real learner has (evolving as words graduate). */
+ *  mastery a real learner has — which includes the presumed-known spine baseline
+ *  (the generator's `withSpineBaseline`). */
 function assertSectionCapClean(lessons: Lesson[], base: MasteryMap): void {
   const m: MasteryMap = { ...base };
+  for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps(), ...spine.paletteSteps()]) for (const w of step.words) m[wordKey(w.form)] = graduated;
   for (const lesson of lessons) {
     assertLessonWithinCap(lesson, m);
     for (const step of lesson.steps) {
@@ -41,9 +44,10 @@ function assertSectionCapClean(lessons: Lesson[], base: MasteryMap): void {
 }
 
 describe('buildSongSectionLessons — Intro (the worked section)', () => {
-  it('empty mastery → a multi-lesson, cap-compliant plan', () => {
+  it('empty mastery → every shipped lesson is one clean ≥8-card encoding-variability lesson', () => {
     const lessons = buildSongSectionLessons(intro, {}, spine, context);
-    expect(lessons.length).toBeGreaterThanOrEqual(4);
+    expect(lessons.length).toBeGreaterThanOrEqual(3); // эй, будто, полетев (фантомом defers)
+    for (const lesson of lessons) expect(lesson.steps.length).toBeGreaterThanOrEqual(8);
     assertSectionCapClean(lessons, {});
   });
 
@@ -62,32 +66,36 @@ describe('buildSongSectionLessons — Intro (the worked section)', () => {
     }
   });
 
-  it('полетев is wrapped in a multi-word phrase (the reported bug, fixed)', () => {
+  it('полетев is taught via ≥8 multi-word context phrases (R7; the reported bug, fixed)', () => {
     const lessons = buildSongSectionLessons(intro, {}, spine, context);
-    const polet = lessons.find((l) => l.id.startsWith('sdyn-sv-intro-3'));
-    expect(polet).toBeTruthy();
-    // полетев surfaces inside a real phrase (e.g. «будто полетев»), not as a bare word.
-    const targetCards = polet!.steps.filter((s) => s.words.some((w) => wordKey(w.form) === 'полетев'));
-    expect(targetCards.length).toBeGreaterThan(0);
+    // Cold start scaffolds palette words inline (dynamic sizing), so полетев's arc
+    // spans several lessons — count its reveal cards across all of them.
+    const poletLessons = lessons.filter((l) => l.id.startsWith('sdyn-sv-intro-3'));
+    const targetCards = poletLessons.flatMap((l) => l.steps).filter((s) => s.words.some((w) => wordKey(w.form) === 'полетев'));
+    expect(targetCards.length).toBeGreaterThanOrEqual(8);
     for (const c of targetCards) expect(c.words.length).toBeGreaterThanOrEqual(2);
   });
 
-  it('every target surfaces inside a multi-word phrase (not isolated)', () => {
+  it('authored targets surface in ≥8 multi-word phrases; unauthored (фантомом) DEFER', () => {
     const lessons = buildSongSectionLessons(intro, {}, spine, context);
-    const targetForms = ['эй', 'будто', 'полетев', 'фантомом'];
-    for (const form of targetForms) {
-      const cards = lessons.flatMap((l) => l.steps).filter((s) => s.words.some((w) => wordKey(w.form) === form));
-      expect(cards.length).toBeGreaterThan(0);
+    const allSteps = lessons.flatMap((l) => l.steps);
+    for (const form of ['эй', 'будто', 'полетев']) {
+      const cards = allSteps.filter((s) => s.words.some((w) => wordKey(w.form) === form));
+      expect(cards.length).toBeGreaterThanOrEqual(8);
       expect(cards.some((c) => c.words.length >= 2)).toBe(true);
     }
+    // фантомом is a case-specific instrumental noun the mock cannot place in ≥8
+    // correct phrases → it defers (acquired via the culminating line), the honest
+    // mock ceiling the Edge Function (Phase 6) removes.
+    expect(allSteps.filter((s) => s.words.some((w) => wordKey(w.form) === 'фантомом')).length).toBe(0);
   });
 
-  it('targets are taught in narrative order', () => {
+  it('authored targets are taught in narrative order', () => {
     const lessons = buildSongSectionLessons(intro, {}, spine, context);
     const idx = (targetOrd: number) => lessons.findIndex((l) => l.id.startsWith(`sdyn-sv-intro-${targetOrd}`));
     expect(idx(1)).toBeLessThan(idx(2));
     expect(idx(2)).toBeLessThan(idx(3));
-    expect(idx(3)).toBeLessThan(idx(4));
+    // фантомом (target 4) defers in the mock — not asserted (Phase 6 AI fills it).
   });
 
   it('a fully-graduated section yields no lessons', () => {
@@ -140,5 +148,31 @@ describe('isDynamicSongLessonId', () => {
     expect(isDynamicSongLessonId('sdyn-sv-intro-1-l1')).toBe(true);
     expect(isDynamicSongLessonId('f-1')).toBe(false);
     expect(isDynamicSongLessonId(undefined)).toBe(false);
+  });
+});
+
+describe('buildSongSectionPlan — deferred targets (§1.4 meaning-before-mastery)', () => {
+  it('lessons match buildSongSectionLessons exactly (the lessons list is plan.lessons)', () => {
+    const plan = buildSongSectionPlan(intro, {}, spine, context);
+    const lessons = buildSongSectionLessons(intro, {}, spine, context);
+    expect(plan.lessons.map((l) => l.id)).toEqual(lessons.map((l) => l.id));
+  });
+
+  it('targets the generator deferred (фантомом) surface in plan.deferred — never silently missing', () => {
+    const plan = buildSongSectionPlan(intro, {}, spine, context);
+    expect(plan.lessons.flatMap((l) => l.steps).filter((s) => s.words.some((w) => wordKey(w.form) === 'фантомом'))).toHaveLength(0);
+    const fantom = plan.deferred.find((t) => t.form === 'фантомом');
+    expect(fantom).toBeDefined();
+    expect(fantom!.gloss.length).toBeGreaterThan(0);
+  });
+
+  it('a fully-graduated section defers nothing (graduation is the only exit)', () => {
+    const allKnown: MasteryMap = {};
+    for (const step of [...spine.foundationalSteps(), ...spine.conceptSteps(), ...spine.lyricSteps()]) {
+      for (const w of step.words) allKnown[wordKey(w.form)] = graduated;
+    }
+    const plan = buildSongSectionPlan(intro, allKnown, spine, context);
+    expect(plan.lessons).toEqual([]);
+    expect(plan.deferred).toEqual([]);
   });
 });

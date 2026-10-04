@@ -103,7 +103,33 @@ export const Z_INDEX = {
  * any non-width audit.
  */
 export type ContentWidthMode = 'constrained' | 'fluid';
-export const CONTENT_WIDTH_MODE: ContentWidthMode = 'constrained';
+// FLIPPED for the learner-journey experience: the consumer app now owns a
+// real responsive strategy (phone bottom nav → desktop nav rail, journey
+// column + contextual panel) per the consumer experience redesign, so the
+// fixed 420pt column cap is retired. SB1/SB2 skip their width findings in
+// this mode; every other audit stays active.
+export const CONTENT_WIDTH_MODE: ContentWidthMode = 'fluid';
+
+// Read the policy through a widened alias: TS narrows a `const` to its
+// initializer literal, which would flag the 'constrained' arms below as
+// unintentional comparisons under the current 'fluid' policy. The branch
+// stays live for a future flip back.
+const WIDTH_MODE = CONTENT_WIDTH_MODE as ContentWidthMode;
+
+/**
+ * Desktop layout policy. 'multi-column' lets screens lift the mobile
+ * body cap (ScreenScaffold's `bodyMaxWidth`) and branch on the desktop
+ * breakpoint for multi-column layouts; 'mobile-only' shelves every
+ * lift — the constrained mobile column is the layout at ANY viewport
+ * width, and the per-screen lift call sites stay in place untouched
+ * for when the desktop layouts come back. Flipping this one constant
+ * re-enables them all.
+ */
+export type DesktopLayoutMode = 'mobile-only' | 'multi-column';
+// FLIPPED alongside CONTENT_WIDTH_MODE='fluid' — the journey/collection/
+// notebook screens compose multi-column desktop layouts (nav rail +
+// reading column + contextual panel) behind this lift.
+export const DESKTOP_LAYOUT_MODE: DesktopLayoutMode = 'multi-column';
 
 /**
  * Constrained-mode cap for full-width mobile content: sheets, anchored
@@ -165,7 +191,7 @@ const CONSTRAINED_DIALOG_WIDTH_STYLE = {
  * - `'fluid'`: `{}` (no width rules; consumer owns layout).
  */
 export const MOBILE_CONTENT_WIDTH_STYLE =
-  CONTENT_WIDTH_MODE === 'constrained'
+  WIDTH_MODE === 'constrained'
     ? CONSTRAINED_CONTENT_WIDTH_STYLE
     : ({} as Record<string, never>);
 
@@ -178,7 +204,7 @@ export const MOBILE_CONTENT_WIDTH_STYLE =
  * - `'fluid'`: `{}` (no width rules; consumer owns layout).
  */
 export const MOBILE_DIALOG_WIDTH_STYLE =
-  CONTENT_WIDTH_MODE === 'constrained'
+  WIDTH_MODE === 'constrained'
     ? CONSTRAINED_DIALOG_WIDTH_STYLE
     : ({} as Record<string, never>);
 

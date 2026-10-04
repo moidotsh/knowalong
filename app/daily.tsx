@@ -9,7 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS, ROLE_COLOR_KEYS, type WordRole, type LearningItem } from '../utils/knowalong/fixtures/learningItems';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
@@ -106,8 +106,8 @@ export default function DailyChallengeScreen() {
 
       {!isOver ? (
         <View style={{ paddingHorizontal: 20, paddingTop: 4, paddingBottom: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
-          <Text style={{ fontSize: 22, fontWeight: '700', color: timeColor }}>{timeStr}</Text>
-          <View style={{ height: 4, flex: 1, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.15)' }}>
+          <Text style={{ ...theme.typography.mobileLedger, fontSize: 18, lineHeight: 22, fontWeight: '700', color: timeColor }}>{timeStr}</Text>
+          <View style={{ height: 4, flex: 1, borderRadius: 2, backgroundColor: colors.cardBorder + '40' }}>
             <View style={{ height: '100%', width: `${(timeLeft / CHALLENGE_SECONDS) * 100}%`, backgroundColor: timeColor, borderRadius: 2 }} />
           </View>
         </View>
@@ -117,10 +117,10 @@ export default function DailyChallengeScreen() {
         {isOver || !item ? (
           <MobileSurface padding={24}>
             <Text style={{ fontSize: 40, textAlign: 'center', marginBottom: 8 }}>{isTimeUp && !isComplete ? '⏰' : '🎉'}</Text>
-            <Text style={{ fontSize: 24, fontWeight: '700', color: colors.text, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileFigure, fontSize: 24, lineHeight: 30, letterSpacing: -0.5, color: colors.text, textAlign: 'center' }}>
               {score.correct} / {total} correct
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
+            <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, textAlign: 'center', marginTop: 8 }}>
               {isTimeUp && !isComplete ? 'Time ran out! ' : ''}{score.mistakes} mistake{score.mistakes === 1 ? '' : 's'}. Time: {CHALLENGE_SECONDS - timeLeft}s.
             </Text>
           </MobileSurface>
@@ -129,7 +129,7 @@ export default function DailyChallengeScreen() {
             <View style={{ alignItems: 'center', marginBottom: 16 }}>
               <ConceptIcon name={ITEM_ICONS[item.id] ?? 'star'} size={40} color={colors.brand} />
             </View>
-            <Text style={{ fontSize: 13, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>
+            <Text style={{ ...theme.typography.mobileEyebrow, color: colors.textMuted, textTransform: 'uppercase', textAlign: 'center' }}>
               Build: {item.meaning}
             </Text>
 
@@ -146,7 +146,7 @@ export default function DailyChallengeScreen() {
                     justifyContent: 'center', alignItems: 'center',
                   }}>
                     {isFilled ? (
-                      <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{item.words[slotIdx].form}</Text>
+                      <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 16, lineHeight: 20, fontFamily: theme.fonts.display, color: colors.text }}>{item.words[slotIdx].form}</Text>
                     ) : null}
                   </View>
                 );
@@ -165,24 +165,27 @@ export default function DailyChallengeScreen() {
                       key={displayIdx}
                       disabled={isPlaced}
                       onPress={() => handleTapWord(w.originalIdx)}
-                      style={{
+                      accessibilityRole="button"
+                      accessibilityLabel={`${w.form} — ${w.gloss}`}
+                      accessibilityState={{ disabled: isPlaced }}
+                      style={({ pressed }) => [{
                         paddingVertical: 12, paddingHorizontal: 16, borderRadius: 10,
                         borderWidth: 2, borderLeftWidth: 4, borderLeftColor: rc,
                         borderColor: isWrong ? colors.status.error : colors.cardBorder,
                         backgroundColor: isWrong ? colors.status.error + '20' : isPlaced ? colors.cardAlt + '60' : colors.cardAlt,
-                        opacity: isPlaced ? 0.3 : 1, minWidth: 70, alignItems: 'center',
-                      }}
+                        opacity: isPlaced ? 0.3 : pressed ? 0.7 : 1, minWidth: 70, alignItems: 'center',
+                      }]}
                     >
-                      <Text style={{ fontSize: 18, fontWeight: '600', color: colors.text }}>{w.form}</Text>
-                      <Text style={{ fontSize: 11, color: colors.textMuted }}>{w.gloss}</Text>
+                      <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 18, lineHeight: 22, fontFamily: theme.fonts.display, color: colors.text }}>{w.form}</Text>
+                      <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 13, color: colors.textMuted }}>{w.gloss}</Text>
                     </Pressable>
                   );
                 })}
               </View>
             ) : (
               <View style={{ padding: 14, borderRadius: 12, backgroundColor: colors.status.success + '15' }}>
-                <Text style={{ fontSize: 18, fontWeight: '700', color: colors.status.success, textAlign: 'center' }}>✓ {item.surfaceForm}</Text>
-                <Text style={{ fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: 2, fontStyle: 'italic' }}>{item.transliteration}</Text>
+                <Text style={{ fontSize: 18, lineHeight: 22, fontWeight: '700', fontFamily: theme.fonts.display, color: colors.status.success, textAlign: 'center' }}>✓ {item.surfaceForm}</Text>
+                <Text style={{ ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, color: colors.textSecondary, textAlign: 'center', marginTop: 4 }}>{item.transliteration}</Text>
               </View>
             )}
           </MobileSurface>

@@ -1,7 +1,9 @@
 // context/ThemeContext.tsx
-// Theme provider + useAppTheme hook for light/dark mode switching. Light
-// is the default; consumers (or users via a settings toggle) can flip to
-// dark. The choice persists across sessions via localStorage (web) or
+// Theme provider + useAppTheme hook for light/dark mode switching. Night
+// Metro is dark-first: the first-run default is 'dark' (the night service
+// is the app's identity, not its alt mode). Users can flip to light or
+// defer to the OS ('system') via Settings → Appearance; any explicit
+// choice persists across sessions via localStorage (web) or
 // AsyncStorage (native).
 //
 // `useAppTheme()` returns the resolved palette — `colors` is the live
@@ -17,12 +19,19 @@ import React, {
   useState,
 } from 'react';
 import { Appearance, useColorScheme as useNativeColorScheme } from 'react-native';
-import { theme, type ColorScheme, type ColorPalette } from '../constants';
+import { theme, STORAGE_KEYS, type ColorScheme, type ColorPalette } from '../constants';
 import { isWeb, hasWindow } from '../utils/platform';
 import { zustandStorage } from '../stores';
 import { logger } from '../utils';
 
-const STORAGE_KEY = 'knowalong:color-scheme';
+const STORAGE_KEY = STORAGE_KEYS.colorScheme;
+
+// The learner journey's first-run scheme. The consumer experience is
+// light-first ("warm paper" is the design's initial reference — see the
+// `score` register in constants/theme.ts), so the boot paint is the
+// daytime paper; dark (the warm-charcoal restatement) and 'system' remain
+// opt-in via Settings. Previously the night service booted first.
+export const DEFAULT_SCHEME_PREFERENCE: ColorSchemePreference = 'light';
 
 // 'system' lets the user opt back in to OS-level prefers-color-scheme.
 // The resolved value is then 'light' | 'dark' based on Appearance API
@@ -47,6 +56,8 @@ interface ThemeContextValue {
   fontSize: typeof theme.fontSize;
   borderRadius: typeof theme.borderRadius;
   typography: typeof theme.typography;
+  /** Atmosphere language (`theme.atmosphere`) — mode-invariant. */
+  atmosphere: typeof theme.atmosphere;
 }
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
@@ -77,9 +88,18 @@ function resolveScheme(pref: ColorSchemePreference): ColorScheme {
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const nativeScheme = useNativeColorScheme();
-  const [preference, setPreferenceState] = useState<ColorSchemePreference>('system');
+  // Night Metro boots dark. The stored preference (if any) replaces this
+  // at hydration; before that the night service owns the first paint —
+  // no light flash for the default visitor.
+  const [preference, setPreferenceState] =
+    useState<ColorSchemePreference>(DEFAULT_SCHEME_PREFERENCE);
+  // Seed from the REAL system scheme, not just RN's useColorScheme — on
+  // web it can boot null (no change event ever fires to correct it), so
+  // a system-dark first visitor would be stuck in light. matchMedia /
+  // Appearance are read directly; the change listener below takes over
+  // from there.
   const [systemScheme, setSystemScheme] = useState<ColorScheme>(
-    nativeScheme === 'dark' ? 'dark' : 'light',
+    () => (nativeScheme === 'dark' ? 'dark' : readSystemScheme()),
   );
   const [hydrated, setHydrated] = useState(false);
 
@@ -151,6 +171,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       fontSize: theme.fontSize,
       borderRadius: theme.borderRadius,
       typography: theme.typography,
+      atmosphere: theme.atmosphere,
     }),
     // `hydrated` is intentionally NOT in deps — once hydrated, the
     // preference state itself drives the value; including `hydrated`

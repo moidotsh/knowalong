@@ -23,6 +23,7 @@
 import type { WordPart } from './fixtures/learningItems';
 import { LEARNING_ITEMS } from './fixtures/learningItems';
 import { SVETOFOR_SONG } from './fixtures/svetoforSong';
+import { AUTHORED_CONTEXT_PHRASES } from './fixtures/contextPhrases';
 import { wordKey } from './mastery';
 
 /** A short phrase wrapping a target (the target is among `words`). */
@@ -38,11 +39,19 @@ export interface ContextPhrase {
  *  gradient scaffolding). */
 export interface ContextProvider {
   contextPhrasesFor(target: WordPart): readonly ContextPhrase[];
+  /** True when this target is served by AUTHORED context phrases (the mock
+   *  stand-in for the Phase 6 Edge Function output). The generator enforces R7
+   *  (≥8 context cards) only for authored-served targets — a loud data-
+   *  completeness gate. Targets the mock hasn't authored yet fall back to
+   *  best-effort (lyric windows only) until their authored set lands, keeping
+   *  the app runnable during incremental authoring. */
+  hasAuthoredContext?(target: WordPart): boolean;
 }
 
-/** Max context phrases returned per target — enough windows + a particle clause
- *  for the generator to find a READY one (no scaffolding) without bloat. */
-const MAX_PHRASES_PER_TARGET = 6;
+/** Max context phrases returned per target. R7 wants ALL usable phrases
+ *  (encoding variability, ≥8 reveal cards), so this is sized to never truncate a
+ *  target's full context set — only a safety ceiling against pathological growth. */
+const MAX_PHRASES_PER_TARGET = 24;
 
 /** Short gradient clauses reused as morphology-safe external context for
  *  particle/conjunction targets (a particle + a clause is grammatical). Bridges
@@ -95,8 +104,11 @@ function particleClauses(target: WordPart): ContextPhrase[] {
   });
 }
 
-/** Mock ContextProvider: lyric-line windows (real song context) + morphology-safe
- *  particle/conjunction external pairing. Pure + deterministic. */
+/** Mock ContextProvider: AUTHORED phrases first (the stand-in for the Phase 6
+ *  Edge Function output — target woven into palette vocabulary, correct
+ *  morphology + natural English meaning), then real lyric-line windows
+ *  (permanent fallback), then morphology-safe particle/conjunction pairing.
+ *  Pure + deterministic. */
 function mockContextPhrasesFor(target: WordPart): readonly ContextPhrase[] {
   const tKey = wordKey(target.form);
   const out: ContextPhrase[] = [];
@@ -107,7 +119,10 @@ function mockContextPhrasesFor(target: WordPart): readonly ContextPhrase[] {
     seen.add(p.surfaceForm);
     out.push(p);
   };
-  // Real song context first (most faithful — the target in its actual line).
+  // Authored phrases first — highest fidelity; they win dedup collisions.
+  for (const p of AUTHORED_CONTEXT_PHRASES.get(tKey) ?? []) add(p);
+  // Real song context (the target in its actual line) — a corpus source the
+  // server uses too; permanent fallback.
   for (const section of SVETOFOR_SONG.sections) {
     for (const line of section.lines) {
       const idx = line.words.findIndex((w) => wordKey(w.form) === tKey);
@@ -122,10 +137,16 @@ function mockContextPhrasesFor(target: WordPart): readonly ContextPhrase[] {
   return out.slice(0, MAX_PHRASES_PER_TARGET);
 }
 
-/** Build a mock ContextProvider (lyric-window + particle pairing). The v1 (and
- *  only) implementation; a Supabase impl lands in Phase 6 with this as fallback. */
+/** Build a mock ContextProvider (authored + lyric-window + particle pairing).
+ *  The v1 (and only) implementation; a Supabase impl lands in Phase 6 with this
+ *  as fallback. `hasAuthoredContext` flags targets the mock has authored ≥8
+ *  phrases for, so the generator enforces R7 where the mock can honestly meet
+ *  it and falls back elsewhere. */
 export function createMockContext(): ContextProvider {
-  return { contextPhrasesFor: mockContextPhrasesFor };
+  return {
+    contextPhrasesFor: mockContextPhrasesFor,
+    hasAuthoredContext: (target: WordPart) => AUTHORED_CONTEXT_PHRASES.has(wordKey(target.form)),
+  };
 }
 
 let DEFAULT_CONTEXT: ContextProvider | null = null;

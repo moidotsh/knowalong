@@ -2,16 +2,18 @@
 // Listening practice — sound discrimination. Shows IPA/transliteration as
 // the "audio" (prototype: no TTS yet), learner picks which Cyrillic word
 // matches. Trains the ear to connect sounds to letters.
+//
+// Night Metro register: the phonetic prompt rides the ledger face (PT Mono
+// — IPA and transliteration are pronunciation facts), options are signage.
 
 import React, { useState, useCallback } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS } from '../utils/knowalong/fixtures/learningItems';
-import { ConceptIcon } from '../components/knowalong/ConceptIcon';
 
 function shuffle<T>(arr: readonly T[]): T[] {
   const a = [...arr];
@@ -72,26 +74,22 @@ export default function ListenScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 20, paddingBottom: 80 }}>
         {isComplete ? (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 32, textAlign: 'center', marginBottom: 8 }}>
+            <Text style={[styles.scoreFigure, { color: colors.text }]}>
               {score.correct}/{TOTAL_ROUNDS}
             </Text>
-            <Text style={{ fontSize: 14, color: colors.textSecondary, textAlign: 'center' }}>
+            <Text style={[styles.verdict, { color: colors.textSecondary }]}>
               {score.correct >= TOTAL_ROUNDS * 0.8 ? 'Great ear!' : 'Keep practicing — Russian sounds take time.'}
             </Text>
           </MobileSurface>
         ) : (
           <MobileSurface padding={28}>
-            <Text style={{ fontSize: 12, color: colors.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, textAlign: 'center' }}>
+            <Text style={[styles.promptLabel, { color: colors.textMuted }]}>
               {round.promptType === 'ipa' ? 'Which word is /…/?' : 'Which word sounds like…?'}
             </Text>
-            <Text style={{ fontSize: 40, fontWeight: '700', color: colors.brand, textAlign: 'center', marginTop: 12, fontFamily: round.promptType === 'ipa' ? 'monospace' : 'normal' }}>
-              {round.prompt}
-            </Text>
-            <Text style={{ fontSize: 11, color: colors.textMuted, textAlign: 'center', marginTop: 8, fontStyle: 'italic' }}>
-              Tap the matching Cyrillic word
-            </Text>
+            <Text style={[styles.phoneticPrompt, { color: colors.brand }]}>{round.prompt}</Text>
+            <Text style={[styles.hint, { color: colors.textMuted }]}>Tap the matching Cyrillic word</Text>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 24 }}>
+            <View style={styles.optionsRow}>
               {round.options.map((opt) => {
                 const isCorrect = opt === round.correct;
                 const isSelected = opt === selected;
@@ -102,9 +100,18 @@ export default function ListenScreen() {
                   else if (isSelected) { bg = colors.status.error + '20'; border = colors.status.error; }
                 }
                 return (
-                  <Pressable key={opt} disabled={!!selected} onPress={() => handleSelect(opt)}
-                    style={{ paddingVertical: 16, paddingHorizontal: 24, borderRadius: 12, borderWidth: 2, borderColor: border, backgroundColor: bg, minWidth: 100, alignItems: 'center' }}>
-                    <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text }}>{opt}</Text>
+                  <Pressable
+                    key={opt}
+                    disabled={!!selected}
+                    onPress={() => handleSelect(opt)}
+                    accessibilityRole="button"
+                    accessibilityLabel={opt}
+                    style={({ pressed }) => [
+                      styles.optionChip,
+                      { borderColor: border, backgroundColor: bg, opacity: pressed ? 0.7 : 1 },
+                    ]}
+                  >
+                    <Text style={[styles.optionText, { color: colors.text }]}>{opt}</Text>
                   </Pressable>
                 );
               })}
@@ -112,7 +119,12 @@ export default function ListenScreen() {
 
             {selected ? (
               <View style={{ marginTop: 16, padding: 14, borderRadius: 12, backgroundColor: (selected === round.correct ? colors.status.success : colors.status.error) + '15' }}>
-                <Text style={{ fontSize: 15, fontWeight: '700', color: selected === round.correct ? colors.status.success : colors.status.error, textAlign: 'center' }}>
+                <Text
+                  style={[
+                    styles.feedback,
+                    { color: selected === round.correct ? colors.status.success : colors.status.error },
+                  ]}
+                >
                   {selected === round.correct ? '✓ Correct!' : `✗ It's "${round.correct}"`}
                 </Text>
               </View>
@@ -132,3 +144,39 @@ export default function ListenScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  // Session score — the working figure, display face at accuracy register.
+  scoreFigure: {
+    ...theme.typography.mobileFigure,
+    fontSize: 32,
+    lineHeight: 36,
+    letterSpacing: -1,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  verdict: { ...theme.typography.mobileBody, textAlign: 'center' },
+  promptLabel: { ...theme.typography.mobileEyebrow, textTransform: 'uppercase', textAlign: 'center' },
+  // IPA / transliteration — the pronunciation ledger. PT Mono carries both
+  // (the old inline 'monospace' family never resolved on native).
+  phoneticPrompt: {
+    fontSize: 38,
+    fontWeight: '700',
+    lineHeight: 46,
+    textAlign: 'center',
+    marginTop: 12,
+    fontFamily: theme.fonts.mono,
+  },
+  hint: { ...theme.typography.mobileLedger, textAlign: 'center', marginTop: 8 },
+  optionsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 24 },
+  optionChip: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    minWidth: 100,
+    alignItems: 'center',
+  },
+  optionText: { fontSize: 20, fontWeight: '700', lineHeight: 26, fontFamily: theme.fonts.display },
+  feedback: { ...theme.typography.mobileItemTitle, fontSize: 16, textAlign: 'center' },
+});

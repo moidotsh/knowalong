@@ -11,8 +11,9 @@
 import { useState, useEffect } from 'react';
 import { Platform } from 'react-native';
 import { isWeb } from '../utils';
+import { STORAGE_KEYS } from '../constants';
 
-const STORAGE_KEY = 'arqavellum:pwa-prompt-dismissed';
+const STORAGE_KEY = STORAGE_KEYS.pwaPromptDismissed;
 const COOLDOWN_DAYS = 14;
 
 export type PwaPlatform = 'ios' | 'android' | 'other-mobile';

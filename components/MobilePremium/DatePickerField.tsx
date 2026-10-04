@@ -35,13 +35,14 @@ import {
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { ChevronDown } from '@tamagui/lucide-icons-2';
 import { isWeb } from '../../utils';
+import { toYmd } from '../../utils/date-helpers';
 import { normalizeDateToISO } from '../../utils/validation';
-import { theme, MOBILE_CONTENT_WIDTH_STYLE } from '../../constants';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
 import { MobileSheet } from './MobileSheet';
 import { CalendarGrid } from './CalendarGrid';
 import { MobilePrimaryButton } from './MobilePrimaryButton';
-import { useFocusRing, usePressedStyle } from '../premium/shared';
+import { useFocusRing, usePressedStyle, useFieldChrome, FIELD_GROUP_STYLE } from '../premium/shared';
 
 export interface DatePickerFieldProps {
   /** Field label. */
@@ -73,13 +74,6 @@ export interface DatePickerFieldProps {
  * getMonth / getDate (NOT toISOString) so negative-offset users never see
  * their selected date shift backward a day.
  */
-function formatLocalYmd(date: Date): string {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-}
-
 /**
  * Parse YYYY-MM-DD into a local-midnight Date. Falls back to "now" on
  * malformed input — the native picker requires a valid Date object.
@@ -97,15 +91,8 @@ function parseLocalYmd(value: string | null | undefined): Date {
   return new Date();
 }
 
-const FIELD_LABEL_STYLE: Pick<
-  typeof theme.typography.mobileFieldLabel,
-  'fontSize' | 'fontWeight' | 'lineHeight' | 'letterSpacing'
-> = {
-  fontSize: theme.typography.mobileFieldLabel.fontSize,
-  fontWeight: theme.typography.mobileFieldLabel.fontWeight as any,
-  lineHeight: theme.typography.mobileFieldLabel.lineHeight,
-  letterSpacing: theme.typography.mobileFieldLabel.letterSpacing,
-};
+// The token object IS the style — reference it directly.
+const FIELD_LABEL_STYLE = theme.typography.mobileFieldLabel;
 
 /**
  * Single-date picker. YYYY-MM-DD in and out — no Date object crosses the
@@ -126,16 +113,18 @@ export function DatePickerField({
   style,
 }: DatePickerFieldProps) {
   const { colors } = useAppTheme();
-  const accent = accentColor ?? colors.brand;
+  const accent = accentColor ?? colors.text;
   const [open, setOpen] = useState(false);
   const [draftValue, setDraftValue] = useState<string | null>(value);
   const pressedStyle = usePressedStyle();
-  const { ringStyle, glowStyle } = useFocusRing({ color: accent, focused: open });
+  const { ringStyle } = useFocusRing({ color: accent, focused: open, duration: 0, radius: theme.shapes.control });
   const hasError = !!errorText;
 
-  const borderColor = open ? `${accent}66` : colors.glass.emptyInputBorder;
-  const triggerBg = open ? colors.glass.inputFocusBackground : colors.glass.inputBackground;
-  const labelColor = hasError ? colors.status.error : open ? accent : colors.text;
+  const { borderColor, backgroundColor: triggerBg, labelColor } = useFieldChrome({
+    focused: open,
+    hasError,
+    accent,
+  });
 
   const nativeInitial = useMemo(() => parseLocalYmd(value), [value]);
   const nativeMin = useMemo(() => (min ? parseLocalYmd(min) : undefined), [min]);
@@ -162,7 +151,7 @@ export function DatePickerField({
       return;
     }
     if (date) {
-      onChange(formatLocalYmd(date));
+      onChange(toYmd(date));
     }
     setOpen(false);
   };
@@ -172,39 +161,37 @@ export function DatePickerField({
   const sheetTitle = label ?? placeholder;
 
   return (
-    <View style={[styles.group, style]} testID={testID}>
+    <View style={[FIELD_GROUP_STYLE, style]} testID={testID}>
       {label ? (
         <Text style={[FIELD_LABEL_STYLE as any, { color: labelColor }]}>{label}</Text>
       ) : null}
 
       <View style={styles.triggerWrap}>
-        <View style={glowStyle}>
-          <Pressable
-            onPress={openSheet}
-            accessibilityRole="button"
-            accessibilityLabel={label ?? placeholder}
-            accessibilityValue={value ? { text: value } : undefined}
-            style={({ pressed }) => [
-              styles.trigger,
-              {
-                borderColor: hasError ? colors.status.error : borderColor,
-                backgroundColor: triggerBg,
-              },
-              pressed ? pressedStyle : null,
+        <Pressable
+          onPress={openSheet}
+          accessibilityRole="button"
+          accessibilityLabel={label ?? placeholder}
+          accessibilityValue={value ? { text: value } : undefined}
+          style={({ pressed }) => [
+            styles.trigger,
+            {
+              borderColor,
+              backgroundColor: triggerBg,
+            },
+            pressed ? pressedStyle : null,
+          ]}
+        >
+          <Text
+            style={[
+              styles.triggerLabel,
+              { color: isPlaceholder ? colors.textColors.tertiary : colors.text },
             ]}
+            numberOfLines={1}
           >
-            <Text
-              style={[
-                styles.triggerLabel,
-                { color: isPlaceholder ? colors.textColors.tertiary : colors.text },
-              ]}
-              numberOfLines={1}
-            >
-              {triggerLabel}
-            </Text>
-            <ChevronDown size={20} color={open ? accent : colors.textColors.muted} />
-          </Pressable>
-        </View>
+            {triggerLabel}
+          </Text>
+          <ChevronDown size={20} color={open ? accent : colors.textColors.muted} />
+        </Pressable>
         {/* Focus ring overlay — matches MobileInput / MobileSelect rhythm. */}
         <View pointerEvents="none" style={ringStyle} />
       </View>
@@ -257,18 +244,13 @@ export function DatePickerField({
 }
 
 const styles = StyleSheet.create({
-  group: {
-    gap: 6,
-    ...MOBILE_CONTENT_WIDTH_STYLE,
-    marginBottom: 16,
-  },
   triggerWrap: {
     position: 'relative',
   },
   trigger: {
     height: 54,
     borderWidth: 1.5,
-    borderRadius: 14,
+    borderRadius: theme.shapes.control,
     paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',

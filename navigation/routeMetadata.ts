@@ -10,7 +10,7 @@
 // Path-keyed, not enum-keyed, so the registry stays decoupled from
 // `navigation/NavigationHelper.tsx`'s `NavigationPath` enum (which differs
 // per consumer). Keys are the leading path segments expo-router reports
-// via `usePathname()` (e.g. `'analytics'`, `'workout-detail'`, `''` for
+// via `usePathname()` (e.g. `'analytics'`, `'record-detail'`, `''` for
 // index).
 //
 // Lookup falls back through progressively shorter path prefixes so a

@@ -235,11 +235,11 @@ function auditC2(files: string[]): Violation[] {
 
 // ── C4: ActivityIndicator outside loading components ────────────────
 //
-// Inline / form / init loading must go through consumer-created loading
+// Inline / form / init loading must go through the shipped loading
 // primitives: `LoadingSpinner` (inline), `LoadingOverlay` (full-screen),
-// `AppLoading` (init). Arqavellum ships none of these by default — the
-// exempt list starts empty except for `MobilePrimaryButton.tsx`, which
-// owns its inline spinner.
+// `AppLoading` (init) — all three in `components/primitives/`. Four
+// sanctioned ActivityIndicator sites exist: those three plus
+// `MobilePrimaryButton.tsx`'s inline button spinner.
 
 const C4_REGEX = /\bActivityIndicator\b/g;
 

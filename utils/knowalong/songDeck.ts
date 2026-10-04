@@ -79,29 +79,37 @@ function sectionTargets(subDeck: SubDeck): WordPart[] {
   return out;
 }
 
-/** Mark every word a set of lessons teaches as graduated in `evolved` (in place)
- *  — the cross-target evolution step. */
-function graduateTaught(lessons: Lesson[], evolved: MasteryMap): void {
-  for (const lesson of lessons) {
-    for (const step of lesson.steps) {
-      for (const w of step.words) {
-        const k = wordKey(w.form);
-        if (classifyWord(evolved[k]) !== 'graduated') evolved[k] = TAUGHT;
-      }
-    }
-  }
+/** Mark the arc's TARGET as graduated in `evolved` (in place) — the cross-target
+ *  evolution step. Only the target: an arc's context words are baseline (palette),
+ *  presumed-known already, and graduating them here would wrongly skip a LATER
+ *  target that doubles as a context word (e.g. `он`, `дух`) — its own arc would
+ *  never build. */
+function graduateTarget(target: WordPart, evolved: MasteryMap): void {
+  const k = wordKey(target.form);
+  if (classifyWord(evolved[k]) !== 'graduated') evolved[k] = TAUGHT;
 }
 
-/** Generate a song section's lessons from current mastery: one arc per lyric
+/** A section's generated plan: its lessons PLUS the targets the generator
+ *  deferred (design doc §1.4). A deferred target is neither graduated nor
+ *  assessed — it gets an explicit "still growing" state with unassessed
+ *  Explore/Listen activities, never a silently missing row and never a
+ *  loosened assessment cap. */
+export interface SongSectionPlan {
+  lessons: Lesson[];
+  deferred: WordPart[];
+}
+
+/** Generate a song section's plan from current mastery: one arc per lyric
  *  target (narrative order), with cross-target mastery evolution (each arc's words
  *  graduate before the next target, so context is reused, not re-taught). A target
  *  that is already graduated OR that defers (no teachable context phrase yet)
- *  contributes no lesson — it is acquired via exposure in the culminating line
- *  (Phase 5). Pure + deterministic. */
-export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider): Lesson[] {
+ *  contributes no lesson — deferred targets are reported in `deferred` instead.
+ *  Pure + deterministic. */
+export function buildSongSectionPlan(subDeck: SubDeck, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider): SongSectionPlan {
   const evolved: MasteryMap = { ...mastery };
   const icon = SECTION_ICON[subDeck.kind] ?? 'sparkles';
   const lessons: Lesson[] = [];
+  const deferred: WordPart[] = [];
   sectionTargets(subDeck).forEach((target, i) => {
     const opts: BuildArcOptions = {
       idPrefix: `${DYNAMIC_SONG_PREFIX}${subDeck.id}-${i + 1}`,
@@ -110,11 +118,22 @@ export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, s
       icon,
     };
     const arc = buildArcForTarget(target, evolved, spine, context, opts);
-    if (arc.length === 0) return; // already graduated OR deferred → no lesson for this target
+    if (arc.length === 0) {
+      // Already graduated (done) OR deferred (no teachable context yet) —
+      // distinguish them so the UI can surface the deferred state honestly.
+      if (classifyWord(evolved[wordKey(target.form)]) !== 'graduated') deferred.push(target);
+      return;
+    }
     lessons.push(...arc);
-    graduateTaught(arc, evolved); // next target reuses this arc's words as known context
+    graduateTarget(target, evolved); // this target is now known for later targets' lyric windows
   });
-  return lessons;
+  return { lessons, deferred };
+}
+
+/** Generate a song section's lessons from current mastery (the plan's lessons
+ *  only — the pre-§1.4 shape, kept for existing callers). */
+export function buildSongSectionLessons(subDeck: SubDeck, mastery: MasteryMap, spine: SpineProvider, context: ContextProvider): Lesson[] {
+  return buildSongSectionPlan(subDeck, mastery, spine, context).lessons;
 }
 
 export interface ResolvedSongLesson {

@@ -1,6 +1,8 @@
 // components/MobilePremium/FilterChip.tsx
-// Interactive pill primitive. One chip — label, optional icon, selected
-// state, tap handler. Domain-neutral: no copy, no schema, no list state.
+// Interactive marking chip reading the declared tag shape token (the
+// token owns the corner — a consumer sets `tag: 999` for full round).
+// One chip — label, optional icon, selected state, tap handler.
+// Domain-neutral: no copy, no schema, no list state.
 //
 // Accessibility state MUST match the chosen role:
 //   • role="button" (default) → accessibilityState.selected
@@ -22,6 +24,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Pressable, usePressedStyle } from '../premium/shared';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
 
 export type FilterChipAccessibilityRole = 'button' | 'radio' | 'checkbox';
@@ -75,6 +78,8 @@ export function FilterChip({
       accessibilityRole={accessibilityRole}
       accessibilityState={a11yState}
       accessibilityLabel={accessibilityLabel ?? label}
+      // 36px visual — hitSlop lifts the effective target to the 44px floor.
+      hitSlop={8}
       style={({ pressed }) => [
         styles.chip,
         {
@@ -100,10 +105,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
+    paddingHorizontal: 12,
+    borderRadius: theme.shapes.tag,
     borderWidth: 1,
-    minHeight: 36,
+    minHeight: 44,
   },
   iconSlot: {
     flexDirection: 'row',
@@ -111,9 +116,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   label: {
-    fontSize: 13,
-    fontWeight: '600',
-    letterSpacing: 0,
+    fontSize: theme.typography.mobileTag.fontSize,
+    fontWeight: theme.typography.mobileTag.fontWeight as any,
+    lineHeight: theme.typography.mobileTag.lineHeight,
+    letterSpacing: theme.typography.mobileTag.letterSpacing,
+    fontFamily: theme.fonts.mono,
   },
 });
 

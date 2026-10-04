@@ -1,10 +1,10 @@
 // __tests__/components/FilterChipGroup.test.tsx
 //
 // Component-level render + layout tests for FilterChipGroup.
-//   - Renders children
-//   - wrap default true → flexWrap 'wrap'
-//   - wrap=false → flexWrap 'nowrap'
-//   - Does NOT render a ScrollView in either mode
+//   - Renders children in both modes
+//   - oneRow default true → renders a horizontal ScrollView (one scrollable row)
+//   - oneRow={false} → plain flex-wrap View, no ScrollView
+//   - Web-only trailing fade present in oneRow mode, absent in wrap mode
 //   - Carries no a11y role of its own (presentational)
 
 import { describe, it, expect } from 'vitest';
@@ -20,7 +20,7 @@ function Wrap({ children }: { children: ReactNode }) {
 }
 
 describe('FilterChipGroup — layout', () => {
-  it('renders its children', () => {
+  it('renders its children (default oneRow mode)', () => {
     const { getByText } = render(
       <Wrap>
         <FilterChipGroup>
@@ -33,7 +33,20 @@ describe('FilterChipGroup — layout', () => {
     expect(getByText('Two')).toBeTruthy();
   });
 
-  it('default wrap is true (flexWrap: "wrap")', () => {
+  it('renders its children (oneRow={false} wrap mode)', () => {
+    const { getByText } = render(
+      <Wrap>
+        <FilterChipGroup oneRow={false}>
+          <FilterChip label="One" selected={false} onPress={() => {}} />
+          <FilterChip label="Two" selected={false} onPress={() => {}} />
+        </FilterChipGroup>
+      </Wrap>,
+    );
+    expect(getByText('One')).toBeTruthy();
+    expect(getByText('Two')).toBeTruthy();
+  });
+
+  it('default oneRow is true → renders a horizontal ScrollView', () => {
     const { container } = render(
       <Wrap>
         <FilterChipGroup>
@@ -41,52 +54,27 @@ describe('FilterChipGroup — layout', () => {
         </FilterChipGroup>
       </Wrap>,
     );
-    // The group is the outer View. We can't read StyleSheet-resolved style
-    // from jsdom, so assert the structure: the group is a View with row
-    // layout containing chip(s).
-    const chips = container.querySelectorAll('[accessibilityrole="button"]');
-    expect(chips.length).toBe(1);
+    // The react-native mock renders ScrollView as a literal <scrollview>
+    // element; the wrap-mode branch (plain View) never does. Tag presence
+    // is the structural signal of the scroll row.
+    const scrollNodes = container.querySelectorAll('scrollview');
+    expect(scrollNodes.length).toBeGreaterThan(0);
   });
 
-  it('wrap=false produces a different flexWrap value than default', () => {
-    // The style is applied inline via StyleSheet. Verify the prop is
-    // accepted without type errors and the component still renders.
+  it('oneRow={false} renders no ScrollView', () => {
     const { container } = render(
       <Wrap>
-        <FilterChipGroup wrap={false}>
+        <FilterChipGroup oneRow={false}>
           <FilterChip label="A" selected={false} onPress={() => {}} />
           <FilterChip label="B" selected={false} onPress={() => {}} />
         </FilterChipGroup>
       </Wrap>,
     );
-    const chips = container.querySelectorAll('[accessibilityrole="button"]');
-    expect(chips.length).toBe(2);
-  });
-
-  it('does NOT render a ScrollView (default wrap mode)', () => {
-    const { container } = render(
-      <Wrap>
-        <FilterChipGroup>
-          <FilterChip label="A" selected={false} onPress={() => {}} />
-        </FilterChipGroup>
-      </Wrap>,
-    );
-    // ScrollView would show up as a host node with a specific prop signature
-    // (e.g. onScroll). The DOM-walked tree should contain only Views.
-    const scrollViews = container.querySelectorAll('[onscroll]');
+    const scrollViews = container.querySelectorAll('scrollview');
     expect(scrollViews.length).toBe(0);
-  });
-
-  it('does NOT render a ScrollView in wrap=false mode either', () => {
-    const { container } = render(
-      <Wrap>
-        <FilterChipGroup wrap={false}>
-          <FilterChip label="A" selected={false} onPress={() => {}} />
-        </FilterChipGroup>
-      </Wrap>,
-    );
-    const scrollViews = container.querySelectorAll('[onscroll]');
-    expect(scrollViews.length).toBe(0);
+    expect(
+      container.querySelectorAll('[accessibilityrole="button"]').length,
+    ).toBe(2);
   });
 
   it('accepts a custom gap without error', () => {

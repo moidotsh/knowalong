@@ -33,6 +33,9 @@ export interface StatCardProps {
   value: string | number;
   /** Optional supporting line under the value. */
   subtitle?: string;
+  /** Provide to make the subtitle a tappable action (the verb lives at
+   *  the finding — e.g. "update your balance" on a stat tile). */
+  subtitleAction?: () => void;
   /** Optional small icon next to the label. Consumer-tinted. */
   icon?: React.ReactNode;
   /** Visual treatment. Default 'plain'. */
@@ -49,12 +52,7 @@ export interface StatCardProps {
   style?: StyleProp<ViewStyle>;
 }
 
-const LABEL_STYLE = {
-  fontSize: theme.typography.mobileEyebrow.fontSize,
-  fontWeight: theme.typography.mobileEyebrow.fontWeight as any,
-  lineHeight: theme.typography.mobileEyebrow.lineHeight,
-  letterSpacing: theme.typography.mobileEyebrow.letterSpacing,
-} as const;
+const LABEL_STYLE = theme.typography.mobileEyebrow;
 
 function valueStyleFor(size: StatCardSize) {
   switch (size) {
@@ -84,6 +82,7 @@ export function StatCard({
   label,
   value,
   subtitle,
+  subtitleAction,
   icon,
   variant = 'plain',
   size = 'md',
@@ -154,15 +153,35 @@ export function StatCard({
         {value}
       </Text>
       {subtitle ? (
-        <Text
-          style={[
-            { fontSize: 13, fontWeight: '400', lineHeight: 18 },
-            { color: subtitleColor, marginTop: gapBetweenValueAndSubtitle },
-          ]}
-          numberOfLines={2}
-        >
-          {subtitle}
-        </Text>
+        subtitleAction ? (
+          <Pressable
+            onPress={subtitleAction}
+            accessibilityRole="button"
+            accessibilityLabel={subtitle}
+            hitSlop={8}
+            style={{ marginTop: gapBetweenValueAndSubtitle, alignSelf: 'flex-start' }}
+          >
+            <Text
+              style={[
+                { fontSize: 13, fontWeight: '600', lineHeight: 18 },
+                { color: colors.brandPress },
+              ]}
+              numberOfLines={2}
+            >
+              {subtitle}
+            </Text>
+          </Pressable>
+        ) : (
+          <Text
+            style={[
+              { fontSize: 13, fontWeight: '400', lineHeight: 18 },
+              { color: subtitleColor, marginTop: gapBetweenValueAndSubtitle },
+            ]}
+            numberOfLines={2}
+          >
+            {subtitle}
+          </Text>
+        )
       ) : null}
     </View>
   );
@@ -196,7 +215,7 @@ export function StatCard({
 const styles = StyleSheet.create({
   shell: {
     width: '100%',
-    borderRadius: 16,
+    borderRadius: theme.shapes.surface,
     overflow: 'hidden',
   },
   inner: {

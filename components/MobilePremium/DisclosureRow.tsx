@@ -11,19 +11,18 @@
 //     worklets (installed, currently unused — adopting them is a stack
 //     decision) or LayoutAnimation (unpredictable on web). A v1 with
 //     instant content swap is correct, simple, and accessible.
-//   • Header chevron rotates 180° on open over 200ms via Animated.timing.
-//     Under reduced motion (useReducedMotion() from hooks/useAnimation),
+//   • Header chevron rotates 180° on open over 200ms (useAnimatedFlag —
+//     the kit's motion core). Under reduced motion
 //     duration collapses to 0 — the chevron snaps to the open orientation
 //     with no rotation animation.
 //
 // v2 (deferred to Batch B) — height animation gated on a real Reanimated
 // adoption decision plus a measurement helper that doesn't exist today.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { Animated, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { ChevronDown } from '@tamagui/lucide-icons-2';
-import { usePressedStyle } from '../premium/shared';
-import { useReducedMotion } from '../../hooks';
+import { usePressedStyle, useAnimatedFlag } from '../premium/shared';
 import { useAppTheme } from '../../context';
 
 export interface DisclosureRowProps {
@@ -55,27 +54,13 @@ export function DisclosureRow({
 }: DisclosureRowProps) {
   const { colors } = useAppTheme();
   const pressedStyle = usePressedStyle();
-  const reducedMotion = useReducedMotion();
-
   const [internalOpen, setInternalOpen] = useState(defaultOpen);
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : internalOpen;
 
-  // Chevron rotation — 0° closed, 180° open. Under reduced motion the
-  // duration is 0, so the chevron snaps to the target rotation on the next
-  // animation tick instead of animating.
-  const rotation = useRef(new Animated.Value(isOpen ? 1 : 0)).current;
-
-  useEffect(() => {
-    const target = isOpen ? 1 : 0;
-    const anim = Animated.timing(rotation, {
-      toValue: target,
-      duration: reducedMotion ? 0 : 200,
-      useNativeDriver: true,
-    });
-    anim.start();
-    return () => anim.stop();
-  }, [isOpen, rotation, reducedMotion]);
+  // Chevron rotation — 0° closed, 180° open. The flag core snaps the
+  // rotation under reduced motion instead of animating.
+  const rotation = useAnimatedFlag(isOpen, { duration: 200 });
 
   const toggle = () => {
     const next = !isOpen;

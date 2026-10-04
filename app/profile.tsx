@@ -1,16 +1,47 @@
 // app/profile.tsx
 // Learner profile — identity, language(s), streak record, total time,
-// study preferences summary. The "who you are as a learner" page.
+// study preferences summary. The "who you are as a learner" page — now a
+// tab surface (§1.1) that also stewards the song shelf: the active song
+// pointer, archived songs with restore, and the explicit-lyrics opt-in
+// (§1.2: warned first, always the learner's call, revocable here).
 
 import React from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { MobileAtmosphere, MobileSurface, MobileHeader, MobileSectionEyebrow } from '../components/MobilePremium';
+import {
+  MobileAtmosphere,
+  MobileSurface,
+  MobileHeader,
+  MobileSectionEyebrow,
+  MobileCheckboxItem,
+} from '../components/MobilePremium';
+import { SongTabBar } from '../components/knowalong';
 import { useAppTheme } from '../context';
-import { safeGoBack, navigateToSettings } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { navigateToSettings } from '../navigation';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { useStreakStore } from '../stores/streakStore';
+import { useSongShelfStore } from '../stores';
+import { useSourceSong } from '../hooks/queries';
+import { DEMO_SONG_ID } from '../utils/knowalong/song/demoSongAdapter';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
+
+/** An archived song row — projects its source quietly; restore returns it
+ *  to the shelf (§1.1: archived is restorable, never destructive). */
+function ArchivedSongRow({ sourceId, onRestore }: { sourceId: string; onRestore: () => void }) {
+  const { colors } = useAppTheme();
+  const song = useSourceSong(sourceId);
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 }}>
+      <ConceptIcon name="book" size={20} color={colors.textMuted} />
+      <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary, flex: 1 }} numberOfLines={1}>
+        {song?.title ?? 'Saved song'}
+      </Text>
+      <Pressable hitSlop={8} onPress={onRestore} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1 })}>
+        <Text style={{ fontFamily: theme.fonts.mono, fontSize: 12, color: colors.brand }}>RESTORE</Text>
+      </Pressable>
+    </View>
+  );
+}
 
 export default function ProfileScreen() {
   const { colors } = useAppTheme();
@@ -20,11 +51,18 @@ export default function ProfileScreen() {
   const sessions = useStreakStore((s) => s.totalSessions);
   const streak = useStreakStore((s) => s.getStreak(5).streak);
 
+  const activeSongId = useSongShelfStore((s) => s.activeSongId);
+  const archivedSongIds = useSongShelfStore((s) => s.archivedSongIds);
+  const restoreSong = useSongShelfStore((s) => s.restoreSong);
+  const explicitOptIn = useSongShelfStore((s) => s.explicitContentOptIn);
+  const optInToExplicitContent = useSongShelfStore((s) => s.optInToExplicitContent);
+  const revokeExplicitContentOptIn = useSongShelfStore((s) => s.revokeExplicitContentOptIn);
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.backgroundDeep }} edges={['top', 'bottom']}>
+    <SafeAreaView style={[styles.shell, { backgroundColor: colors.backgroundDeep }]} edges={['top', 'bottom']}>
       <MobileAtmosphere surface="analytics" />
-      <MobileHeader title="Profile" onBack={safeGoBack} />
-      <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 }}>
+      <MobileHeader title="Profile" eyebrow="Learn from lyrics" />
+      <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 120 }}>
 
         {/* Identity */}
         <MobileSurface padding={24}>
@@ -36,8 +74,8 @@ export default function ProfileScreen() {
               <ConceptIcon name="user" size={32} color={colors.brand} />
             </View>
             <View>
-              <Text style={{ fontSize: 20, fontWeight: '700', color: colors.text }}>Demo Learner</Text>
-              <Text style={{ fontSize: 13, color: colors.textSecondary, marginTop: 2 }}>Learning Russian 🇷🇺</Text>
+              <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 20, lineHeight: 26, fontFamily: theme.fonts.display, color: colors.text }}>Demo Learner</Text>
+              <Text style={{ ...theme.typography.mobileBody, fontSize: 13, lineHeight: 18, color: colors.textSecondary, marginTop: 2 }}>Learning Russian 🇷🇺</Text>
             </View>
           </View>
         </MobileSurface>
@@ -54,11 +92,35 @@ export default function ProfileScreen() {
             <MobileSurface key={i} padding={14}>
               <View style={{ minWidth: 100 }}>
                 <ConceptIcon name={stat.icon} size={24} color={colors.brand} />
-                <Text style={{ fontSize: 22, fontWeight: '700', color: colors.text, marginTop: 6 }}>{stat.value}</Text>
-                <Text style={{ fontSize: 11, color: colors.textMuted }}>{stat.label}</Text>
+                <Text style={{ ...theme.typography.mobileFigure, color: colors.text, marginTop: 6 }}>{stat.value}</Text>
+                <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 2 }}>{stat.label}</Text>
               </View>
             </MobileSurface>
           ))}
+        </View>
+
+        {/* Your songs — shelf stewardship (§1.1) */}
+        <View style={{ marginTop: 20 }}>
+          <MobileSectionEyebrow>Your songs</MobileSectionEyebrow>
+          <MobileSurface padding={16}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 6 }}>
+              <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary }}>Leading Today</Text>
+              <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text, flexShrink: 1, marginLeft: 12 }} numberOfLines={1}>
+                {!activeSongId || activeSongId === DEMO_SONG_ID ? 'Demo song' : 'Saved song'}
+              </Text>
+            </View>
+            {archivedSongIds.length > 0 ? (
+              <>
+                <View style={{ height: 1, backgroundColor: colors.cardAlt, marginVertical: 8 }} />
+                <Text style={{ ...theme.typography.mobileEyebrow, fontSize: 10, lineHeight: 14, color: colors.textMuted }}>
+                  ARCHIVED
+                </Text>
+                {archivedSongIds.map((id) => (
+                  <ArchivedSongRow key={id} sourceId={id} onRestore={() => restoreSong(id)} />
+                ))}
+              </>
+            ) : null}
+          </MobileSurface>
         </View>
 
         {/* Study preferences */}
@@ -66,43 +128,65 @@ export default function ProfileScreen() {
           <MobileSectionEyebrow>Study preferences</MobileSectionEyebrow>
           <MobileSurface padding={16}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-              <Text style={{ fontSize: 14, color: colors.textSecondary }}>Daily goal</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>10 phrases</Text>
+              <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary }}>Daily goal</Text>
+              <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>10 phrases</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-              <Text style={{ fontSize: 14, color: colors.textSecondary }}>Weekly target</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>5 days</Text>
+              <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary }}>Weekly target</Text>
+              <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>5 days</Text>
             </View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 6 }}>
-              <Text style={{ fontSize: 14, color: colors.textSecondary }}>Target language</Text>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.text }}>Russian</Text>
+              <Text style={{ ...theme.typography.mobileBody, color: colors.textSecondary }}>Target language</Text>
+              <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>Russian</Text>
             </View>
           </MobileSurface>
           <View style={{ height: 12 }} />
-          <Pressable onPress={navigateToSettings}>
+          <Pressable onPress={navigateToSettings} style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}
+            accessibilityRole="button"
+            accessibilityLabel="Open all settings">
           <MobileSurface padding={16}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontSize: 14, fontWeight: '600', color: colors.brand }}>All settings</Text>
+              <Text style={{ ...theme.typography.mobileEyebrow, color: colors.brand, textTransform: 'uppercase' }}>All settings</Text>
               <Text style={{ fontSize: 16, color: colors.brand }}>→</Text>
             </View>
           </MobileSurface>
           </Pressable>
         </View>
+
+        {/* Content — explicit-lyrics opt-in (§1.2: warned, opt-in, revocable) */}
+        <View style={{ marginTop: 20 }}>
+          <MobileSectionEyebrow>Content</MobileSectionEyebrow>
+          <MobileSurface padding={16}>
+            <MobileCheckboxItem
+              title="Explicit-lyrics passages"
+              subtitle="Some songs carry an explicit tag. Their passages stay readable — but practice stays hidden — until you opt in. You can change this any time."
+              checked={explicitOptIn}
+              onToggle={() => (explicitOptIn ? revokeExplicitContentOptIn() : optInToExplicitContent())}
+            />
+          </MobileSurface>
+        </View>
+
         <View style={{ marginTop: 20 }}>
           <MobileSectionEyebrow>About</MobileSectionEyebrow>
           <MobileSurface padding={16}>
-            <Text style={{ fontSize: 13, color: colors.textSecondary, lineHeight: 20 }}>
+            <Text style={{ ...theme.typography.mobileBody, fontSize: 13, lineHeight: 20, color: colors.textSecondary }}>
               KnowAlong teaches languages from basic principles — you build phrases
               atom by atom (я → я вижу → я вижу море), then learn from song lyrics
               by studying the concepts each verse needs.
             </Text>
-            <Text style={{ fontSize: 11, color: colors.textMuted, marginTop: 12 }}>
+            <Text style={{ ...theme.typography.mobileLedger, fontSize: 10, lineHeight: 14, color: colors.textMuted, marginTop: 12 }}>
               Prototype · Demo mode · No data leaves your device
             </Text>
           </MobileSurface>
         </View>
 
       </ScrollView>
+
+      <SongTabBar activeId="profile" />
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  shell: { flex: 1 },
+});

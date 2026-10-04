@@ -1,4 +1,4 @@
-// components/MobilePremium/showcase.tsx
+// components/MobilePremium/showcase/index.tsx
 // The design-system showcase. Renders every MobilePremium primitive, plus
 // all 7 atmosphere palettes side-by-side, plus demos of the cross-cutting
 // Tier 1 + Tier 2 surface (Toast, animation hooks, theme switching). This
@@ -11,366 +11,104 @@
 // The theme is read via `useAppTheme()` — the showcase reacts live to
 // light/dark/system preferences. Use the Theme selector at the top to
 // flip the whole surface.
+//
+// Module map: this index composes the page (sections in render order,
+// portal layer, shared state); demos/ holds the interactive demo
+// components; styles.ts the shared StyleSheet; data.ts the atmosphere
+// surface list + preference chips.
 
-import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sun, Moon, Monitor, Mail, Lock, Eye, EyeOff, Settings, Bell, Info, ChevronRight, Home, Package, TrendingUp, Search } from '@tamagui/lucide-icons-2';
-import { theme, APP_LAYOUT, SCREEN_BODY_STYLE } from '../../constants';
-import { useAppTheme, useToast, type ColorSchemePreference } from '../../context';
-import {
-  useFadeIn,
-  useScaleIn,
-  usePopIn,
-  useAnimatedCounter,
-  useShake,
-  useTranslateY,
-  useContainerVariant,
-} from '../../hooks';
+import { Mail, Lock, Eye, EyeOff, Settings, Bell, Info, ChevronRight, Home, Package, TrendingUp, Search } from '@tamagui/lucide-icons-2';
+import { theme, APP_LAYOUT, SCREEN_BODY_STYLE, APP_DISPLAY_NAME } from '../../../constants';
+import { useAppTheme } from '../../../context';
 // Direct imports from each primitive file (not the barrel). The
 // showcase is intentionally NOT re-exported by the MobilePremium
 // barrel (see that file's note + docs/contributing.md), so going
 // through the barrel here is no longer a cycle — these direct
 // imports remain preferable for tree-shaking and to keep the
 // showcase's dependency surface explicit.
-import { MobileAtmosphere } from './MobileAtmosphere';
-import { MobileSurface } from './MobileSurface';
-import { MobileHeader } from './MobileHeader';
-import { MobileHomeHeader } from './MobileHomeHeader';
-import { MobileActionFooter } from './MobileActionFooter';
-import { MobilePrimaryButton } from './MobilePrimaryButton';
-import { MobileInput } from './MobileInput';
-import { MobileAlert } from './MobileAlert';
-import { MobileSettingsRow } from './MobileSettingsRow';
-import { MobileSectionEyebrow } from './MobileSectionEyebrow';
-import { MobileStepper } from './MobileStepper';
-import { MobileCheckboxItem } from './MobileCheckboxItem';
-import { MobileSelectionList } from './MobileSelectionList';
-import { MobileStepRail } from './MobileStepRail';
-import { MobileDialog } from './MobileDialog';
-import { MobileSelect } from './MobileSelect';
-import { MobileNavDrawer } from './MobileNavDrawer';
-import type { MobileNavDrawerItem } from './MobileNavDrawer';
-import { MobileNavDrawerGlassCap } from './MobileNavDrawerGlassCap';
-import { HamburgerButton } from './HamburgerButton';
-import { SkeletonBlock } from './SkeletonBlock';
-import { SegmentedControl } from './SegmentedControl';
-import { FilterChip } from './FilterChip';
-import { FilterChipGroup } from './FilterChipGroup';
-import { DisclosureRow } from './DisclosureRow';
-import { EmptyState } from './EmptyState';
-import { StatCard } from './StatCard';
-import { Avatar } from './Avatar';
-import { SegmentedProgress } from './SegmentedProgress';
-import { OfflineBanner } from './OfflineBanner';
-import { CarouselTutorial } from './CarouselTutorial';
-import { Wizard } from './Wizard';
-import { ProgressRing } from './ProgressRing';
-import { MobileSheet } from './MobileSheet';
-import { DatePickerField } from './DatePickerField';
-import { RevealMask } from './RevealMask';
-import { LoadingOverlay } from '../primitives';
-import { ActivityGridPreview } from './ActivityGridPreview';
-import { CopyForAiButton } from './CopyForAiButton';
-import { buildAiPayload } from '../../utils/buildAiPayload';
-import { PALETTES, type AtmosphereSurface } from '../premium/shared';
+import { MobileAtmosphere } from '../MobileAtmosphere';
+import { InkPanel } from '../InkPanel';
+import { MobileSurface } from '../MobileSurface';
+import { MobileHeader } from '../MobileHeader';
+import { MobileHomeHeader } from '../MobileHomeHeader';
+import { MobileActionFooter } from '../MobileActionFooter';
+import { MobilePrimaryButton } from '../MobilePrimaryButton';
+import { MobileInput } from '../MobileInput';
+import { MobileAlert } from '../MobileAlert';
+import { MobileSettingsRow } from '../MobileSettingsRow';
+import { MobileSectionEyebrow } from '../MobileSectionEyebrow';
+import { MobileStepper } from '../MobileStepper';
+import { MobileCheckboxItem } from '../MobileCheckboxItem';
+import { CheckBox } from '../CheckBox';
+import { MobileSelectionList } from '../MobileSelectionList';
+import { MobileStepRail } from '../MobileStepRail';
+import { MobileDialog } from '../MobileDialog';
+import { MobileSelect } from '../MobileSelect';
+import { MobileNavDrawer } from '../MobileNavDrawer';
+import type { MobileNavDrawerItem } from '../MobileNavDrawer';
+import { MobileNavDrawerGlassCap } from '../MobileNavDrawerGlassCap';
+import { HamburgerButton } from '../HamburgerButton';
+import { SegmentedControl } from '../SegmentedControl';
+import { FilterChip } from '../FilterChip';
+import { SearchField } from '../SearchField';
+import { FilterChipGroup } from '../FilterChipGroup';
+import { DisclosureRow } from '../DisclosureRow';
+import { EmptyState } from '../EmptyState';
+import { Figure } from '../Figure';
+import { TallyStrip } from '../TallyStrip';
+import { StatCard } from '../StatCard';
+import { Avatar } from '../Avatar';
+import { SegmentedProgress } from '../SegmentedProgress';
+import { OfflineBanner } from '../OfflineBanner';
+import { MobileAnnouncementBar } from '../MobileAnnouncementBar';
+import { MobileFootnote } from '../MobileFootnote';
+import { CarouselTutorial } from '../CarouselTutorial';
+import { Wizard } from '../Wizard';
+import { ProgressRing } from '../ProgressRing';
+import { MobileSheet } from '../MobileSheet';
+import { DatePickerField } from '../DatePickerField';
+import { RevealMask } from '../RevealMask';
+import { LoadingOverlay } from '../../primitives';
+import { ActivityGridPreview } from '../ActivityGridPreview';
+import { CopyForAiButton } from '../CopyForAiButton';
+import { buildAiPayload } from '../../../utils/buildAiPayload';
+import { SURFACES } from './data';
+import { styles } from './styles';
+import { ThemeSelector } from './demos/ThemeSelector';
+import { ToastDemo } from './demos/ToastDemo';
+import { AnimationDemo } from './demos/AnimationDemo';
+import { SkeletonDemo } from './demos/SkeletonDemo';
+import { ContainerVariantDemo } from './demos/ContainerVariantDemo';
+import { ThemeAxesDemo } from './demos/ThemeAxesDemo';
+import { CurtainDemo } from './demos/CurtainDemo';
+import { LangDemo } from './demos/LangDemo';
+import { AbsorbBarDemo } from './demos/AbsorbBarDemo';
+import { TabBarDemo } from './demos/TabBarDemo';
+import { ShellHeaderDemo } from './demos/ShellHeaderDemo';
 
-const SURFACES: AtmosphereSurface[] = [
-  'auth',
-  'setup',
-  'training',
-  'goal',
-  'instructions',
-  'privacy',
-  'analytics',
-];
-
-const PREFERENCE_OPTIONS: ReadonlyArray<{
-  value: ColorSchemePreference;
-  label: string;
-  Icon: React.ComponentType<{ size?: number; color?: string }>;
-}> = [
-  { value: 'light', label: 'Light', Icon: Sun },
-  { value: 'dark', label: 'Dark', Icon: Moon },
-  { value: 'system', label: 'System', Icon: Monitor },
-];
-
-function ThemeSelector() {
-  const { colors, preference, setPreference } = useAppTheme();
-  return (
-    <View style={styles.themeRow}>
-      {PREFERENCE_OPTIONS.map(({ value, label, Icon }) => {
-        const active = preference === value;
-        return (
-          <Pressable
-            key={value}
-            onPress={() => setPreference(value)}
-            style={[
-              styles.themeChip,
-              {
-                backgroundColor: active ? colors.brand : colors.card,
-                borderColor: active ? colors.brand : colors.border,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityState={{ selected: active }}
-            accessibilityLabel={`Theme: ${label}`}
-          >
-            <Icon size={14} color={active ? colors.textOnBrand : colors.textSecondary} />
-            <Text
-              style={[
-                styles.themeChipLabel,
-                {
-                  color: active ? colors.textOnBrand : colors.textSecondary,
-                },
-              ]}
-            >
-              {label}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
-function ToastDemo() {
-  const { colors } = useAppTheme();
-  const { showToast } = useToast();
-  const toastButtons: ReadonlyArray<{ type: 'success' | 'warning' | 'error' | 'info'; label: string }> = [
-    { type: 'success', label: 'Success' },
-    { type: 'warning', label: 'Warning' },
-    { type: 'error', label: 'Error' },
-    { type: 'info', label: 'Info' },
-  ];
-  return (
-    <MobileSurface>
-      <View style={styles.toastRow}>
-        {toastButtons.map(({ type, label }) => (
-          <Pressable
-            key={type}
-            onPress={() => showToast(type, `${label} toast — auto-dismisses in 4s.`)}
-            style={[
-              styles.toastChip,
-              {
-                backgroundColor: colors.buttonBackground,
-                borderColor: colors.border,
-              },
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={`Show ${label} toast`}
-          >
-            <Text style={[styles.toastChipLabel, { color: colors.textOnBrand }]}>{label}</Text>
-          </Pressable>
-        ))}
-      </View>
-    </MobileSurface>
-  );
-}
-
-function AnimationDemo() {
-  const { colors } = useAppTheme();
-  const fadeIn = useFadeIn({ animateOnMount: false, duration: 600 });
-  const scaleIn = useScaleIn({ animateOnMount: false, duration: 600, useSpring: true });
-  const popIn = usePopIn({ animateOnMount: false });
-  const shake = useShake({ intensity: 8, cycles: 3 });
-  const translateY = useTranslateY({ animateOnMount: false, initialValue: 24, duration: 500 });
-
-  const [counterTarget, setCounterTarget] = useState('0');
-  const counter = useAnimatedCounter(counterTarget);
-
-  const replay = () => {
-    fadeIn.reset();
-    scaleIn.reset();
-    popIn.reset();
-    translateY.reset();
-    // Defer one frame so the reset lands before the animation restarts.
-    setTimeout(() => {
-      fadeIn.fadeIn();
-      scaleIn.scaleIn();
-      popIn.popIn();
-      translateY.animate();
-    }, 16);
-  };
-
-  const runCounter = () => {
-    const next = Math.floor(Math.random() * 1000);
-    counter.startCount(
-      counterTarget,
-      next.toString(),
-      (n) => Math.round(n).toString(),
-      () => setCounterTarget(next.toString()),
-      900,
-    );
-  };
-
-  return (
-    <View>
-      <MobileSurface>
-        <View style={styles.animGrid}>
-          <Animated.View style={[styles.animCard, { backgroundColor: colors.buttonBackground }, fadeIn.style]}>
-            <Text style={[styles.animLabel, { color: colors.textOnBrandMuted }]}>useFadeIn</Text>
-            <Text style={[styles.animValue, { color: colors.textOnBrand }]}>opacity → 1</Text>
-          </Animated.View>
-          <Animated.View style={[styles.animCard, { backgroundColor: colors.buttonBackground }, scaleIn.style]}>
-            <Text style={[styles.animLabel, { color: colors.textOnBrandMuted }]}>useScaleIn</Text>
-            <Text style={[styles.animValue, { color: colors.textOnBrand }]}>spring → 1</Text>
-          </Animated.View>
-          <Animated.View style={[styles.animCard, { backgroundColor: colors.buttonBackground }, popIn.style]}>
-            <Text style={[styles.animLabel, { color: colors.textOnBrandMuted }]}>usePopIn</Text>
-            <Text style={[styles.animValue, { color: colors.textOnBrand }]}>overshoot</Text>
-          </Animated.View>
-          <Animated.View
-            style={[styles.animCard, { backgroundColor: colors.buttonBackground }, translateY.style]}
-          >
-            <Text style={[styles.animLabel, { color: colors.textOnBrandMuted }]}>useTranslateY</Text>
-            <Text style={[styles.animValue, { color: colors.textOnBrand }]}>slide ↑</Text>
-          </Animated.View>
-        </View>
-      </MobileSurface>
-      <View style={styles.spacer} />
-      <MobilePrimaryButton onPress={replay} variant="secondary">
-        Replay animations
-      </MobilePrimaryButton>
-      <View style={styles.spacer} />
-      <MobilePrimaryButton onPress={shake.shake} variant="secondary">
-        Shake the card below
-      </MobilePrimaryButton>
-      <View style={styles.spacer} />
-      <MobileSurface>
-        <Animated.View style={[styles.shakeCard, { backgroundColor: colors.buttonBackground }, shake.style]}>
-          <Text style={[styles.animLabel, { color: colors.textOnBrandMuted }]}>useShake</Text>
-          <Text style={[styles.animValue, { color: colors.textOnBrand }]}>imperative — call shake() from any handler</Text>
-        </Animated.View>
-      </MobileSurface>
-      <View style={styles.spacer} />
-      <Text style={[styles.animLabel, { color: colors.textSecondary, marginBottom: 8 }]}>
-        useAnimatedCounter
-      </Text>
-      <MobileSurface>
-        <View style={styles.counterRow}>
-          <Text style={[styles.counterValue, { color: colors.brand }]}>
-            {counter.displayed}
-          </Text>
-          <MobilePrimaryButton
-            onPress={runCounter}
-            variant="secondary"
-            style={styles.counterButton}
-          >
-            Count
-          </MobilePrimaryButton>
-        </View>
-      </MobileSurface>
-    </View>
-  );
-}
-
-/**
- * SkeletonBlock + useShimmer demo. Three variants — a full-width bar, a
- * short bar, and a circular avatar placeholder — plus a stacked avatar+
- * two-line composition. The shimmer pulse is the live useShimmer output;
- * under `prefers-reduced-motion: reduce` the blocks render as flat
- * `colors.cardAlt` rectangles with no animation.
- */
-function SkeletonDemo() {
-  const { colors } = useAppTheme();
-  return (
-    <View>
-      <MobileSurface>
-        <SkeletonBlock height={16} />
-        <View style={{ height: 12 }} />
-        <SkeletonBlock width="60%" height={16} />
-      </MobileSurface>
-      <View style={styles.spacer} />
-      <MobileSurface>
-        <View style={styles.skeletonAvatarRow}>
-          <SkeletonBlock width={48} height={48} borderRadius={24} />
-          <View style={styles.skeletonAvatarMeta}>
-            <SkeletonBlock width="80%" height={14} />
-            <View style={{ height: 8 }} />
-            <SkeletonBlock width="50%" height={12} />
-          </View>
-        </View>
-      </MobileSurface>
-      <Text style={[styles.animLabel, { color: colors.textSecondary, marginTop: 12 }]}>
-        useShimmer pulses 1.0 → 0.5 → 1.0 over 1200ms via Animated.loop;
-        collapses to a flat placeholder under prefers-reduced-motion: reduce.
-      </Text>
-    </View>
-  );
-}
-
-/**
- * useContainerVariant demo: three sample containers at different aspect
- * ratios. Each reports its detected variant ('compact' | 'medium' | 'full').
- */
-function ContainerVariantDemo() {
-  const { colors } = useAppTheme();
-  const refA = useRef(null);
-  const refB = useRef(null);
-  const refC = useRef(null);
-  const a = useContainerVariant(refA, 'default');
-  const b = useContainerVariant(refB, 'default');
-  const c = useContainerVariant(refC, 'default');
-
-  const samples: Array<{
-    label: string;
-    ref: React.RefObject<unknown>;
-    style: ViewStyle;
-    reading: { variant: string; fixedHeight: number; width: number; height: number };
-  }> = [
-    {
-      label: 'wide & short → compact',
-      ref: refA,
-      style: { width: '100%', height: 28 },
-      reading: a,
-    },
-    {
-      label: 'balanced → medium',
-      ref: refB,
-      style: { width: '66%', height: 56 },
-      reading: b,
-    },
-    {
-      label: 'tall & narrow → full',
-      ref: refC,
-      style: { width: '40%', height: 110 },
-      reading: c,
-    },
-  ];
-
-  return (
-    <View>
-      <MobileSurface>
-        {samples.map((s) => (
-          <View key={s.label} style={styles.variantRow}>
-            <View
-              ref={s.ref as React.RefObject<View>}
-              style={[styles.variantProbe, s.style, { backgroundColor: colors.brandMuted }]}
-            />
-            <View style={styles.variantMeta}>
-              <Text style={[styles.bodyText, { color: colors.text }]}>{s.label}</Text>
-              <Text style={[styles.animLabel, { color: colors.textSecondary, marginTop: 4 }]}>
-                variant: {s.reading.variant} · fixedHeight: {s.reading.fixedHeight}px · measured:{' '}
-                {s.reading.width.toFixed(0)}×{s.reading.height.toFixed(0)}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </MobileSurface>
-    </View>
-  );
-}
 
 export function Showcase() {
   const { colors } = useAppTheme();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // The drawer demo's surface language — flipped by the segmented control
+  // via the component's showcase-only `drawerStyle` override (the theme's
+  // drawer.style stays the single consumer declaration point).
+  const [demoDrawerStyle, setDemoDrawerStyle] = useState<'sheet' | 'ink'>('sheet');
+  // The header pairing follows: on the ink plate the masthead rides it.
+  const demoOnPlate = drawerOpen && demoDrawerStyle === 'ink';
   const [stepperValue, setStepperValue] = useState(5);
   const [checked, setChecked] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>('option-a');
   const [multiSelectedIds, setMultiSelectedIds] = useState<string[]>(['feature-1']);
   const [inputValue, setInputValue] = useState('');
+  const [multiNote, setMultiNote] = useState('');
+  const [submitValue, setSubmitValue] = useState('');
+  const [lastSubmitted, setLastSubmitted] = useState<string | null>(null);
+  const [searchValue, setSearchValue] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [selectValue, setSelectValue] = useState('monthly');
   const [segSelection, setSegSelection] = useState<'7d' | '30d' | '90d'>('30d');
@@ -396,30 +134,32 @@ export function Showcase() {
     return () => clearTimeout(t);
   }, [showLoading]);
 
+  // Icons follow the surface: paper on the ink plate, text on the sheet.
+  const demoIconColor = demoDrawerStyle === 'ink' ? colors.background : colors.text;
   const drawerItems: MobileNavDrawerItem[] = [
     {
       id: '/',
       label: 'Home',
-      icon: <Home size={18} color={colors.text} />,
+      icon: <Home size={18} color={demoIconColor} />,
       onPress: () => {},
     },
     {
       id: '/items',
       label: 'Items',
-      icon: <Package size={18} color={colors.text} />,
+      icon: <Package size={18} color={demoIconColor} />,
       onPress: () => {},
     },
     {
       id: '/progress',
       label: 'Progress',
-      icon: <TrendingUp size={18} color={colors.text} />,
+      icon: <TrendingUp size={18} color={demoIconColor} />,
       badge: 3,
       onPress: () => {},
     },
     {
       id: '/settings',
       label: 'Settings',
-      icon: <Settings size={18} color={colors.text} />,
+      icon: <Settings size={18} color={demoIconColor} />,
       onPress: () => {},
     },
   ];
@@ -460,26 +200,82 @@ export function Showcase() {
         </View>
 
         <View style={styles.section}>
-          <MobileSectionEyebrow>Home Header (brand + subtitle row)</MobileSectionEyebrow>
-          {/* Live cutout-drawer demo: the HamburgerButton swaps to X, the
-              glass cap slides over the brand cutout, and the drawer below
-              opens in APP_LAYOUT's configured mode. */}
+          <MobileSectionEyebrow>Drawer — sheet vs ink (theme.drawer.style)</MobileSectionEyebrow>
+          {/* Live cutout-drawer demo, both surface languages through one
+              hamburger. 'sheet' (default): frosted scrim + blur, atmosphere
+              body, hairline edge, the iOS slide curve — the glass cap
+              completes the cutout. 'ink': the InkPanel plate (print grain +
+              full-height brand rule), flat dim scrim, the out-cubic curve,
+              and the on-plate masthead — the real header stacks above the
+              plate and bleeds to the background color while the subtitle
+              and right-side chrome go invisible holding their space. */}
+          <SegmentedControl
+            variant="selection"
+            segments={[
+              { label: 'Sheet (default)', value: 'sheet' },
+              { label: 'Ink', value: 'ink' },
+            ]}
+            value={demoDrawerStyle}
+            onChange={setDemoDrawerStyle}
+            accessibilityLabel="Drawer surface language"
+          />
+          <View style={styles.spacer} />
           <MobileHomeHeader
             brand="Showcase"
             subtitle="Welcome back, visitor"
+            onPlate={demoOnPlate}
             menuButton={
               <HamburgerButton
                 isOpen={drawerOpen}
                 onPress={() => setDrawerOpen((prev) => !prev)}
+                color={demoOnPlate ? colors.background : undefined}
+                openLabel="Ouvrir le menu"
+                closeLabel="Fermer le menu"
               />
             }
-            drawerGlassCap={<MobileNavDrawerGlassCap open={drawerOpen} />}
+            drawerGlassCap={
+              demoDrawerStyle === 'sheet' ? (
+                <MobileNavDrawerGlassCap open={drawerOpen} />
+              ) : undefined
+            }
           />
+          <Text style={[styles.bodyText, { color: colors.textSecondary, marginTop: 8 }]}>
+            One hamburger, two materials. Sheet slides on the iOS curve under a frosted scrim;
+            ink sweeps the plate on the out-cubic with the masthead bleeding onto it — the
+            subtitle and any right-side chrome go invisible and hold their space, so nothing
+            shifts and nothing straddles the plate&apos;s rule. Consumers set the row face via
+            itemLabelStyle (e.g. a ledger mono) and declare the language once in the theme.
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>AppShellHeader — the composed one-drawer pattern</MobileSectionEyebrow>
+          {/* The home header wired to the cutout drawer, pre-assembled in
+              components/composed: brand from APP_DISPLAY_NAME + the
+              hamburger + MobileNavDrawer in the APP_LAYOUT defaults, locked
+              to the content column. The section above shows the pieces;
+              this is the assembly a consumer's home surface mounts. */}
+          <ShellHeaderDemo />
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>Tab bar — raised center action</MobileSectionEyebrow>
+          {/* Bottom chrome for apps whose primary verb deserves a home in
+              the thumb arc: four flanking tabs + a raised signal action
+              (START/RESUME-style). Active tab = ink label + 2px signal
+              notch; `active` runs the resume pulse (ambient, collapsed
+              under reduced motion). The bar owns no routing. */}
+          <TabBarDemo />
         </View>
 
         <View style={styles.section}>
           <MobileSectionEyebrow>Theme</MobileSectionEyebrow>
           <ThemeSelector />
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>Theme axes — the dialect family</MobileSectionEyebrow>
+          <ThemeAxesDemo />
         </View>
 
         <MobileStepRail current={2} total={5} accentColor={colors.brand} />
@@ -520,6 +316,45 @@ export function Showcase() {
               </View>
             </View>
           ))}
+          {/* InkPanel — the inverted-surface primitive (theme.drawer.style
+              'ink' composes it; any ink-language consumer surface can).
+              Text-color plate + print grain + brand edge rule. */}
+          <View style={[styles.atmosphereContainer, { height: 88 }]}>
+            <InkPanel rule>
+              <View style={{ flex: 1, justifyContent: 'center', paddingLeft: 16 }}>
+                <Text
+                  style={[
+                    styles.bodyText,
+                    theme.typography.mobileFieldLabel,
+                    { color: colors.background },
+                  ]}
+                >
+                  InkPanel (plate + grain + rule)
+                </Text>
+              </View>
+            </InkPanel>
+          </View>
+
+          {/* The atmosphere-language override point, demonstrated: the
+              theme declares 'aurora' or 'flat' once and every surface
+              follows. This row pins the flat read with the explicit
+              prop so both styles stay visible under any theme. */}
+          <View style={styles.atmosphereRow}>
+            <View style={styles.atmosphereContainer}>
+              <MobileAtmosphere surface="analytics" showVignette={false} showOrbs={false} />
+              <View style={[styles.atmosphereLabel, { backgroundColor: colors.card }]}>
+                <Text
+                  style={[
+                    styles.bodyText,
+                    theme.typography.mobileFieldLabel,
+                    { color: colors.text },
+                  ]}
+                >
+                  flat (theme.atmosphere.style)
+                </Text>
+              </View>
+            </View>
+          </View>
         </View>
 
         <View style={styles.section}>
@@ -579,6 +414,48 @@ export function Showcase() {
               onRightIconPress={() => setShowPassword((s) => !s)}
               maxLength={64}
             />
+            <MobileInput
+              label="Quick note"
+              value={submitValue}
+              onChangeText={setSubmitValue}
+              placeholder="Type and press Enter…"
+              returnKeyType="send"
+              onSubmitEditing={() => {
+                const trimmed = submitValue.trim();
+                if (trimmed.length === 0) return;
+                setLastSubmitted(trimmed);
+                setSubmitValue('');
+              }}
+              helperText={
+                lastSubmitted != null ? `Sent: ${lastSubmitted}` : 'Enter submits the field.'
+              }
+              maxLength={80}
+            />
+            <MobileInput
+              label="Long note (multiline)"
+              value={multiNote}
+              onChangeText={setMultiNote}
+              placeholder="Paste a description — the field grows to four rows and scrolls internally once full…"
+              multiline
+              numberOfLines={4}
+              maxLength={400}
+            />
+          </MobileSurface>
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>Search</MobileSectionEyebrow>
+          <MobileSurface>
+            <SearchField
+              value={searchValue}
+              onChangeText={setSearchValue}
+              placeholder="Search foods, stores, tags…"
+            />
+            <FilterChipGroup>
+              <FilterChip label="Search" selected={searchValue.length > 0} onPress={() => {}} />
+              <FilterChip label="Filters" selected={false} onPress={() => {}} />
+              <FilterChip label="Add item" selected={false} onPress={() => {}} />
+            </FilterChipGroup>
           </MobileSurface>
         </View>
 
@@ -633,6 +510,12 @@ export function Showcase() {
               checked={checked}
               onToggle={() => setChecked((c) => !c)}
             />
+            <View style={styles.bareCheckboxRow}>
+              <CheckBox checked={checked} />
+              <Text style={[styles.bareCheckboxLabel, { color: colors.textColors.tertiary }]}>
+                Bare indicator — the row owns the press
+              </Text>
+            </View>
           </MobileSurface>
         </View>
 
@@ -704,6 +587,16 @@ export function Showcase() {
         </View>
 
         <View style={styles.section}>
+          <MobileSectionEyebrow>Route curtain (theme.transition.style)</MobileSectionEyebrow>
+          <CurtainDemo />
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>Language toggle (the i18n seam)</MobileSectionEyebrow>
+          <LangDemo />
+        </View>
+
+        <View style={styles.section}>
           <MobileSectionEyebrow>Copy for AI (dev helper)</MobileSectionEyebrow>
           <MobileSurface>
             <Text style={[styles.bodyText, { color: colors.textSecondary, marginBottom: 12 }]}>
@@ -715,7 +608,7 @@ export function Showcase() {
               variant="subtle"
               testID="showcase-copy-for-ai-subtle"
               payload={buildAiPayload({
-                appName: 'arqavellum',
+                appName: APP_DISPLAY_NAME,
                 route: '/dev/premium',
                 title: 'Showcase',
                 contextLabel: 'Design system reference',
@@ -739,7 +632,7 @@ export function Showcase() {
                 <CopyForAiButton
                   testID="showcase-copy-for-ai-ghost"
                   payload={buildAiPayload({
-                    appName: 'arqavellum',
+                    appName: APP_DISPLAY_NAME,
                     route: '/dev/premium',
                     title: 'Showcase',
                   })}
@@ -908,20 +801,32 @@ export function Showcase() {
             </FilterChipGroup>
             <View style={styles.spacer} />
             <Text style={[styles.bodyText, { color: colors.textSecondary, marginBottom: 8 }]}>
-              wrap: false inside a consumer-supplied horizontal ScrollView
+              One row (default) — overflows scroll instead of wrapping
             </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <FilterChipGroup wrap={false}>
-                {['tag-a', 'tag-b', 'tag-c', 'tag-d', 'tag-e', 'tag-f'].map((t) => (
-                  <FilterChip
-                    key={t}
-                    label={t}
-                    selected={false}
-                    onPress={() => {}}
-                  />
-                ))}
-              </FilterChipGroup>
-            </ScrollView>
+            <FilterChipGroup>
+              {['tag-a', 'tag-b', 'tag-c', 'tag-d', 'tag-e', 'tag-f'].map((t) => (
+                <FilterChip
+                  key={t}
+                  label={t}
+                  selected={false}
+                  onPress={() => {}}
+                />
+              ))}
+            </FilterChipGroup>
+            <View style={styles.spacer} />
+            <Text style={[styles.bodyText, { color: colors.textSecondary, marginBottom: 8 }]}>
+              oneRow: false — chips flex-wrap
+            </Text>
+            <FilterChipGroup oneRow={false}>
+              {['tag-a', 'tag-b', 'tag-c', 'tag-d', 'tag-e', 'tag-f'].map((t) => (
+                <FilterChip
+                  key={t}
+                  label={t}
+                  selected={false}
+                  onPress={() => {}}
+                />
+              ))}
+            </FilterChipGroup>
           </MobileSurface>
         </View>
 
@@ -1014,6 +919,54 @@ export function Showcase() {
         </View>
 
         <View style={styles.section}>
+          <MobileSectionEyebrow rule>Figures — the labeled number, no chrome</MobileSectionEyebrow>
+          {/* The figure scale's full ramp on paper: hero for the one
+              per screen, display for totals, md for stat rows, sm for
+              ledger facts. The unit whispers after the value. */}
+          <View style={styles.figureRow}>
+            <Figure value="3" unit="d" label="day streak" size="hero" tone="brand" />
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.figureRow}>
+            <Figure value="6,695" unit="kg" label="tonnage" size="display" />
+            <View style={styles.figureGap} />
+            <Figure value="12" label="sets" align="right" />
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.figureRow}>
+            <Figure value="00:41" label="elapsed" size="sm" />
+            <View style={styles.figureGap} />
+            <Figure value="6" label="lifts" size="sm" align="center" />
+            <View style={styles.figureGap} />
+            <Figure value="4,250" unit="kg" label="this week" size="sm" align="right" />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow rule>Tallies — the counting mark (TallyStrip)</MobileSectionEyebrow>
+          {/* A sequence as tally strokes: struck marks are done, the
+              NEXT mark is the one accent stroke, ghosts are slots
+              ahead. Groups of five cross. Decoration by contract — the
+              ledger beside it carries the same info as text. */}
+          <View style={styles.figureRow}>
+            <TallyStrip struck={2} next ghost={2} size="lg" />
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.figureRow}>
+            <TallyStrip struck={5} next ghost={2} size="sm" />
+            <View style={styles.figureGap} />
+            <TallyStrip struck={3} size="sm" />
+            <View style={styles.figureGap} />
+            <TallyStrip struck={0} next ghost={4} size="sm" />
+          </View>
+          <View style={styles.spacer} />
+          <View style={styles.figureRow}>
+            <TallyStrip struck={7} ghost={1} size="sm" animateLastStrike />
+          </View>
+        </View>
+
+
+        <View style={styles.section}>
           <MobileSectionEyebrow>Stat cards</MobileSectionEyebrow>
           <View style={styles.statRow}>
             <StatCard
@@ -1088,6 +1041,29 @@ export function Showcase() {
             actionLabel="Retry"
             onAction={() => {}}
           />
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>Announcement bar</MobileSectionEyebrow>
+          <MobileAnnouncementBar
+            message="Pickup Friday 17–19h — details under Visit."
+            actionLabel="Details"
+            onAction={() => {}}
+            onDismiss={() => {}}
+          />
+          <View style={styles.spacer} />
+          <MobileAnnouncementBar
+            tone="strong"
+            message="Last day — the drop closes tonight at 22:00."
+            onDismiss={() => {}}
+          />
+          <View style={styles.spacer} />
+          <MobileFootnote lines={['All prices CAD. Examples shown for layout.', 'Starter shell — replace this fine print.']} />
+        </View>
+
+        <View style={styles.section}>
+          <MobileSectionEyebrow>Absorbing top bar (web motion)</MobileSectionEyebrow>
+          <AbsorbBarDemo />
         </View>
 
         <View style={styles.section}>
@@ -1351,6 +1327,7 @@ export function Showcase() {
         atmosphere="analytics"
         anchor={APP_LAYOUT.navDrawerAnchor}
         brandPersistence={APP_LAYOUT.navDrawerBrandPersistence}
+        drawerStyle={demoDrawerStyle}
         header={
           <View>
             <Text style={[theme.typography.mobileEyebrow, { color: colors.textMuted }]}>
@@ -1365,200 +1342,5 @@ export function Showcase() {
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  shell: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 60,
-  },
-  section: {
-    paddingHorizontal: 20,
-    marginTop: 24,
-  },
-  pageHeaderDemo: {
-    paddingHorizontal: 20,
-    marginTop: 16,
-    marginBottom: 4,
-  },
-  spacer: {
-    height: 12,
-  },
-  skeletonAvatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-  },
-  skeletonAvatarMeta: {
-    flex: 1,
-  },
-  bodyText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  atmosphereRow: {
-    marginBottom: 12,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  atmosphereContainer: {
-    height: 120,
-    position: 'relative',
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  atmosphereLabel: {
-    position: 'absolute',
-    bottom: 12,
-    left: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  themeRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  themeChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  themeChipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  toastRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  toastChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  toastChipLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  animGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  animCard: {
-    flex: 1,
-    minWidth: 100,
-    padding: 12,
-    borderRadius: 12,
-  },
-  animLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  animValue: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 4,
-  },
-  counterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  counterButton: {
-    width: 'auto',
-    alignSelf: 'auto',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    minHeight: 44,
-  },
-  counterValue: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginTop: 4,
-  },
-  shakeCard: {
-    padding: 12,
-    borderRadius: 12,
-  },
-  variantRow: {
-    marginBottom: 12,
-  },
-  variantProbe: {
-    borderRadius: 8,
-  },
-  variantMeta: {
-    marginTop: 6,
-  },
-  tabPanel: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  disclosureHeader: {
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  statRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  statRowCell: {
-    flex: 1,
-  },
-  avatarRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  tutorialSlide: {
-    paddingHorizontal: 20,
-    paddingVertical: 24,
-    minHeight: 160,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-around',
-    gap: 12,
-  },
-  ringCell: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  ringLabel: {
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  ringLabelLg: {
-    fontSize: 20,
-    fontWeight: '700',
-  },
-  revealWrap: {
-    paddingVertical: 20,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-  },
-  revealText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '500',
-  },
-});
 
 export default Showcase;

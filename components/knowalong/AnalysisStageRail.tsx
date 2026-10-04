@@ -7,6 +7,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '../../context';
+import { theme } from '../../constants';
 
 interface Props {
   runType: 'source_analysis' | 'clcc_generation';
@@ -110,6 +111,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   label: {
-    fontSize: 13,
+    ...theme.typography.mobileLedger,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

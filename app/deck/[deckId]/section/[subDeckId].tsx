@@ -4,6 +4,9 @@
 // (the first lesson is always unlocked) — a learner can't absorb a whole
 // verse/chorus at once. A collapsible lyric preview shows the lines the
 // lessons build toward (joined via SubDeck.lyricSectionId).
+// §1.4 Explore vs Practice: targets the context defers from assessment
+// appear in an explicit "Still growing" block — explorable (gloss + Listen),
+// never quizzed, never counted as mastery.
 
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -12,15 +15,16 @@ import { useLocalSearchParams } from 'expo-router';
 import { MobileAtmosphere, MobileSurface, MobileHeader, EmptyState } from '../../../../components/MobilePremium';
 import { useAppTheme } from '../../../../context';
 import { safeGoBack, navigateToLesson } from '../../../../navigation';
-import { SCREEN_BODY_STYLE } from '../../../../constants';
+import { SCREEN_BODY_STYLE, theme } from '../../../../constants';
 import { getDeck, getSubDeck, type SectionKind } from '../../../../utils/knowalong/fixtures/decks';
 import { SVETOFOR_SONG } from '../../../../utils/knowalong/fixtures/svetoforSong';
-import { buildSongSectionLessons } from '../../../../utils/knowalong/songDeck';
+import { buildSongSectionPlan } from '../../../../utils/knowalong/songDeck';
 import { buildCulminatingLines } from '../../../../utils/knowalong/culminatingLines';
 import { getSpine } from '../../../../utils/knowalong/spine';
 import { getContext } from '../../../../utils/knowalong/contextProvider';
 import { sectionProgress, isLessonUnlocked } from '../../../../utils/knowalong/progress';
 import { classifyWord } from '../../../../utils/knowalong/mastery';
+import { isSpeechAvailable, speak } from '../../../../utils/knowalong/tts';
 import { useLessonProgressStore } from '../../../../stores/lessonProgressStore';
 import { useWordMasteryStore } from '../../../../stores/wordMasteryStore';
 import { ConceptIcon } from '../../../../components/knowalong/ConceptIcon';
@@ -60,8 +64,12 @@ export default function SectionLessonsScreen() {
   }
 
   // Song sections are dynamic (Phase 4): lessons generated from current mastery,
-  // one arc per lyric target. Static decks use their authored lessons unchanged.
-  const lessons = deckId === 'svetofor' ? buildSongSectionLessons(subDeck, mastery, getSpine(), getContext()) : subDeck.lessons;
+  // one arc per lyric target — plus the §1.4 deferred set the context holds
+  // out of assessment. Static decks use their authored lessons unchanged.
+  const plan = deckId === 'svetofor'
+    ? buildSongSectionPlan(subDeck, mastery, getSpine(), getContext())
+    : { lessons: subDeck.lessons, deferred: [] };
+  const lessons = plan.lessons;
   const progress = sectionProgress(lessons, completed);
   // Culminating full-line lessons (Phase 5): mastery-gated — a line unlocks when
   // every word in it is graduated. Song deck only.
@@ -85,7 +93,7 @@ export default function SectionLessonsScreen() {
           <Text style={[styles.heroSub, { color: colors.textMuted }]}>
             {progress.done}/{progress.total} lessons — finish one to unlock the next
           </Text>
-          <View style={{ height: 6, borderRadius: 3, backgroundColor: 'rgba(128,128,128,0.15)', marginTop: 10 }}>
+          <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.cardBorder + '40', marginTop: 10 }}>
             <View style={{ height: '100%', width: `${progress.pct}%`, backgroundColor: colors.brand, borderRadius: 3 }} />
           </View>
         </MobileSurface>
@@ -93,7 +101,11 @@ export default function SectionLessonsScreen() {
         {/* Lyric preview (collapsible) — what these lessons build toward */}
         {lyricSection ? (
           <View style={{ marginTop: 12 }}>
-            <Pressable onPress={() => setShowLyrics((v) => !v)}>
+            <Pressable onPress={() => setShowLyrics((v) => !v)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showLyrics }}
+              accessibilityLabel={showLyrics ? 'Hide lyrics preview' : 'Show lyrics preview'}
+              style={({ pressed }) => [{ opacity: pressed ? 0.7 : 1 }]}>
               <MobileSurface padding={14}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={[styles.lyricToggle, { color: colors.textSecondary }]}>
@@ -105,7 +117,7 @@ export default function SectionLessonsScreen() {
                   <View style={{ marginTop: 10, gap: 8 }}>
                     {lyricSection.lines.map((line) => (
                       <View key={line.ordinal} style={{ paddingTop: 6, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.cardBorder }}>
-                        <Text style={{ fontSize: 14, fontWeight: '600', lineHeight: 20, flexWrap: 'wrap' }}>
+                        <Text style={{ ...theme.typography.mobileItemTitle, fontSize: 14, lineHeight: 20, flexWrap: 'wrap' }}>
                           {line.text.split(/\s+/).filter(Boolean).map((tok, i) => {
                             const known = classifyWord(mastery[tokenKey(tok)]) === 'graduated';
                             return (
@@ -113,7 +125,7 @@ export default function SectionLessonsScreen() {
                             );
                           })}
                         </Text>
-                        <Text style={{ fontSize: 12, color: colors.textMuted, fontStyle: 'italic', marginTop: 2 }}>{line.translation}</Text>
+                        <Text style={{ ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, color: colors.textMuted, marginTop: 2 }}>{line.translation}</Text>
                       </View>
                     ))}
                   </View>
@@ -133,6 +145,9 @@ export default function SectionLessonsScreen() {
                 key={lesson.id}
                 disabled={!unlocked}
                 onPress={() => navigateToLesson(lesson.id)}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !unlocked }}
+                accessibilityLabel={`Lesson ${idx + 1}: ${lesson.title}${unlocked ? '' : ' (locked)'}`}
                 style={({ pressed }) => ({ opacity: !unlocked ? 0.45 : pressed ? 0.6 : 1, marginBottom: 8 })}
               >
                 <MobileSurface padding={14}>
@@ -144,7 +159,7 @@ export default function SectionLessonsScreen() {
                       {done ? (
                         <ConceptIcon name="check" size={16} color={colors.status.success} />
                       ) : unlocked ? (
-                        <Text style={{ fontSize: 12, fontWeight: '700', color: colors.brand }}>{idx + 1}</Text>
+                        <Text style={{ ...theme.typography.mobileLedger, fontSize: 12, lineHeight: 16, fontWeight: '700', color: colors.brand }}>{idx + 1}</Text>
                       ) : (
                         <ConceptIcon name="lock" size={15} color={colors.textMuted} />
                       )}
@@ -178,6 +193,9 @@ export default function SectionLessonsScreen() {
                   key={c.ordinal}
                   disabled={!c.unlocked}
                   onPress={() => (c.lesson ? navigateToLesson(c.lesson.id) : undefined)}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: !c.unlocked }}
+                  accessibilityLabel={`Culminating line: ${c.text}${c.unlocked ? '' : ` (${c.missingCount} words to go)`}`}
                   style={({ pressed }) => ({ opacity: !c.unlocked ? 0.6 : pressed ? 0.6 : 1, marginBottom: 8, marginTop: 8 })}
                 >
                   <MobileSurface padding={14}>
@@ -210,6 +228,44 @@ export default function SectionLessonsScreen() {
           </View>
         ) : null}
 
+        {/* §1.4 — deferred targets: explore, don't test. These never build
+            quiz cards and are never counted as mastery; the gloss and Listen
+            are pure Explore support. */}
+        {plan.deferred.length > 0 ? (
+          <View style={{ marginTop: 18 }}>
+            <Text style={[styles.linesHeader, { color: colors.textSecondary }]}>Still growing</Text>
+            <Text style={[styles.linesHint, { color: colors.textMuted }]}>
+              Held out of testing for now — explore freely. None of this is counted as mastery.
+            </Text>
+            {plan.deferred.map((d) => (
+              <MobileSurface key={d.form} padding={14} style={{ marginTop: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <View style={[styles.badge, { backgroundColor: colors.cardAlt, borderColor: colors.cardBorder }]}>
+                    <ConceptIcon name="book" size={15} color={colors.textMuted} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.lessonTitle, { color: colors.text }]}>{d.form}</Text>
+                    <Text style={[styles.lessonSub, { color: colors.textMuted }]}>{d.gloss}</Text>
+                    <Text style={[styles.lessonMeta, { color: colors.textMuted }]}>
+                      Explore only — no quiz cards yet
+                    </Text>
+                  </View>
+                  {isSpeechAvailable() ? (
+                    <Pressable
+                      hitSlop={8}
+                      onPress={() => speak(d.form)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Listen to ${d.form}`}
+                    >
+                      <Text style={{ fontSize: 15, color: colors.brand }}>🔊</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </MobileSurface>
+            ))}
+          </View>
+        ) : null}
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -218,14 +274,14 @@ export default function SectionLessonsScreen() {
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
   progressHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  heroTitle: { fontSize: 22, fontWeight: '700' },
-  heroSub: { fontSize: 12, marginTop: 4 },
-  progressPct: { fontSize: 14, fontWeight: '700' },
-  linesHeader: { fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 },
-  linesHint: { fontSize: 12, marginTop: 3, marginBottom: 2 },
-  lyricToggle: { fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 },
+  heroTitle: { ...theme.typography.mobileItemTitle, fontSize: 22, lineHeight: 28, fontFamily: theme.fonts.display },
+  heroSub: { ...theme.typography.mobileBody, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  progressPct: { ...theme.typography.mobileLedger, fontSize: 14, lineHeight: 18, fontWeight: '700' },
+  linesHeader: { ...theme.typography.mobileEyebrow, textTransform: 'uppercase' },
+  linesHint: { ...theme.typography.mobileBody, fontSize: 12, lineHeight: 17, marginTop: 3, marginBottom: 2 },
+  lyricToggle: { ...theme.typography.mobileEyebrow, textTransform: 'uppercase' },
   badge: { width: 30, height: 30, borderRadius: 15, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center' },
-  lessonTitle: { fontSize: 15, fontWeight: '600' },
-  lessonSub: { fontSize: 12, marginTop: 2 },
-  lessonMeta: { fontSize: 11, marginTop: 3 },
+  lessonTitle: { ...theme.typography.mobileItemTitle, fontSize: 15, lineHeight: 20 },
+  lessonSub: { ...theme.typography.mobileBody, fontSize: 12, lineHeight: 17, marginTop: 2 },
+  lessonMeta: { ...theme.typography.mobileLedger, fontSize: 11, lineHeight: 15, marginTop: 3 },
 });

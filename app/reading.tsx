@@ -10,7 +10,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MobileAtmosphere, MobileSurface, MobileHeader, MobilePrimaryButton, MobileActionFooter } from '../components/MobilePremium';
 import { useAppTheme } from '../context';
 import { safeGoBack } from '../navigation';
-import { SCREEN_BODY_STYLE } from '../constants';
+import { SCREEN_BODY_STYLE, theme } from '../constants';
 import { LEARNING_ITEMS, type LearningItem } from '../utils/knowalong/fixtures/learningItems';
 import { ITEM_ICONS } from '../utils/knowalong/icons';
 import { ConceptIcon } from '../components/knowalong/ConceptIcon';
@@ -106,13 +106,15 @@ export default function ReadingScreen() {
       <ScrollView style={SCREEN_BODY_STYLE} contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 80 }}>
 
         <MobileSurface padding={24}>
-          <Text style={{ fontSize: 13, color: colors.textMuted, marginBottom: 16, textAlign: 'center' }}>
+          <Text style={{ ...theme.typography.mobileLedger, color: colors.textMuted, marginBottom: 16, textAlign: 'center' }}>
             Tap any word to see its meaning.
           </Text>
 
           {passage.sentences.map((sentence, sIdx) => (
             <View key={sIdx} style={{ marginBottom: 20 }}>
-              <Text style={{ fontSize: 22, lineHeight: 36, color: colors.text }}>
+              {/* Passage prose — Golos at reading size; the display face is
+                  for signage, not sustained text. */}
+              <Text style={{ fontSize: 22, lineHeight: 36, color: colors.text, fontFamily: theme.fonts.body }}>
                 {sentence.words.map((word, wIdx) => (
                   <Text key={wIdx}>
                     <Text
@@ -134,7 +136,7 @@ export default function ReadingScreen() {
                 ))}
               </Text>
               {showTranslation ? (
-                <Text style={{ fontSize: 14, color: colors.textSecondary, marginTop: 4, fontStyle: 'italic' }}>
+                <Text style={{ ...theme.typography.mobileLedger, color: colors.textSecondary, marginTop: 4 }}>
                   {sentence.translation}
                 </Text>
               ) : null}
@@ -148,16 +150,21 @@ export default function ReadingScreen() {
             <MobileSurface padding={14}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <ConceptIcon name="check" size={20} color={colors.brand} />
-                <Text style={{ fontSize: 16, fontWeight: '600', color: colors.text }}>{tappedGloss}</Text>
+                <Text style={{ ...theme.typography.mobileItemTitle, color: colors.text }}>{tappedGloss}</Text>
               </View>
             </MobileSurface>
           </View>
         ) : null}
 
         <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-          <Pressable onPress={() => setShowTranslation(!showTranslation)} style={{ flex: 1 }}>
+          <Pressable
+            onPress={() => setShowTranslation(!showTranslation)}
+            accessibilityRole="button"
+            accessibilityLabel={showTranslation ? 'Hide translations' : 'Show translations'}
+            style={({ pressed }) => [{ flex: 1, opacity: pressed ? 0.7 : 1 }]}
+          >
             <MobileSurface padding={12}>
-              <Text style={{ fontSize: 13, fontWeight: '600', color: colors.brand, textAlign: 'center' }}>
+              <Text style={{ ...theme.typography.mobileEyebrow, textTransform: 'uppercase', color: colors.brand, textAlign: 'center' }}>
                 {showTranslation ? 'Hide translations' : 'Show translations'}
               </Text>
             </MobileSurface>

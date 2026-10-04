@@ -30,7 +30,9 @@
 
 import React, { useMemo, useRef } from 'react';
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { theme } from '../../constants';
 import { useAppTheme } from '../../context';
+import { rgbaOf } from '../../utils/color';
 import { useContainerQuery, useActivityGridLayout } from '../../hooks';
 import type { ActivityGridLayoutMode } from '../../hooks';
 import {
@@ -93,6 +95,21 @@ export interface ActivityGridProps {
   maxRows?: number;
   /** Group label for the grid (announced once by screen readers). */
   accessibilityLabel: string;
+  /**
+   * Base color for the level ramp (levels 1–4 render as this color at
+   * increasing alpha; level 0 stays the muted track tone). Defaults to
+   * the theme brand — consumers whose design language reads data as
+   * ink density pass their text color instead.
+   */
+  levelColor?: string;
+  /**
+   * 'YYYY-MM-DD'. When set, that date cell also carries a 2px border in
+   * `todayBorderColor` — the "you are here" affordance. Defaults to
+   * `levelColor`.
+   */
+  todayISO?: string;
+  /** Border color for the today cell; defaults to `levelColor`. */
+  todayBorderColor?: string;
   /** Tap handler for date cells only. When omitted, cells are non-interactive. */
   onCellPress?: (datum: ActivityGridDatum) => void;
   testID?: string;
@@ -119,6 +136,9 @@ export function ActivityGrid({
   minGap,
   maxRows,
   accessibilityLabel,
+  levelColor,
+  todayISO,
+  todayBorderColor,
   onCellPress,
   testID,
   style,
@@ -180,7 +200,8 @@ export function ActivityGrid({
     columns,
   });
 
-  const levelFills = useLevelFills(colors.brand, colors.cardAlt);
+  const levelFills = useLevelFills(levelColor ?? colors.brand, colors.cardAlt);
+  const todayBorder = todayBorderColor ?? levelColor ?? colors.brand;
 
   if (isInvalidRange) {
     return (
@@ -256,7 +277,7 @@ export function ActivityGrid({
                 style={{
                   ...sizeStyle,
                   backgroundColor: levelFills[0],
-                  borderRadius: Math.max(2, Math.floor(geometry.cellSize * 0.18)),
+                  borderRadius: theme.shapes.tile,
                 }}
               />
             );
@@ -268,8 +289,12 @@ export function ActivityGrid({
           const cellStyle: ViewStyle = {
             ...sizeStyle,
             backgroundColor: fill,
-            borderRadius: Math.max(2, Math.floor(geometry.cellSize * 0.18)),
+            borderRadius: theme.shapes.tile,
           };
+          if (todayISO && dateStr === todayISO) {
+            cellStyle.borderWidth = 2;
+            cellStyle.borderColor = todayBorder;
+          }
 
           if (onCellPress) {
             return (
@@ -311,7 +336,7 @@ export function ActivityGrid({
                 height: geometry.cellSize,
                 marginRight: isLastInRow ? 0 : cellGap,
                 backgroundColor: levelFills[0],
-                borderRadius: Math.max(2, Math.floor(geometry.cellSize * 0.18)),
+                borderRadius: theme.shapes.tile,
               }}
             />
           );
@@ -363,7 +388,7 @@ function ActivityGridLegend({
  */
 function useLevelFills(brandHex: string, cardAltHex: string): readonly string[] {
   return useMemo(() => {
-    const rgba = hexToRgba(brandHex);
+    const rgba = rgbaOf(brandHex);
     return [
       cardAltHex,
       rgba(LEVEL_ALPHAS[0]),
@@ -372,16 +397,6 @@ function useLevelFills(brandHex: string, cardAltHex: string): readonly string[] 
       rgba(LEVEL_ALPHAS[3]),
     ];
   }, [brandHex, cardAltHex]);
-}
-
-function hexToRgba(hex: string): (alpha: number) => string {
-  return (alpha: number) => {
-    const clean = hex.replace('#', '');
-    const r = parseInt(clean.substring(0, 2), 16) || 0;
-    const g = parseInt(clean.substring(2, 4), 16) || 0;
-    const b = parseInt(clean.substring(4, 6), 16) || 0;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  };
 }
 
 const styles = StyleSheet.create({

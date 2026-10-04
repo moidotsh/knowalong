@@ -4,8 +4,10 @@
 // repos, not the shell.
 
 export { theme } from './theme';
+export { STORAGE_KEYS, DOM_IDS, DEV_AUTH_EMAIL } from './storageKeys';
+export { APP_DISPLAY_NAME } from './displayName';
 export type { ColorScheme, ColorPalette } from './theme';
-export { DURATION, ANIMATION_CONFIG, RESIZE_MEASUREMENT_DEBOUNCE, ANIMATION } from './animation';
+export { DURATION, EASING, ANIMATION_CONFIG, ANIMATION } from './animation';
 export {
   BREAKPOINTS,
   CONTAINER_THRESHOLDS,
@@ -54,8 +56,9 @@ export {
   MOBILE_DIALOG_MAX_WIDTH,
   MOBILE_CONTENT_WIDTH_STYLE,
   MOBILE_DIALOG_WIDTH_STYLE,
+  DESKTOP_LAYOUT_MODE,
 } from './styles';
-export type { ContentWidthMode } from './styles';
+export type { ContentWidthMode, DesktopLayoutMode } from './styles';
 
 // App-level layout config (cross-cutting switches for screen composition).
 export { APP_LAYOUT } from './layout';

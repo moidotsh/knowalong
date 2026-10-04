@@ -7,6 +7,7 @@ import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAppTheme } from '../../context';
 import { useCompanionCredential, useCompanionHealth } from '../../hooks';
+import { theme } from '../../constants';
 import type { CompanionConnectionError } from '../../shared/types/knowalong';
 
 type ChipState = 'green' | 'amber' | 'red' | 'grey';
@@ -101,8 +102,9 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   label: {
-    fontSize: 11,
-    fontWeight: '600',
-    letterSpacing: 0.2,
+    ...theme.typography.mobileEyebrow,
+    fontSize: 10,
+    lineHeight: 14,
+    textTransform: 'uppercase',
   },
 });

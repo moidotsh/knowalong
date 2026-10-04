@@ -23,6 +23,15 @@
 // surface — gating it would block consumers from evaluating the kit
 // before wiring auth. Add a segment here only when the route carries
 // no user data and serves a tooling/docs purpose.
+//
+// THE NOT-FOUND EXEMPTION: an unknown URL renders the +not-found screen
+// (shell copy, nothing to protect), and it must render — a mistyped URL
+// gets the honest dead end, never a login wall. The not-found screen
+// marks itself active from its mount effect; the guard reads the flag
+// before redirecting. Ordering is the documented child-before-parent
+// effect rule (the same guarantee the /qr screen's report-before-root-
+// layout relies on): the child's mount/cleanup both run before this
+// guard's effect on their commits.
 
 import React, { useEffect } from 'react';
 import { useSegments } from 'expo-router';
@@ -30,9 +39,36 @@ import { useAuthStore } from '../../stores';
 import { replaceWithHome, replaceWithLogin } from '../../navigation';
 
 const AUTH_SEGMENTS = new Set(['login', 'register', 'forgot-password']);
-const PUBLIC_SEGMENTS = new Set(['dev']);
+// 'qr' is the printed-code redirect stub (invariant 13) — no data,
+// hands straight to home; an unsigned scanner must never see /login.
+const PUBLIC_SEGMENTS = new Set(['dev', 'qr']);
 
-export function AuthGuard({ children }: { children: React.ReactNode }) {
+// Set by the +not-found screen's mount effect; see the header note.
+let notFoundActive = false;
+
+/** Called by app/+not-found.tsx on mount. */
+export function markNotFoundActive(): void {
+  notFoundActive = true;
+}
+
+/** Called by app/+not-found.tsx's cleanup — the screen unmounted. */
+export function markNotFoundInactive(): void {
+  notFoundActive = false;
+}
+
+export function AuthGuard({
+  children,
+  enabled = true,
+}: {
+  children: React.ReactNode;
+  /**
+   * False = open mode: unauthenticated visitors render every route
+   * (the starter default — see APP_LAYOUT.authGuard in
+   * constants/layout.ts). The signed-in-away-from-auth-screens
+   * redirect runs in both modes.
+   */
+  enabled?: boolean;
+}) {
   const status = useAuthStore((s) => s.status);
   const segments = useSegments();
   const root = segments[0];
@@ -43,12 +79,18 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
       typeof root === 'string' && AUTH_SEGMENTS.has(root);
     const isPublic =
       typeof root === 'string' && PUBLIC_SEGMENTS.has(root);
-    if (status === 'unauthenticated' && !inAuthGroup && !isPublic) {
+    if (
+      enabled &&
+      status === 'unauthenticated' &&
+      !inAuthGroup &&
+      !isPublic &&
+      !notFoundActive
+    ) {
       replaceWithLogin();
     } else if (status === 'authenticated' && inAuthGroup) {
       replaceWithHome();
     }
-  }, [status, root]);
+  }, [status, root, enabled]);
 
   return <>{children}</>;
 }
